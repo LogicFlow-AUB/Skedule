@@ -174,7 +174,7 @@ A comprehensive backend implementation plan is available at [`BACKEND_TODO.md`](
 
 ## Database
 
-> Documentation will be added once the backend is integrated.
+The existing Supabase project is provisioned from the version-controlled SQL migrations in `supabase/migrations/`. Do not create application tables manually in the Supabase dashboard. Apply the migrations to create or update the schema, and add every future schema change as a new SQL migration.
 
 ---
 

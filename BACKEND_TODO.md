@@ -6,7 +6,7 @@
 
 ## Prerequisites — Supabase Database
 
-A shared Supabase project has already been created with the database schema, tables, and relationships in place. No initial schema design, migration creation, or table setup is required.
+A shared Supabase project already exists with the application schema. The backend reads that schema directly — no local migrations are applied.
 
 **To get started:**
 
@@ -22,50 +22,41 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 # App
 PORT=3000
 NODE_ENV=development
-
-# Auth
-JWT_SECRET=your-jwt-secret
-JWT_EXPIRES_IN=15m
-REFRESH_TOKEN_EXPIRES_IN=7d
-
-# AI (when implemented)
-OPENAI_API_KEY=sk-...
-# or
-ANTHROPIC_API_KEY=sk-...
+CLIENT_ORIGIN=http://localhost:8443
 ```
 
-> Migration files, if any, are located in `src/database/migrations/`. If that directory is empty, the project relies on the existing shared Supabase schema — no local migration step is needed.
+> Authentication uses Supabase Auth (GoTrue). The `users` table is a profile table referencing `auth.users`, so no passwords are stored in the application schema.
 
 ---
 
 ## Phase 1 — Foundation
 
-- [ ] **1.1 Initialize backend project**
-  - [ ] Choose framework (Express / NestJS / Fastify)
-  - [ ] Set up TypeScript, linting, formatting
-  - [ ] Set up logger (pino / winston)
-  - [ ] Set up error handling middleware
+- [x] **1.1 Initialize backend project**
+  - [x] Choose framework (Express / NestJS / Fastify)
+  - [x] Set up TypeScript, linting, formatting
+  - [x] Set up logger (pino / winston)
+  - [x] Set up error handling middleware
 
-- [ ] **1.2 Configure Supabase connection**
-  - [ ] Install Supabase client library (`@supabase/supabase-js`)
-  - [ ] Create Supabase client wrapper/service that reads from environment variables
-  - [ ] Verify connectivity with a health-check query
-  - [ ] Document all required `.env` variables in `.env.example`
+- [x] **1.2 Configure Supabase connection**
+  - [x] Install Supabase client library (`@supabase/supabase-js`)
+  - [x] Create Supabase client wrapper/service that reads from environment variables
+  - [x] Verify connectivity with a health-check query
+  - [x] Document all required `.env` variables in `.env.example`
 
-- [ ] **1.3 Define local TypeScript types mirroring the database schema**
-  - [ ] User, UserProfile, NotificationPreference, PrivacySetting
-  - [ ] Course, Section
-  - [ ] Professor
-  - [ ] Schedule, ScheduleCourse, GeneratedSchedule, UserPreference
-  - [ ] Review, ReviewLike, Report
-  - [ ] Post, Comment, PostLike, PostSave
-  - [ ] Friend, FriendRequest
-  - [ ] Event, StudyGroup, StudyGroupMember
-  - [ ] Notification
-  - [ ] AIChatMessage, ChatSession
-  - [ ] Achievement, CompletedCourse, WishlistCourse, FavoriteProfessor
-  - [ ] TrendingCourse, TrendingProfessor
-  - [ ] Activity
+- [x] **1.3 Define local TypeScript types mirroring the database schema**
+  - [x] User, UserProfile, NotificationPreference, PrivacySetting
+  - [x] Course, Section
+  - [x] Professor
+  - [x] Schedule, ScheduleCourse, GeneratedSchedule, UserPreference
+  - [x] Review, ReviewLike, Report
+  - [x] Post, Comment, PostLike, PostSave
+  - [x] Friend, FriendRequest
+  - [x] Event, StudyGroup, StudyGroupMember
+  - [x] Notification
+  - [x] AIChatMessage, ChatSession
+  - [x] Achievement, CompletedCourse, WishlistCourse, FavoriteProfessor
+  - [x] TrendingCourse, TrendingProfessor
+  - [x] Activity
 
 - [ ] **1.4 Seed data** (optional — insert sample records for development)
   - [ ] Seed courses, sections, professors
@@ -79,48 +70,48 @@ ANTHROPIC_API_KEY=sk-...
 
 ## Phase 2 — Core Infrastructure
 
-- [ ] **2.1 Auth module**
-  - [ ] POST /api/auth/register
-  - [ ] POST /api/auth/login
-  - [ ] POST /api/auth/logout
-  - [ ] POST /api/auth/refresh
-  - [ ] POST /api/auth/forgot-password
-  - [ ] POST /api/auth/reset-password
-  - [ ] GET /api/auth/me
-  - [ ] JWT middleware (protect routes)
-  - [ ] Password hashing (bcrypt)
-  - [ ] Rate limiting on login/register
+- [x] **2.1 Auth module**
+  - [x] POST /api/auth/register
+  - [x] POST /api/auth/login
+  - [x] POST /api/auth/logout
+  - [x] POST /api/auth/refresh
+  - [x] POST /api/auth/forgot-password
+  - [x] POST /api/auth/reset-password
+  - [x] GET /api/auth/me
+  - [x] Auth middleware (verifies Supabase access tokens)
+  - [x] Passwords handled by Supabase Auth
+  - [x] Rate limiting on login/register
 
-- [ ] **2.2 Validation middleware**
-  - [ ] Request body validation (zod / joi / class-validator)
-  - [ ] Query parameter validation
-  - [ ] Path parameter validation
+- [x] **2.2 Validation middleware**
+  - [x] Request body validation (zod / joi / class-validator)
+  - [x] Query parameter validation
+  - [x] Path parameter validation
 
-- [ ] **2.3 Pagination utility**
-  - [ ] Offset-based pagination helper
-  - [ ] Cursor-based pagination helper
+- [x] **2.3 Pagination utility**
+  - [x] Offset-based pagination helper
+  - [x] Cursor-based pagination helper
 
 ---
 
 ## Phase 3 — User & Profile
 
-- [ ] **3.1 User module**
-  - [ ] GET /api/users/:id/profile
-  - [ ] GET /api/users/:id/achievements
-  - [ ] GET /api/users/:id/favorite-professors
-  - [ ] GET /api/users/:id/wishlist
-  - [ ] GET /api/users/:id/stats
-  - [ ] GET /api/users/:id/completed-courses
-  - [ ] GET /api/users/:id/reviews
+- [x] **3.1 User module**
+  - [x] GET /api/users/:id/profile
+  - [x] GET /api/users/:id/achievements
+  - [x] GET /api/users/:id/favorite-professors
+  - [x] GET /api/users/:id/wishlist
+  - [x] GET /api/users/:id/stats
+  - [x] GET /api/users/:id/completed-courses
+  - [x] GET /api/users/:id/reviews
 
-- [ ] **3.2 Settings module**
-  - [ ] PUT /api/users/me/profile
-  - [ ] PUT /api/users/me/notifications
-  - [ ] PUT /api/users/me/privacy
-  - [ ] PUT /api/users/me/password
-  - [ ] PUT /api/users/me/theme
-  - [ ] POST /api/users/me/avatar
-  - [ ] DELETE /api/users/me/account
+- [x] **3.2 Settings module**
+  - [x] PUT /api/users/me/profile
+  - [x] PUT /api/users/me/notifications
+  - [x] PUT /api/users/me/privacy
+  - [x] PUT /api/users/me/password
+  - [x] PUT /api/users/me/theme
+  - [x] POST /api/users/me/avatar
+  - [x] DELETE /api/users/me/account
 
 ---
 
