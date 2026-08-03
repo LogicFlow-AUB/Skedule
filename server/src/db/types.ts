@@ -14,6 +14,7 @@ export type CourseReview = {
   rating: number;
   difficulty: number | null;
   workload: number | null;
+  would_retake: boolean | null;
   comment: string | null;
   created_at: string;
 };
@@ -23,6 +24,27 @@ export type ProfessorReview = {
   user_id: string;
   professor_id: number | null;
   rating: number;
+  difficulty: number | null;
+  would_retake: boolean | null;
   comment: string | null;
   created_at: string;
+};
+
+export type Course = {
+  id: number;
+  title: string;
+  subject: string;
+  course_number: string;
+  credits: string;
+  level: string | null;
+  college: string | null;
+  department: string | null;
+};
+
+export type Professor = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  department: string | null;
+  title: string | null;
 };

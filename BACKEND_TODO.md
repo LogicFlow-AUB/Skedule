@@ -117,16 +117,16 @@ CLIENT_ORIGIN=http://localhost:8443
 
 ## Phase 4 — Courses & Professors
 
-- [ ] **4.1 Course module**
-  - [ ] GET /api/courses (search, filter by attribute, sort)
-  - [ ] GET /api/courses/:code (detail with stats)
-  - [ ] GET /api/courses/:code/sections
-  - [ ] GET /api/courses/:code/grade-distribution
-  - [ ] POST /api/courses/compare
+- [x] **4.1 Course module**
+  - [x] GET /api/courses (search, filter by attribute, sort)
+  - [x] GET /api/courses/:code (detail with stats)
+  - [x] GET /api/courses/:code/sections
+  - [x] GET /api/courses/:code/grade-distribution
+  - [x] POST /api/courses/compare
 
-- [ ] **4.2 Professor module**
-  - [ ] GET /api/professors (search, sort)
-  - [ ] GET /api/professors/:id (detail with rating breakdown)
+- [x] **4.2 Professor module**
+  - [x] GET /api/professors (search, sort)
+  - [x] GET /api/professors/:id (detail with rating breakdown)
 
 ---
 
