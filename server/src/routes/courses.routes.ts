@@ -9,6 +9,13 @@ import {
   listCourses,
 } from '../controllers/courses.controller.js';
 import {
+  createCourseReview,
+  getCourseReviews,
+  saveCourse,
+  unsaveCourse,
+} from '../controllers/reviews.controller.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
+import {
   validateBody,
   validateParams,
   validateQuery,
@@ -36,11 +43,46 @@ const compareCoursesBody = z
   .object({ codes: z.array(courseCode).length(2) })
   .strict()
   .refine((value) => value.codes[0] !== value.codes[1], 'Choose two different courses.');
+const reviewsQuery = z
+  .object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().max(100).optional(),
+  })
+  .strict();
+const courseReviewBody = z
+  .object({
+    rating: z.number().int().min(1).max(5),
+    difficulty: z.number().int().min(1).max(5).optional(),
+    workload: z.number().int().min(1).max(5).optional(),
+    wouldRetake: z.boolean().optional(),
+    comment: z.string().trim().min(1).max(5000).optional(),
+  })
+  .strict();
 
 const router = Router();
 
 router.get('/', validateQuery(courseListQuery), asyncHandler(listCourses));
 router.post('/compare', validateBody(compareCoursesBody), asyncHandler(compareCourses));
+router.post(
+  '/:code/reviews',
+  requireAuth,
+  validateParams(courseCodeParams),
+  validateBody(courseReviewBody),
+  asyncHandler(createCourseReview),
+);
+router.get(
+  '/:code/reviews',
+  validateParams(courseCodeParams),
+  validateQuery(reviewsQuery),
+  asyncHandler(getCourseReviews),
+);
+router.post('/:code/save', requireAuth, validateParams(courseCodeParams), asyncHandler(saveCourse));
+router.delete(
+  '/:code/save',
+  requireAuth,
+  validateParams(courseCodeParams),
+  asyncHandler(unsaveCourse),
+);
 router.get('/:code/sections', validateParams(courseCodeParams), asyncHandler(getSections));
 router.get(
   '/:code/grade-distribution',

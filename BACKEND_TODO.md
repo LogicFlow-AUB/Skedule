@@ -132,26 +132,26 @@ CLIENT_ORIGIN=http://localhost:8443
 
 ## Phase 5 — Reviews
 
-- [ ] **5.1 Review module**
-  - [ ] POST /api/courses/:code/reviews
-  - [ ] GET /api/courses/:code/reviews (paginated)
-  - [ ] POST /api/professors/:id/reviews
-  - [ ] GET /api/professors/:id/reviews (paginated)
-  - [ ] POST /api/courses/:code/save
-  - [ ] DELETE /api/courses/:code/save
-  - [ ] POST /api/professors/:id/reviews/:reviewId/like
-  - [ ] POST /api/professors/:id/reviews/:reviewId/report
-  - [ ] Aggregation service (average ratings, grade distribution)
+- [x] **5.1 Review module**
+  - [x] POST /api/courses/:code/reviews
+  - [x] GET /api/courses/:code/reviews (paginated)
+  - [x] POST /api/professors/:id/reviews
+  - [x] GET /api/professors/:id/reviews (paginated)
+  - [x] POST /api/courses/:code/save
+  - [x] DELETE /api/courses/:code/save
+  - [x] POST /api/professors/:id/reviews/:reviewId/like
+  - [x] POST /api/professors/:id/reviews/:reviewId/report
+  - [x] Aggregation service (average ratings, grade distribution)
 
 ---
 
 ## Phase 6 — Dashboard
 
-- [ ] **6.1 Dashboard module**
-  - [ ] GET /api/dashboard/stats
-  - [ ] GET /api/dashboard/upcoming
-  - [ ] GET /api/dashboard/activity
-  - [ ] Activity tracking service
+- [x] **6.1 Dashboard module**
+  - [x] GET /api/dashboard/stats
+  - [x] GET /api/dashboard/upcoming
+  - [x] GET /api/dashboard/activity
+  - [x] Activity tracking service
 
 ---
 

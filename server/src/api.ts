@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { checkSupabaseConnection } from './db/supabase.js';
 import authRoutes from './routes/auth.routes.js';
 import coursesRoutes from './routes/courses.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
 import professorsRoutes from './routes/professors.routes.js';
 import usersRoutes from './routes/users.routes.js';
 import type { ApiHealthResponse } from './types.js';
@@ -24,5 +25,6 @@ api.use('/auth', authRoutes);
 api.use('/users', usersRoutes);
 api.use('/courses', coursesRoutes);
 api.use('/professors', professorsRoutes);
+api.use('/dashboard', dashboardRoutes);
 
 export default api;
