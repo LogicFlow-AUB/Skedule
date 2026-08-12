@@ -48,3 +48,31 @@ export type Professor = {
   department: string | null;
   title: string | null;
 };
+
+export type Section = {
+  id: number;
+  course_id: number | null;
+  professor_id: number | null;
+  section_number: string;
+  days: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  room: string | null;
+  seats_total: number | null;
+  seats_remaining: number | null;
+};
+
+export type Schedule = {
+  id: number;
+  user_id: string;
+  name: string | null;
+  notes: string | null;
+  term_id: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ScheduleSection = {
+  schedule_id: number;
+  section_id: number;
+};

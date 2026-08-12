@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.routes.js';
 import coursesRoutes from './routes/courses.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import professorsRoutes from './routes/professors.routes.js';
+import schedulesRoutes from './routes/schedules.routes.js';
 import usersRoutes from './routes/users.routes.js';
 import type { ApiHealthResponse } from './types.js';
 
@@ -26,5 +27,6 @@ api.use('/users', usersRoutes);
 api.use('/courses', coursesRoutes);
 api.use('/professors', professorsRoutes);
 api.use('/dashboard', dashboardRoutes);
+api.use('/schedules', schedulesRoutes);
 
 export default api;
