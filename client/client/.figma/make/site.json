@@ -1,0 +1,10 @@
+{
+  "description": "Delivers a user-friendly frontend interface designed to enhance user interaction and streamline access to key features efficiently.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

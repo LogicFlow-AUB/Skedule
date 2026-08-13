@@ -157,17 +157,17 @@ CLIENT_ORIGIN=http://localhost:8443
 
 ## Phase 7 — Schedules (CRUD)
 
-- [ ] **7.1 Schedule module**
-  - [ ] GET /api/schedules (list user's schedules)
-  - [ ] POST /api/schedules (create)
-  - [ ] GET /api/schedules/:id (detail)
-  - [ ] PUT /api/schedules/:id (update name/notes)
-  - [ ] DELETE /api/schedules/:id
-  - [ ] POST /api/schedules/:id/courses (add course)
-  - [ ] DELETE /api/schedules/:id/courses/:courseId (remove course)
-  - [ ] PUT /api/schedules/:id/courses/:courseId/section (swap section)
-  - [ ] POST /api/schedules/compare (compare two schedules)
-  - [ ] GET /api/schedules/:id/conflicts
+- [x] **7.1 Schedule module**
+  - [x] GET /api/schedules (list user's schedules)
+  - [x] POST /api/schedules (create)
+  - [x] GET /api/schedules/:id (detail)
+  - [x] PUT /api/schedules/:id (update name/notes)
+  - [x] DELETE /api/schedules/:id
+  - [x] POST /api/schedules/:id/courses (add course)
+  - [x] DELETE /api/schedules/:id/courses/:courseId (remove course)
+  - [x] PUT /api/schedules/:id/courses/:courseId/section (swap section)
+  - [x] POST /api/schedules/compare (compare two schedules)
+  - [x] GET /api/schedules/:id/conflicts
 
 ---
 
