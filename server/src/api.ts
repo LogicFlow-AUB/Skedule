@@ -4,6 +4,7 @@ import { checkSupabaseConnection } from './db/supabase.js';
 import authRoutes from './routes/auth.routes.js';
 import coursesRoutes from './routes/courses.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import feedRoutes from './routes/feed.routes.js';
 import professorsRoutes from './routes/professors.routes.js';
 import schedulesRoutes from './routes/schedules.routes.js';
 import usersRoutes from './routes/users.routes.js';
@@ -28,5 +29,6 @@ api.use('/courses', coursesRoutes);
 api.use('/professors', professorsRoutes);
 api.use('/dashboard', dashboardRoutes);
 api.use('/schedules', schedulesRoutes);
+api.use('/feed', feedRoutes);
 
 export default api;

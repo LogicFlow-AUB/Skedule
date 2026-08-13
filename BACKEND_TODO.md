@@ -173,17 +173,17 @@ CLIENT_ORIGIN=http://localhost:8443
 
 ## Phase 8 — Social Feed
 
-- [ ] **8.1 Feed module**
-  - [ ] GET /api/feed (paginated)
-  - [ ] POST /api/feed (create post)
-  - [ ] GET /api/feed/:id
-  - [ ] DELETE /api/feed/:id
-  - [ ] POST /api/feed/:id/like
-  - [ ] DELETE /api/feed/:id/like
-  - [ ] POST /api/feed/:id/save
-  - [ ] DELETE /api/feed/:id/save
-  - [ ] GET /api/feed/:id/comments
-  - [ ] POST /api/feed/:id/comments
+- [x] **8.1 Feed module**
+  - [x] GET /api/feed (paginated)
+  - [x] POST /api/feed (create post)
+  - [x] GET /api/feed/:id
+  - [x] DELETE /api/feed/:id
+  - [x] POST /api/feed/:id/like
+  - [x] DELETE /api/feed/:id/like
+  - [x] POST /api/feed/:id/save
+  - [x] DELETE /api/feed/:id/save
+  - [x] GET /api/feed/:id/comments
+  - [x] POST /api/feed/:id/comments
 
 ---
 

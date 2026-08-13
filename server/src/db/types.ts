@@ -76,3 +76,21 @@ export type ScheduleSection = {
   schedule_id: number;
   section_id: number;
 };
+
+export type Post = {
+  id: number;
+  user_id: string;
+  type: 'schedule' | 'review' | 'question' | 'tip';
+  content: string;
+  tags: string[];
+  schedule_id: number | null;
+  created_at: string;
+};
+
+export type PostComment = {
+  id: number;
+  post_id: number;
+  user_id: string;
+  content: string;
+  created_at: string;
+};
