@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Send, UserPlus, Users, Calendar, TrendingUp, Star, CheckCircle, Clock } from 'lucide-react'
+import { useState, useContext } from 'react'
+import { Heart, Bookmark, MoreHorizontal, UserPlus, Calendar, Star, MessageCircle, TrendingUp, CheckCircle, X, BookOpen, Clock } from 'lucide-react'
+import { AppContext } from '../context'
 
 interface Post {
   id: string
@@ -29,7 +30,7 @@ const POSTS: Post[] = [
     year: 'Junior',
     semester: 'Fall 2025',
     avatar: 'SK',
-    badges: [{ label: 'Top Contributor', color: '#F59E0B' }, { label: 'CS Student', color: '#4338CA' }],
+    badges: [{ label: 'CS Student', color: 'var(--color-primary)' }],
     time: '2h ago',
     content: "Just finalized my Fall 2025 schedule! Managed to get all EECE courses with top-rated professors and keep Fridays free 🎉 Pro tip: use the AI Scheduler and set priority to 'Highest rated professors' — it worked perfectly for me.",
     tags: ['Schedule Tips', 'EECE', 'Fall 2025'],
@@ -48,7 +49,7 @@ const POSTS: Post[] = [
     year: 'Senior',
     semester: 'Fall 2025',
     avatar: 'OK',
-    badges: [{ label: 'Senior', color: '#7C3AED' }, { label: 'Honor Student', color: '#059669' }],
+    badges: [{ label: 'Senior', color: '#7C3AED' }],
     time: '5h ago',
     content: 'Just finished Dr. Nassif\'s PHYS 211 — absolute legend of a professor. Gave us a study guide for the final and curved the midterm by 15 points. 100% recommend, rating him 5/5 without hesitation. Also great for students who learn better visually.',
     tags: ['Professor Reviews', 'PHYS 211', 'Nassif'],
@@ -66,7 +67,7 @@ const POSTS: Post[] = [
     year: 'Sophomore',
     semester: 'Fall 2025',
     avatar: 'JR',
-    badges: [{ label: 'Helpful Reviewer', color: '#0EA5E9' }],
+    badges: [],
     time: '1d ago',
     content: "Does anyone know if ENGL 210 with Dr. Saad counts as a Writing attribute? I need one more writing course and I've heard great things but can't find confirmation in the course catalog. Also is it hard to get into?",
     tags: ['Question', 'ENGL 210', 'Attributes'],
@@ -84,7 +85,7 @@ const POSTS: Post[] = [
     year: 'Junior',
     semester: 'Fall 2025',
     avatar: 'KA',
-    badges: [{ label: 'CS Student', color: '#4338CA' }, { label: 'Top Contributor', color: '#F59E0B' }],
+    badges: [{ label: 'CS Student', color: 'var(--color-primary)' }],
     time: '2d ago',
     content: 'Registration tip for CS majors: EECE 330 fills up in the first 10 minutes. Have the section number and CRN ready before registration opens. Also, Section 01 with Dr. Hassan is the best — worth waking up early for.',
     tags: ['Registration Tips', 'EECE 330', 'CS Majors'],
@@ -98,7 +99,7 @@ const POSTS: Post[] = [
 ]
 
 const FRIENDS = [
-  { name: 'Sarah K.', major: 'CS', year: 'Junior', status: 'online', sharedCourses: 2, avatar: 'SK', avatarColor: '#4338CA' },
+  { name: 'Sarah K.', major: 'CS', year: 'Junior', status: 'online', sharedCourses: 2, avatar: 'SK', avatarColor: 'var(--color-primary)' },
   { name: 'Karim A.', major: 'CS', year: 'Junior', status: 'online', sharedCourses: 3, avatar: 'KA', avatarColor: '#059669' },
   { name: 'Lara M.', major: 'EECE', year: 'Senior', status: 'away', sharedCourses: 1, avatar: 'LM', avatarColor: '#7C3AED' },
   { name: 'Nour H.', major: 'Math', year: 'Sophomore', status: 'offline', sharedCourses: 2, avatar: 'NH', avatarColor: '#D97706' },
@@ -107,30 +108,11 @@ const FRIENDS = [
 
 const SUGGESTED = [
   { name: 'Dina F.', major: 'CS', year: 'Junior', mutual: 5, avatar: 'DF', avatarColor: '#EC4899' },
-  { name: 'Rami S.', major: 'EECE', year: 'Sophomore', mutual: 3, avatar: 'RS', avatarColor: '#6366F1' },
+  { name: 'Rami S.', major: 'EECE', year: 'Sophomore', mutual: 3, avatar: 'RS', avatarColor: 'var(--color-primary-grad)' },
 ]
-
-const EVENTS = [
-  { title: 'Course Registration Opens', date: 'Nov 3, 9:00 AM', type: 'registration', urgent: true },
-  { title: 'CS Study Group — Finals', date: 'Nov 10, 3:00 PM', type: 'study' },
-  { title: 'EECE 330 Exam Prep', date: 'Nov 7, 5:00 PM', type: 'study' },
-]
-
-const TRENDING_COURSES = [
-  { code: 'EECE 330', name: 'Digital Systems', trend: '+23% interest', color: '#4338CA' },
-  { code: 'CS 201', name: 'Data Structures', trend: '+18% interest', color: '#059669' },
-  { code: 'MATH 201', name: 'Calculus III', trend: '+12% interest', color: '#0EA5E9' },
-]
-
-const TRENDING_PROFS = [
-  { name: 'Dr. Nassif', rating: 4.9, department: 'Physics', trend: '96% recommend' },
-  { name: 'Dr. Hassan', rating: 4.8, department: 'EECE', trend: '94% recommend' },
-]
-
-const STATUS_COLORS: Record<string, string> = { online: '#10B981', away: '#F59E0B', offline: '#CBD5E1' }
 
 const TAG_COLORS: Record<string, { bg: string; text: string }> = {
-  'Schedule Tips': { bg: '#EEF2FF', text: '#4338CA' },
+  'Schedule Tips': { bg: 'var(--color-primary-light)', text: 'var(--color-primary)' },
   'Professor Reviews': { bg: '#FFF7ED', text: '#C2410C' },
   'Question': { bg: '#F0FDF4', text: '#15803D' },
   'Registration Tips': { bg: '#FEF9C3', text: '#92400E' },
@@ -144,7 +126,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  schedule: '#4338CA',
+  schedule: 'var(--color-primary)',
   review: '#F59E0B',
   question: '#059669',
   tip: '#D97706',
@@ -154,8 +136,6 @@ function PostCard({ post }: { post: Post }) {
   const [liked, setLiked] = useState(post.liked)
   const [saved, setSaved] = useState(post.saved)
   const [likeCount, setLikeCount] = useState(post.likes)
-  const [showComment, setShowComment] = useState(false)
-  const [comment, setComment] = useState('')
 
   const toggleLike = () => {
     setLiked(!liked)
@@ -168,7 +148,7 @@ function PostCard({ post }: { post: Post }) {
       {/* Header */}
       <div className="flex items-start gap-3 p-4 pb-3">
         <div className="rounded-full flex items-center justify-center shrink-0 font-bold"
-          style={{ width: 40, height: 40, background: `linear-gradient(135deg, ${post.badges[0]?.color ?? '#4338CA'} 0%, ${post.badges[0]?.color ?? '#6366F1'}BB 100%)`, color: 'white', fontSize: 14 }}>
+          style={{ width: 40, height: 40, background: `linear-gradient(135deg, ${post.badges[0]?.color ?? 'var(--color-primary)'} 0%, ${post.badges[0]?.color ?? 'var(--color-primary-grad)'}BB 100%)`, color: 'white', fontSize: 14 }}>
           {post.avatar}
         </div>
         <div className="flex-1 min-w-0">
@@ -204,13 +184,13 @@ function PostCard({ post }: { post: Post }) {
       {post.schedulePreview && (
         <div className="mx-4 mb-3 rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #E0E7FF' }}>
           <div className="flex items-center gap-2 mb-2">
-            <Calendar size={12} color="#4338CA" />
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#4338CA' }}>Schedule Preview · {post.schedulePreview.days}</span>
+            <Calendar size={12} color="var(--color-primary)" />
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary)' }}>Schedule Preview · {post.schedulePreview.days}</span>
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {post.schedulePreview.courses.map((c) => (
               <span key={c} className="rounded-lg px-2 py-1"
-                style={{ fontSize: 11, fontWeight: 700, background: '#EEF2FF', color: '#4338CA' }}>{c}</span>
+                style={{ fontSize: 11, fontWeight: 700, background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>{c}</span>
             ))}
           </div>
         </div>
@@ -236,70 +216,20 @@ function PostCard({ post }: { post: Post }) {
           style={{ color: liked ? '#EF4444' : '#64748B', background: liked ? '#FEF2F2' : 'transparent', fontSize: 12, fontWeight: liked ? 700 : 500 }}>
           <Heart size={14} fill={liked ? '#EF4444' : 'none'} /> {likeCount}
         </button>
-        <button onClick={() => setShowComment(!showComment)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors"
-          style={{ color: '#64748B', fontSize: 12 }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
-          <MessageCircle size={14} /> {post.comments}
-        </button>
-        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors"
-          style={{ color: '#64748B', fontSize: 12 }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
-          <Share2 size={14} /> {post.shares}
-        </button>
-        <button onClick={() => setSaved(!saved)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg ml-auto transition-all"
-          style={{ color: saved ? '#4338CA' : '#64748B', background: saved ? '#EEF2FF' : 'transparent' }}>
-          <Bookmark size={14} fill={saved ? '#4338CA' : 'none'} />
-        </button>
       </div>
-
-      {/* Comment input */}
-      {showComment && (
-        <div className="flex items-center gap-2 px-4 pb-3">
-          <div className="rounded-full flex items-center justify-center shrink-0"
-            style={{ width: 28, height: 28, background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', fontSize: 10, fontWeight: 700, color: 'white' }}>
-            AH
-          </div>
-          <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-1.5"
-            style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-            <input value={comment} onChange={(e) => setComment(e.target.value)}
-              placeholder="Write a comment..."
-              className="flex-1 outline-none bg-transparent"
-              style={{ fontSize: 12, color: '#374151' }} />
-            <button style={{ color: comment ? '#4338CA' : '#CBD5E1' }}>
-              <Send size={13} />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
 export default function Community() {
+  const { userName } = useContext(AppContext)
+  const initials = userName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
   const [activeCompose, setActiveCompose] = useState(false)
   const [composeText, setComposeText] = useState('')
-  const [joinedGroups, setJoinedGroups] = useState<Set<string>>(new Set())
-  const [groupModal, setGroupModal] = useState<string | null>(null)
+  const [addedFriends, setAddedFriends] = useState<Set<string>>(new Set())
+  const [selectedFriend, setSelectedFriend] = useState<typeof FRIENDS[0] | null>(null)
+  const [showSharedSchedule, setShowSharedSchedule] = useState(false)
   const posts = POSTS
-
-  const STUDY_GROUPS = [
-    { name: 'EECE 330 — HW 5', members: 8, time: 'Tonight 8 PM', location: 'Library Room 204', host: 'Sarah K.' },
-    { name: 'MATH 201 — Finals', members: 12, time: 'Sat 2 PM', location: 'AUB Science Hall', host: 'Karim A.' },
-  ]
-
-  const handleJoinGroup = (name: string) => {
-    setJoinedGroups((prev) => {
-      const next = new Set(prev)
-      next.add(name)
-      return next
-    })
-    setGroupModal(name)
-    setTimeout(() => setGroupModal(null), 3000)
-  }
 
   return (
     <div className="flex h-full overflow-hidden" style={{ background: '#F8FAFC' }}>
@@ -308,16 +238,13 @@ export default function Community() {
         style={{ width: 220, background: '#FFFFFF', borderRight: '1px solid #F1F5F9' }}>
         <div className="px-4 py-3" style={{ borderBottom: '1px solid #F1F5F9' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 2 }}>Friends</div>
-          <div style={{ fontSize: 11, color: '#94A3B8' }}>3 online now</div>
+          <div style={{ fontSize: 11, color: '#94A3B8' }}>{FRIENDS.length} friends</div>
         </div>
 
         <div className="px-3 py-3 flex-1">
-          {/* Online */}
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, paddingLeft: 4 }}>
-            Online — 3
-          </div>
-          {FRIENDS.filter((f) => f.status === 'online').map((f) => (
-            <button key={f.name} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
+          {/* All Friends */}
+          {FRIENDS.map((f) => (
+            <button key={f.name} onClick={() => setSelectedFriend(f)} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
               style={{ textAlign: 'left' }}
               onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC' }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
@@ -326,31 +253,6 @@ export default function Community() {
                   style={{ width: 32, height: 32, background: f.avatarColor + '20', color: f.avatarColor, fontSize: 11, fontWeight: 700 }}>
                   {f.avatar}
                 </div>
-                <div className="absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-white"
-                  style={{ width: 10, height: 10, background: STATUS_COLORS[f.status] }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
-                <div style={{ fontSize: 10, color: '#94A3B8' }}>{f.major} · {f.sharedCourses} shared</div>
-              </div>
-            </button>
-          ))}
-
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, paddingLeft: 4, marginTop: 12 }}>
-            Away / Offline
-          </div>
-          {FRIENDS.filter((f) => f.status !== 'online').map((f) => (
-            <button key={f.name} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
-              style={{ textAlign: 'left', opacity: 0.6 }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.opacity = '1' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.opacity = '0.6' }}>
-              <div className="relative shrink-0">
-                <div className="rounded-full flex items-center justify-center"
-                  style={{ width: 32, height: 32, background: f.avatarColor + '20', color: f.avatarColor, fontSize: 11, fontWeight: 700 }}>
-                  {f.avatar}
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-white"
-                  style={{ width: 10, height: 10, background: STATUS_COLORS[f.status] }} />
               </div>
               <div className="flex-1 min-w-0">
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
@@ -363,7 +265,9 @@ export default function Community() {
           <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, paddingLeft: 4, marginTop: 12 }}>
             Suggested
           </div>
-          {SUGGESTED.map((s) => (
+          {SUGGESTED.map((s) => {
+            const added = addedFriends.has(s.name)
+            return (
             <div key={s.name} className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
               style={{ background: '#F8FAFC', marginBottom: 4 }}>
               <div className="rounded-full flex items-center justify-center shrink-0"
@@ -374,11 +278,11 @@ export default function Community() {
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B' }}>{s.name}</div>
                 <div style={{ fontSize: 10, color: '#94A3B8' }}>{s.mutual} mutual friends</div>
               </div>
-              <button style={{ color: '#4338CA' }}>
-                <UserPlus size={14} />
+              <button onClick={() => setAddedFriends(p => new Set(p).add(s.name))} style={{ color: added ? '#10B981' : 'var(--color-primary)' }}>
+                {added ? <CheckCircle size={14} /> : <UserPlus size={14} />}
               </button>
             </div>
-          ))}
+          )})}
         </div>
       </aside>
 
@@ -389,14 +293,14 @@ export default function Community() {
           <div className="rounded-2xl p-4" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div className="flex items-center gap-3 mb-3">
               <div className="rounded-full flex items-center justify-center shrink-0"
-                style={{ width: 36, height: 36, background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', fontSize: 12, fontWeight: 700, color: 'white' }}>
-                AH
+                style={{ width: 36, height: 36, background: 'linear-gradient(135deg, var(--color-primary-grad) 0%, #8B5CF6 100%)', fontSize: 12, fontWeight: 700, color: 'white' }}>
+                {initials}
               </div>
               <button
                 onClick={() => setActiveCompose(true)}
                 className="flex-1 rounded-xl px-4 py-2.5 text-left transition-colors"
                 style={{ fontSize: 13, color: '#94A3B8', background: '#F8FAFC', border: '1px solid #E2E8F0' }}
-                onMouseEnter={(e) => { e.currentTarget.style.border = '1px solid #C7D2FE' }}
+                onMouseEnter={(e) => { e.currentTarget.style.border = '1px solid var(--color-primary-border)' }}
                 onMouseLeave={(e) => { e.currentTarget.style.border = '1px solid #E2E8F0' }}>
                 Share a schedule, tip, or question...
               </button>
@@ -426,7 +330,7 @@ export default function Community() {
                       className="px-3 py-1.5 rounded-lg" style={{ fontSize: 12, color: '#64748B' }}>Cancel</button>
                     <button
                       className="px-4 py-1.5 rounded-lg font-semibold"
-                      style={{ fontSize: 12, background: composeText ? '#4338CA' : '#E2E8F0', color: composeText ? 'white' : '#94A3B8' }}>
+                      style={{ fontSize: 12, background: composeText ? 'var(--color-primary)' : '#E2E8F0', color: composeText ? 'white' : '#94A3B8' }}>
                       Post
                     </button>
                   </div>
@@ -442,119 +346,98 @@ export default function Community() {
         </div>
       </main>
 
-      {/* Right: Sidebar */}
-      <aside className="flex flex-col shrink-0 h-full overflow-y-auto"
-        style={{ width: 240, borderLeft: '1px solid #F1F5F9', background: '#FFFFFF' }}>
-        {/* Events */}
-        <div className="p-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Upcoming Events</div>
-          {EVENTS.map((e, i) => (
-            <div key={i} className="flex items-start gap-2.5 mb-3 last:mb-0">
-              <div className="rounded-lg p-1.5 mt-0.5 shrink-0"
-                style={{ background: e.urgent ? '#FEF2F2' : '#F0F9FF', color: e.urgent ? '#EF4444' : '#0284C7' }}>
-                {e.type === 'registration' ? <CheckCircle size={12} /> : <Users size={12} />}
+      {/* Selected Friend Modal */}
+      {selectedFriend && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }} onClick={() => setSelectedFriend(null)}>
+          <div className="rounded-2xl p-6" style={{ background: '#FFFFFF', width: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center gap-3">
+                <div className="rounded-full flex items-center justify-center" style={{ width: 48, height: 48, background: selectedFriend.avatarColor + '20', color: selectedFriend.avatarColor, fontSize: 16, fontWeight: 700 }}>
+                  {selectedFriend.avatar}
+                </div>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A' }}>{selectedFriend.name}</div>
+                  <div style={{ fontSize: 13, color: '#64748B' }}>{selectedFriend.major}</div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B', lineHeight: 1.3 }}>{e.title}</div>
-                <div style={{ fontSize: 11, color: '#94A3B8' }}>{e.date}</div>
-                {e.urgent && <span className="rounded-full px-1.5 py-0.5"
-                  style={{ fontSize: 9, fontWeight: 700, background: '#FEF2F2', color: '#EF4444' }}>Urgent</span>}
+              <button onClick={() => setSelectedFriend(null)} className="p-2 rounded-lg hover:bg-slate-100">
+                <X size={20} color="#64748B" />
+              </button>
+            </div>
+            
+            <div className="mb-6">
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Shared Schedules</h3>
+              <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                <div className="flex items-center gap-2">
+                  <Calendar size={16} color="var(--color-primary)" />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>Fall 2025 Schedule</span>
+                </div>
+                <button onClick={() => setShowSharedSchedule(true)} className="text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>View</button>
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* Study groups */}
-        <div className="p-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Study Groups</div>
-          {STUDY_GROUPS.map((g, i) => {
-            const joined = joinedGroups.has(g.name)
-            return (
-              <div key={i} className="rounded-xl p-3 mb-2 last:mb-0 transition-all"
-                style={{ background: joined ? '#F0FDF4' : '#F8FAFC', border: `1px solid ${joined ? '#BBF7D0' : '#F1F5F9'}` }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B' }}>{g.name}</div>
-                <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 1 }}>{g.location} · Hosted by {g.host}</div>
-                <div className="flex items-center justify-between mt-1.5">
-                  <div style={{ fontSize: 11, color: '#94A3B8' }}>{joined ? g.members + 1 : g.members} members · {g.time}</div>
-                  <button
-                    onClick={() => { if (!joined) handleJoinGroup(g.name) }}
-                    className="rounded-full px-2.5 py-0.5 transition-all"
-                    style={{
-                      fontSize: 10, fontWeight: 700,
-                      background: joined ? '#DCFCE7' : '#EEF2FF',
-                      color: joined ? '#15803D' : '#4338CA',
-                      cursor: joined ? 'default' : 'pointer',
-                    }}>
-                    {joined ? '✓ Joined' : 'Join Group'}
-                  </button>
+            <div>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Common Free Time</h3>
+              <div className="flex flex-col gap-2">
+                <div className="rounded-xl p-3" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#15803D' }}>Mondays & Wednesdays</div>
+                  <div style={{ fontSize: 12, color: '#16A34A' }}>10:00 AM – 1:00 PM</div>
+                </div>
+                <div className="rounded-xl p-3" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#15803D' }}>Fridays</div>
+                  <div style={{ fontSize: 12, color: '#16A34A' }}>All Day</div>
                 </div>
               </div>
-            )
-          })}
-        </div>
-
-        {/* Common free time */}
-        <div className="p-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Common Free Time</div>
-          <div className="flex flex-col gap-1.5">
-            {[['Mon', '#4338CA', 70], ['Tue', '#059669', 40], ['Wed', '#0EA5E9', 85], ['Thu', '#7C3AED', 30], ['Fri', '#10B981', 95]].map(([day, color, pct]) => (
-              <div key={day as string} className="flex items-center gap-2">
-                <span style={{ fontSize: 11, color: '#64748B', width: 28, fontWeight: 600 }}>{day}</span>
-                <div className="flex-1 rounded-full h-2" style={{ background: '#F1F5F9' }}>
-                  <div className="h-2 rounded-full" style={{ width: `${pct}%`, background: color as string }} />
-                </div>
-                <span style={{ fontSize: 10, color: '#94A3B8', width: 24, textAlign: 'right' }}>{pct}%</span>
-              </div>
-            ))}
+            </div>
           </div>
-          <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 6 }}>% of friends free</div>
         </div>
+      )}
 
-        {/* Trending */}
-        <div className="p-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Trending Courses</div>
-          {TRENDING_COURSES.map((c) => (
-            <div key={c.code} className="flex items-center gap-2.5 mb-2.5 last:mb-0">
-              <div className="rounded-lg px-1.5 py-0.5"
-                style={{ background: c.color + '20', color: c.color, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
-                {c.code}
+      {/* Shared Schedule Modal */}
+      {showSharedSchedule && selectedFriend && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }} onClick={() => setShowSharedSchedule(false)}>
+          <div className="rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ width: 560, maxHeight: '85vh', background: '#FFFFFF' }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
+              <div>
+                <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A' }}>{selectedFriend.name}'s Schedule</h2>
+                <p style={{ fontSize: 12, color: '#64748B' }}>15 credits · Mon–Thu</p>
               </div>
-              <div className="flex-1 min-w-0">
-                <div style={{ fontSize: 11, fontWeight: 600, color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
-                <div style={{ fontSize: 10, color: '#10B981', fontWeight: 600 }}>{c.trend}</div>
-              </div>
+              <button onClick={() => setShowSharedSchedule(false)} className="rounded-lg p-1.5" style={{ color: '#64748B' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
+                <X size={18} />
+              </button>
             </div>
-          ))}
-        </div>
-
-        {/* Trending profs */}
-        <div className="p-4">
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Top Professors</div>
-          {TRENDING_PROFS.map((p) => (
-            <div key={p.name} className="flex items-center gap-2.5 mb-3 last:mb-0">
-              <div className="rounded-full flex items-center justify-center shrink-0"
-                style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #4338CA 0%, #8B5CF6 100%)', fontSize: 11, fontWeight: 700, color: 'white' }}>
-                {p.name.split(' ').map((w) => w[0]).join('').slice(1)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B' }}>{p.name}</div>
-                <div style={{ fontSize: 10, color: '#94A3B8' }}>{p.department}</div>
-              </div>
-              <div className="flex items-center gap-0.5">
-                <Star size={11} fill="#F59E0B" color="#F59E0B" />
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#F59E0B' }}>{p.rating}</span>
-              </div>
+            
+            <div className="p-6 flex flex-col gap-3 overflow-y-auto">
+              {[
+                { code: 'EECE 330', name: 'Digital Systems', prof: 'Dr. Hassan', time: '10:00 AM - 11:15 AM', days: 'Mon, Wed', color: '#4338CA' },
+                { code: 'MATH 201', name: 'Calculus III', prof: 'Dr. Khalil', time: '9:00 AM - 10:15 AM', days: 'Tue, Thu', color: '#059669' },
+                { code: 'PHYS 211', name: 'Physics II', prof: 'Dr. Nassif', time: '1:00 PM - 2:00 PM', days: 'Mon, Wed, Fri', color: '#0284C7' },
+                { code: 'EECE 351', name: 'Signals & Systems', prof: 'Dr. Farhat', time: '11:30 AM - 1:00 PM', days: 'Tue, Thu', color: '#7C3AED' },
+              ].map((c, i) => (
+                <div key={i} className="flex items-center gap-4 rounded-xl p-4" style={{ border: '1px solid #F1F5F9', background: '#F8FAFC' }}>
+                  <div className="rounded-full flex items-center justify-center shrink-0" style={{ width: 40, height: 40, background: c.color + '20', color: c.color }}>
+                    <BookOpen size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold" style={{ fontSize: 14, color: '#1E293B' }}>{c.code}</span>
+                      <span style={{ fontSize: 13, color: '#64748B' }}>{c.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1" style={{ fontSize: 12, color: '#64748B' }}>
+                        <Clock size={12} /> {c.time}
+                      </span>
+                      <span className="flex items-center gap-1" style={{ fontSize: 12, color: '#64748B' }}>
+                        <Calendar size={12} /> {c.days}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </aside>
-
-      {/* Join confirmation toast */}
-      {groupModal && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-3 shadow-xl"
-          style={{ background: '#1E293B', color: 'white', fontSize: 13, fontWeight: 600 }}>
-          <CheckCircle size={16} color="#10B981" />
-          Joined "{groupModal}" — you'll receive updates in your messages.
+          </div>
         </div>
       )}
     </div>

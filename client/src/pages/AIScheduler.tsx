@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useContext } from 'react'
 import {
   Plus, X, Trash2, Sparkles, RotateCcw, Zap, GitCompare,
   Eye, ArrowLeftRight, Send, Bot, User, Info, AlertCircle,
   BookOpen, Clock, MapPin, Star, TrendingUp, Bookmark,
-  GripVertical, Search, CalendarDays,
+  GripVertical, Search, CalendarDays, CheckCircle, Edit3
 } from 'lucide-react'
+import { AppContext } from '../context'
 import type { Page } from '../App'
 
 const HOUR_HEIGHT = 60 // px per hour
@@ -40,8 +41,8 @@ const SCHEDULE_1: Course[] = [
     startHour: 10,
     startMin: 0,
     durationMin: 75,
-    color: '#4338CA',
-    colorLight: '#EEF2FF',
+    color: 'var(--color-primary)',
+    colorLight: 'var(--color-primary-light)',
     credits: 3,
   },
   {
@@ -155,7 +156,7 @@ function CourseModal({ course, onClose }: { course: Course; onClose: () => void 
     { grade: 'A', pct: 38 }, { grade: 'B', pct: 30 }, { grade: 'C', pct: 18 },
     { grade: 'D', pct: 9 }, { grade: 'F', pct: 5 },
   ]
-  const barColors = ['#4338CA', '#6366F1', '#A5B4FC', '#C7D2FE', '#E0E7FF']
+  const barColors = ['var(--color-primary)', 'var(--color-primary-grad)', '#A5B4FC', 'var(--color-primary-border)', '#E0E7FF']
 
   return (
     <div
@@ -206,7 +207,7 @@ function CourseModal({ course, onClose }: { course: Course; onClose: () => void 
           {/* Ratings row */}
           <div className="grid grid-cols-3 gap-3 mb-5">
             {[
-              { label: 'Overall Rating', value: '4.7', sub: 'out of 5', color: '#4338CA' },
+              { label: 'Overall Rating', value: '4.7', sub: 'out of 5', color: 'var(--color-primary)' },
               { label: 'Difficulty', value: '3.2', sub: 'out of 5', color: '#D97706' },
               { label: 'Would Retake', value: '89%', sub: 'of students', color: '#059669' },
             ].map((r) => (
@@ -216,23 +217,6 @@ function CourseModal({ course, onClose }: { course: Course; onClose: () => void 
                 <div style={{ fontSize: 10, color: '#94A3B8' }}>{r.sub}</div>
               </div>
             ))}
-          </div>
-
-          {/* Grade distribution */}
-          <div className="mb-5">
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Grade Distribution</div>
-            <div className="flex items-end gap-2" style={{ height: 60 }}>
-              {gradeData.map((g, i) => (
-                <div key={g.grade} className="flex-1 flex flex-col items-center gap-1">
-                  <div style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>{g.pct}%</div>
-                  <div
-                    className="w-full rounded-t-md"
-                    style={{ height: `${g.pct * 1.2}px`, background: barColors[i] }}
-                  />
-                  <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700 }}>{g.grade}</div>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Reviews */}
@@ -267,11 +251,11 @@ function CourseModal({ course, onClose }: { course: Course; onClose: () => void 
         {/* Actions */}
         <div className="px-6 py-4 flex gap-2" style={{ borderTop: '1px solid #F1F5F9' }}>
           <button className="flex-1 py-2 rounded-lg text-sm font-semibold transition-colors"
-            style={{ background: '#EEF2FF', color: '#4338CA' }}>
+            style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
             View Full Reviews
           </button>
           <button className="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-colors"
-            style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}>
+            style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-grad) 100%)' }}>
             Replace Section
           </button>
         </div>
@@ -423,7 +407,7 @@ function WeeklyCalendar({ courses, onCourseClick, onRemove, onChange }: { course
 }
 
 // ----- Preferences Panel -----
-function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
+function PreferencesPanel({ onGenerate, onPrefChange }: { onGenerate: () => void, onPrefChange: () => void }) {
   const [requiredCourses, setRequiredCourses] = useState(['EECE 330', 'MATH 201', 'PHYS 211', 'EECE 351'])
   const [newCourse, setNewCourse] = useState('')
   const [priority, setPriority] = useState('Balanced workload')
@@ -435,6 +419,7 @@ function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
 
   const toggleDay = (d: string) => {
     setFreeDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])
+    onPrefChange()
   }
 
   return (
@@ -450,10 +435,10 @@ function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
           Required Courses
         </div>
         <div className="flex flex-col gap-1.5 mb-2">
-          {requiredCourses.map((c) => (
-            <div key={c} className="flex items-center justify-between rounded-lg px-2.5 py-1.5"
-              style={{ background: '#EEF2FF', border: '1px solid #C7D2FE' }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#4338CA' }}>{c}</span>
+          {requiredCourses.map((c, i) => (
+            <div key={`${c}-${i}`} className="flex items-center justify-between rounded-lg px-2.5 py-1.5"
+              style={{ background: 'var(--color-primary-light)', border: '1px solid var(--color-primary-border)' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)' }}>{c}</span>
               <button onClick={() => setRequiredCourses((p) => p.filter((x) => x !== c))}
                 style={{ color: '#818CF8' }}>
                 <X size={12} />
@@ -469,16 +454,16 @@ function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
             className="flex-1 rounded-lg px-2.5 py-1.5 outline-none"
             style={{ fontSize: 12, border: '1px solid #E2E8F0', background: '#FFFFFF' }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && newCourse.trim()) {
+              if (e.key === 'Enter' && newCourse.trim() && !requiredCourses.includes(newCourse.trim())) {
                 setRequiredCourses((p) => [...p, newCourse.trim()])
                 setNewCourse('')
               }
             }}
           />
           <button
-            onClick={() => { if (newCourse.trim()) { setRequiredCourses((p) => [...p, newCourse.trim()]); setNewCourse('') } }}
+            onClick={() => { if (newCourse.trim() && !requiredCourses.includes(newCourse.trim())) { setRequiredCourses((p) => [...p, newCourse.trim()]); setNewCourse('') } }}
             className="rounded-lg px-2 py-1.5"
-            style={{ background: '#4338CA', color: 'white' }}
+            style={{ background: 'var(--color-primary)', color: 'white' }}
           >
             <Plus size={12} />
           </button>
@@ -499,7 +484,7 @@ function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
               <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>{f.label}</div>
               <select
                 value={f.val}
-                onChange={(e) => f.set(e.target.value)}
+                onChange={(e) => { f.set(e.target.value); onPrefChange(); }}
                 className="w-full rounded-lg px-2 py-1.5 outline-none"
                 style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}
               >
@@ -518,7 +503,7 @@ function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
         <div className="flex flex-col gap-2">
           <div>
             <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>Max Classes/Day</div>
-            <select value={maxClasses} onChange={(e) => setMaxClasses(e.target.value)}
+            <select value={maxClasses} onChange={(e) => { setMaxClasses(e.target.value); onPrefChange(); }}
               className="w-full rounded-lg px-2 py-1.5 outline-none"
               style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}>
               {['1', '2', '3', '4', '5'].map((o) => <option key={o}>{o}</option>)}
@@ -526,7 +511,7 @@ function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
           </div>
           <div>
             <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>Min Break Between Classes</div>
-            <select value={minBreak} onChange={(e) => setMinBreak(e.target.value)}
+            <select value={minBreak} onChange={(e) => { setMinBreak(e.target.value); onPrefChange(); }}
               className="w-full rounded-lg px-2 py-1.5 outline-none"
               style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}>
               {['No minimum', '15 min', '30 min', '45 min', '1 hour'].map((o) => <option key={o}>{o}</option>)}
@@ -534,7 +519,7 @@ function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
           </div>
           <div>
             <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>Schedule Priority</div>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)}
+            <select value={priority} onChange={(e) => { setPriority(e.target.value); onPrefChange(); }}
               className="w-full rounded-lg px-2 py-1.5 outline-none"
               style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}>
               {['Shortest days', 'Longest weekends', 'Balanced workload', 'Highest rated professors', 'Lowest workload', 'No morning classes'].map((o) => <option key={o}>{o}</option>)}
@@ -557,9 +542,9 @@ function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
                 onClick={() => toggleDay(d)}
                 className="rounded-full px-2.5 py-1 text-xs font-semibold transition-all"
                 style={{
-                  background: sel ? '#4338CA' : '#F1F5F9',
+                  background: sel ? 'var(--color-primary)' : '#F1F5F9',
                   color: sel ? 'white' : '#64748B',
-                  border: sel ? '1px solid #4338CA' : '1px solid #E2E8F0',
+                  border: sel ? '1px solid var(--color-primary)' : '1px solid #E2E8F0',
                 }}
               >
                 {d}
@@ -573,7 +558,7 @@ function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
       <button
         onClick={onGenerate}
         className="w-full py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all"
-        style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)', color: 'white', fontSize: 13 }}
+        style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-grad) 100%)', color: 'white', fontSize: 13 }}
       >
         <Sparkles size={14} />
         Generate Schedule
@@ -622,9 +607,11 @@ const EXAMPLE_PROMPTS = [
 ]
 
 function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
+  const { aiName, setAiName } = useContext(AppContext)
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isEditingName, setIsEditingName] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -655,12 +642,26 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
     >
       {/* Header */}
       <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid #F1F5F9' }}>
-        <div className="rounded-lg p-1.5" style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}>
+        <div className="rounded-lg p-1.5" style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-grad) 100%)' }}>
           <Sparkles size={13} color="white" />
         </div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>AI Assistant</div>
-          <div style={{ fontSize: 10, color: '#10B981', fontWeight: 600 }}>● Online</div>
+        <div className="flex-1 min-w-0">
+          {isEditingName ? (
+            <input 
+              value={aiName} 
+              onChange={(e) => setAiName(e.target.value)} 
+              onBlur={() => setIsEditingName(false)}
+              onKeyDown={(e) => e.key === 'Enter' && setIsEditingName(false)}
+              className="w-full bg-transparent outline-none border-b border-slate-300"
+              style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}
+              autoFocus
+            />
+          ) : (
+            <div className="flex items-center gap-1.5 cursor-pointer group" onClick={() => setIsEditingName(true)}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{aiName}</div>
+              <Edit3 size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" color="#94A3B8" />
+            </div>
+          )}
         </div>
       </div>
 
@@ -672,15 +673,15 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
               className="shrink-0 rounded-full flex items-center justify-center"
               style={{
                 width: 26, height: 26,
-                background: m.role === 'ai' ? 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' : '#EEF2FF',
+                background: m.role === 'ai' ? 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-grad) 100%)' : 'var(--color-primary-light)',
               }}
             >
-              {m.role === 'ai' ? <Bot size={13} color="white" /> : <User size={13} color="#4338CA" />}
+              {m.role === 'ai' ? <Bot size={13} color="white" /> : <User size={13} color="var(--color-primary)" />}
             </div>
             <div
               className="rounded-2xl px-3 py-2 max-w-[200px]"
               style={{
-                background: m.role === 'user' ? '#4338CA' : '#F8FAFC',
+                background: m.role === 'user' ? 'var(--color-primary)' : '#F8FAFC',
                 color: m.role === 'user' ? 'white' : '#374151',
                 fontSize: 12,
                 lineHeight: 1.6,
@@ -695,7 +696,7 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
         {loading && (
           <div className="flex gap-2">
             <div className="shrink-0 rounded-full flex items-center justify-center"
-              style={{ width: 26, height: 26, background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}>
+              style={{ width: 26, height: 26, background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-grad) 100%)' }}>
               <Bot size={13} color="white" />
             </div>
             <div className="rounded-2xl px-3 py-2 flex items-center gap-1" style={{ background: '#F8FAFC' }}>
@@ -750,7 +751,7 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
               onClick={() => setInput(p)}
               className="rounded-full px-2.5 py-1 transition-colors"
               style={{ fontSize: 10, fontWeight: 600, background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#EEF2FF'; e.currentTarget.style.color = '#4338CA' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary-light)'; e.currentTarget.style.color = 'var(--color-primary)' }}
               onMouseLeave={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#64748B' }}
             >
               {p}
@@ -764,14 +765,13 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
         {[
           { icon: <RotateCcw size={11} />, label: 'Regenerate', fn: onGenerate },
           { icon: <Zap size={11} />, label: 'Optimize', fn: onGenerate },
-          { icon: <GitCompare size={11} />, label: 'Compare', fn: () => {} },
         ].map((b) => (
           <button
             key={b.label}
             onClick={b.fn}
             className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg transition-colors"
             style={{ fontSize: 10, fontWeight: 600, background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#EEF2FF'; e.currentTarget.style.color = '#4338CA' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary-light)'; e.currentTarget.style.color = 'var(--color-primary)' }}
             onMouseLeave={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#64748B' }}
           >
             {b.icon}{b.label}
@@ -793,7 +793,7 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
           <button
             onClick={sendMessage}
             className="rounded-lg p-1.5 transition-colors"
-            style={{ background: input.trim() ? '#4338CA' : '#E2E8F0', color: input.trim() ? 'white' : '#94A3B8' }}
+            style={{ background: input.trim() ? 'var(--color-primary)' : '#E2E8F0', color: input.trim() ? 'white' : '#94A3B8' }}
           >
             <Send size={12} />
           </button>
@@ -885,7 +885,7 @@ function ManualBuilder() {
   const [changeCourse, setChangeCourse] = useState<Course | null>(null)
 
   const ALL_AVAILABLE = [
-    { code: 'EECE 330', name: 'Digital Systems', sections: 3, color: '#4338CA' },
+    { code: 'EECE 330', name: 'Digital Systems', sections: 3, color: 'var(--color-primary)' },
     { code: 'MATH 201', name: 'Calculus III', sections: 5, color: '#059669' },
     { code: 'PHYS 211', name: 'Physics II', sections: 4, color: '#0284C7' },
     { code: 'EECE 351', name: 'Signals & Systems', sections: 2, color: '#7C3AED' },
@@ -914,10 +914,33 @@ function ManualBuilder() {
   }
 
   const addCourse = (code: string) => {
-    const found = SCHEDULE_1.find((c) => c.code === code)
-    if (found && !manualCourses.find((c) => c.code === code)) {
-      setManualCourses((p) => [...p, { ...found, id: found.id + '_added' }])
+    const base = ALL_AVAILABLE.find((c) => c.code === code)
+    if (base && !manualCourses.find((c) => c.code === code)) {
+      const newC: Course = {
+        id: code + '_' + Date.now(),
+        code: base.code,
+        name: base.name,
+        section: '01',
+        professor: 'Staff',
+        room: 'TBA',
+        days: [1, 3], // Default Tue/Thu
+        startHour: 14,
+        startMin: 0,
+        durationMin: 75,
+        color: base.color,
+        colorLight: base.color + '15',
+        credits: 3,
+      }
+      setManualCourses((p) => [...p, newC])
     }
+  }
+
+  const [fixing, setFixing] = useState(false)
+  const handleFixConflicts = () => {
+    setFixing(true)
+    setTimeout(() => {
+      setFixing(false)
+    }, 1500)
   }
 
   return (
@@ -977,11 +1000,12 @@ function ManualBuilder() {
             {manualCourses.length} courses · {manualCourses.length * 3} credits
           </div>
           <button
+            onClick={handleFixConflicts}
             className="w-full py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2"
-            style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)', color: 'white', fontSize: 13 }}
+            style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-grad) 100%)', color: 'white', fontSize: 13 }}
           >
-            <Sparkles size={14} />
-            AI Fix Conflicts
+            {fixing ? <Sparkles size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            {fixing ? 'Fixing...' : 'AI Fix Conflicts'}
           </button>
         </div>
       </div>
@@ -1020,12 +1044,24 @@ function ManualBuilder() {
 }
 
 // ----- Main AIScheduler -----
-export default function AIScheduler({ activeMode }: { activeMode: Page; setPage: (p: Page) => void }) {
+export default function AIScheduler({ activeMode, setPage }: { activeMode: Page; setPage: (p: Page) => void }) {
   const [mode, setMode] = useState<'ai' | 'manual'>(activeMode === 'manual-builder' ? 'manual' : 'ai')
+  
+  useEffect(() => {
+    setMode(activeMode === 'manual-builder' ? 'manual' : 'ai')
+  }, [activeMode])
+
   const [scheduleTab, setScheduleTab] = useState(0)
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [generating, setGenerating] = useState(false)
   const [_currentScheduleIdx, setCurrentScheduleIdx] = useState(0)
+
+  const [toast, setToast] = useState<string | null>(null)
+  
+  const handlePrefChange = () => {
+    setToast('Preferences updated')
+    setTimeout(() => setToast(null), 2000)
+  }
 
   const handleGenerate = () => {
     setGenerating(true)
@@ -1046,13 +1082,16 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
           {[{ id: 'ai', label: 'AI Builder', icon: <Sparkles size={12} /> }, { id: 'manual', label: 'Manual Builder', icon: <CalendarDays size={12} /> }].map((m) => (
             <button
               key={m.id}
-              onClick={() => setMode(m.id as 'ai' | 'manual')}
+              onClick={() => {
+                setMode(m.id as 'ai' | 'manual')
+                setPage(m.id === 'ai' ? 'ai-scheduler' : 'manual-builder')
+              }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all"
               style={{
                 fontSize: 12,
                 fontWeight: 600,
                 background: mode === m.id ? '#FFFFFF' : 'transparent',
-                color: mode === m.id ? '#4338CA' : '#64748B',
+                color: mode === m.id ? 'var(--color-primary)' : '#64748B',
                 boxShadow: mode === m.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
               }}
             >
@@ -1072,22 +1111,15 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
                 style={{
                   fontSize: 12,
                   fontWeight: 600,
-                  background: scheduleTab === i ? '#EEF2FF' : 'transparent',
-                  color: scheduleTab === i ? '#4338CA' : '#64748B',
-                  border: scheduleTab === i ? '1px solid #C7D2FE' : '1px solid transparent',
+                  background: scheduleTab === i ? 'var(--color-primary-light)' : 'transparent',
+                  color: scheduleTab === i ? 'var(--color-primary)' : '#64748B',
+                  border: scheduleTab === i ? '1px solid var(--color-primary-border)' : '1px solid transparent',
                 }}
               >
                 {t}
-                {scheduleTab === i && <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#4338CA' }} />}
+                {scheduleTab === i && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-primary)' }} />}
               </button>
             ))}
-            <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-              style={{ fontSize: 12, fontWeight: 600, color: '#64748B', border: '1px solid #E2E8F0' }}
-            >
-              <GitCompare size={12} />
-              Compare
-            </button>
           </div>
         )}
 
@@ -1097,11 +1129,6 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
             <TrendingUp size={12} color="#16A34A" />
             <span style={{ fontSize: 12, fontWeight: 700, color: '#15803D' }}>15 Credits</span>
           </div>
-          <button className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
-            style={{ fontSize: 12, fontWeight: 600, background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#64748B' }}>
-            <Bookmark size={12} />
-            Save
-          </button>
         </div>
       </div>
 
@@ -1113,14 +1140,14 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
               style={{ background: 'rgba(248,250,252,0.8)', backdropFilter: 'blur(4px)' }}>
               <div className="flex flex-col items-center gap-3">
                 <div className="rounded-2xl p-4" style={{ background: 'white', boxShadow: '0 8px 32px rgba(67,56,202,0.15)', border: '1px solid #E0E7FF' }}>
-                  <Sparkles size={28} color="#4338CA" className="animate-pulse" />
+                  <Sparkles size={28} color="var(--color-primary)" className="animate-pulse" />
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#4338CA' }}>Generating your perfect schedule...</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-primary)' }}>Generating your perfect schedule...</div>
                 <div style={{ fontSize: 12, color: '#94A3B8' }}>Analyzing 847 section combinations</div>
               </div>
             </div>
           )}
-          <PreferencesPanel onGenerate={handleGenerate} />
+          <PreferencesPanel onGenerate={handleGenerate} onPrefChange={handlePrefChange} />
           <div className="flex-1 overflow-hidden">
             <WeeklyCalendar courses={activeCourses} onCourseClick={setSelectedCourse} />
           </div>
@@ -1134,6 +1161,14 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
 
       {selectedCourse && (
         <CourseModal course={selectedCourse} onClose={() => setSelectedCourse(null)} />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-3 shadow-xl"
+          style={{ background: '#1E293B', color: 'white', fontSize: 13, fontWeight: 600 }}>
+          <CheckCircle size={16} color="#10B981" />
+          {toast}
+        </div>
       )}
     </div>
   )

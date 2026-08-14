@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookmarkCheck, GitCompare, Eye, FileDown, X, Calendar, Clock, MapPin, BookOpen, CheckCircle } from 'lucide-react'
+import { BookmarkCheck, GitCompare, Eye, FileDown, X, Calendar, Clock, BookOpen, CheckCircle } from 'lucide-react'
 
 const HOUR_HEIGHT = 60
 const START_HOUR = 7
@@ -21,14 +21,14 @@ interface Course {
 
 const SCHEDULE_COURSES: Record<string, Course[]> = {
   'Schedule A': [
-    { id: 'e330', code: 'EECE 330', name: 'Digital Systems', section: '01', professor: 'Dr. Hassan', room: 'BE-301', days: [0, 2], startHour: 10, startMin: 0, durationMin: 75, color: '#4338CA' },
+    { id: 'e330', code: 'EECE 330', name: 'Digital Systems', section: '01', professor: 'Dr. Hassan', room: 'BE-301', days: [0, 2], startHour: 10, startMin: 0, durationMin: 75, color: 'var(--color-primary)' },
     { id: 'm201', code: 'MATH 201', name: 'Calculus III', section: '03', professor: 'Dr. Khalil', room: 'SCC-210', days: [1, 3], startHour: 9, startMin: 0, durationMin: 75, color: '#059669' },
     { id: 'p211', code: 'PHYS 211', name: 'Physics II', section: '02', professor: 'Dr. Nassif', room: 'SCC-315', days: [0, 2, 4], startHour: 13, startMin: 0, durationMin: 60, color: '#0284C7' },
     { id: 'e351', code: 'EECE 351', name: 'Signals & Systems', section: '01', professor: 'Dr. Farhat', room: 'BE-402', days: [1, 3], startHour: 11, startMin: 30, durationMin: 90, color: '#7C3AED' },
     { id: 'c201', code: 'CHEM 201', name: 'General Chemistry', section: '05', professor: 'Dr. Ibrahim', room: 'SCC-110', days: [4], startHour: 8, startMin: 0, durationMin: 60, color: '#D97706' },
   ],
   'Schedule B': [
-    { id: 'e330b', code: 'EECE 330', name: 'Digital Systems', section: '02', professor: 'Dr. Hassan', room: 'BE-205', days: [1, 3], startHour: 11, startMin: 0, durationMin: 75, color: '#4338CA' },
+    { id: 'e330b', code: 'EECE 330', name: 'Digital Systems', section: '02', professor: 'Dr. Hassan', room: 'BE-205', days: [1, 3], startHour: 11, startMin: 0, durationMin: 75, color: 'var(--color-primary)' },
     { id: 'm201b', code: 'MATH 201', name: 'Calculus III', section: '01', professor: 'Dr. Khalil', room: 'SCC-108', days: [0, 2], startHour: 14, startMin: 0, durationMin: 75, color: '#059669' },
     { id: 'p211b', code: 'PHYS 211', name: 'Physics II', section: '04', professor: 'Dr. Nassif', room: 'SCC-220', days: [1, 3], startHour: 15, startMin: 0, durationMin: 60, color: '#0284C7' },
     { id: 'e351b', code: 'EECE 351', name: 'Signals & Systems', section: '03', professor: 'Dr. Farhat', room: 'BE-301', days: [0, 2], startHour: 9, startMin: 0, durationMin: 90, color: '#7C3AED' },
@@ -301,9 +301,9 @@ export default function SavedSchedules() {
           <button
             onClick={() => setShowCompare(true)}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold transition-all"
-            style={{ fontSize: 13, background: '#4338CA', color: 'white' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#3730A3' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#4338CA' }}
+            style={{ fontSize: 13, background: 'var(--color-primary)', color: 'white' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary-dark)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-primary)' }}
           >
             <GitCompare size={15} />
             Compare All
@@ -369,9 +369,9 @@ export default function SavedSchedules() {
                     <button
                       onClick={() => setViewSchedule(s)}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all"
-                      style={{ fontSize: 12, background: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE' }}
+                      style={{ fontSize: 12, background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary-border)' }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = '#E0E7FF' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = '#EEF2FF' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-primary-light)' }}
                     >
                       <Eye size={13} />
                       View Schedule

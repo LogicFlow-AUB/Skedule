@@ -1,37 +1,30 @@
-import { Sparkles, CalendarDays, BookmarkCheck, Star, Users, TrendingUp, Clock, ChevronRight, Calendar, Zap, Award } from 'lucide-react'
+import { Sparkles, CalendarDays, BookmarkCheck, Star, Users, TrendingUp, ChevronRight, Zap, Award } from 'lucide-react'
 import type { Page } from '../App'
+import { useContext } from 'react'
+import { AppContext } from '../context'
 
 interface DashboardProps {
   setPage: (p: Page) => void
 }
 
 const QUICK_STATS = [
-  { label: 'Credits Enrolled', value: '15', sub: 'Fall 2025', color: '#4338CA', bg: '#EEF2FF' },
+  { label: 'Credits Enrolled', value: '15', sub: 'Fall 2025', color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
   { label: 'Saved Schedules', value: '3', sub: 'View all →', color: '#059669', bg: '#ECFDF5' },
-  { label: 'Courses Reviewed', value: '14', sub: 'Community rank #12', color: '#F59E0B', bg: '#FFFBEB' },
-  { label: 'Friends Online', value: '3', sub: '5 total friends', color: '#0EA5E9', bg: '#F0F9FF' },
-]
-
-const UPCOMING = [
-  { event: 'Fall 2025 Registration', date: 'Nov 3, 9:00 AM', type: 'registration', color: '#EF4444', bg: '#FEF2F2' },
-  { event: 'Add/Drop Period Ends', date: 'Nov 17, 5:00 PM', type: 'deadline', color: '#D97706', bg: '#FFFBEB' },
-  { event: 'EECE 330 Lab Section', date: 'Oct 28, 2:00 PM', type: 'class', color: '#4338CA', bg: '#EEF2FF' },
-  { event: 'MATH 201 Midterm', date: 'Nov 5, 10:00 AM', type: 'exam', color: '#7C3AED', bg: '#F5F3FF' },
-]
-
-const RECENT_ACTIVITY = [
-  { text: 'Sarah K. shared her Fall 2025 schedule with you', time: '2h ago', icon: '📅' },
-  { text: 'New review posted for Dr. Nassif (PHYS 211)', time: '5h ago', icon: '⭐' },
-  { text: 'EECE 330 seat availability: 3 seats left in Section 01', time: '1d ago', icon: '⚠️' },
+  { label: 'Courses Reviewed', value: '14', sub: '', color: '#F59E0B', bg: '#FFFBEB' },
 ]
 
 export default function Dashboard({ setPage }: DashboardProps) {
+  const { userName } = useContext(AppContext)
+  
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+
   return (
     <div className="h-full overflow-y-auto" style={{ background: '#F8FAFC' }}>
       {/* Welcome banner */}
       <div
         className="px-8 py-8 relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 60%, #8B5CF6 100%)' }}
+        style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-grad) 60%, #8B5CF6 100%)' }}
       >
         {/* Decorative circles */}
         <div className="absolute -top-8 -right-8 rounded-full opacity-10"
@@ -42,7 +35,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
         <div className="relative z-10 flex items-center justify-between">
           <div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 500, marginBottom: 4 }}>
-              Good morning, Alex 👋
+              {greeting}, {userName.split(' ')[0]} 👋
             </div>
             <h1 style={{ fontSize: 26, fontWeight: 800, color: '#FFFFFF', lineHeight: 1.2 }}>
               Build your perfect semester.
@@ -55,7 +48,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
             <button
               onClick={() => setPage('ai-scheduler')}
               className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all"
-              style={{ background: '#FFFFFF', color: '#4338CA', fontSize: 14, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}
+              style={{ background: '#FFFFFF', color: 'var(--color-primary)', fontSize: 14, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}
               onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)' }}
               onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)' }}
             >
@@ -78,7 +71,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
 
       <div className="px-8 py-6 flex flex-col gap-6">
         {/* Quick stats */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {QUICK_STATS.map((s) => (
             <button
               key={s.label}
@@ -127,11 +120,11 @@ export default function Dashboard({ setPage }: DashboardProps) {
               <button
                 onClick={() => setPage('ai-scheduler')}
                 className="flex items-center gap-4 p-4 rounded-xl text-left transition-all group"
-                style={{ background: '#EEF2FF', border: '1px solid #C7D2FE' }}
+                style={{ background: 'var(--color-primary-light)', border: '1px solid var(--color-primary-border)' }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = '#E0E7FF'; e.currentTarget.style.transform = 'translateX(2px)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#EEF2FF'; e.currentTarget.style.transform = 'translateX(0)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-primary-light)'; e.currentTarget.style.transform = 'translateX(0)' }}
               >
-                <div className="rounded-xl p-3" style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)', boxShadow: '0 2px 8px rgba(67,56,202,0.3)' }}>
+                <div className="rounded-xl p-3" style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-grad) 100%)', boxShadow: '0 2px 8px rgba(67,56,202,0.3)' }}>
                   <Sparkles size={20} color="white" />
                 </div>
                 <div className="flex-1">
@@ -179,46 +172,20 @@ export default function Dashboard({ setPage }: DashboardProps) {
             </div>
           </div>
 
-          {/* Upcoming */}
-          <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Upcoming</div>
-              <div className="flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
-                <div className="rounded-full" style={{ width: 6, height: 6, background: '#EF4444' }} />
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#EF4444' }}>Registration in 12d</span>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2">
-              {UPCOMING.map((u, i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: u.bg, border: `1px solid ${u.color}20` }}>
-                  <div className="rounded-lg p-1.5 shrink-0" style={{ background: u.color + '20' }}>
-                    <Calendar size={13} color={u.color} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.event}</div>
-                    <div style={{ fontSize: 11, color: '#64748B' }}>{u.date}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-6" style={{ gridTemplateColumns: '1fr 1fr' }}>
           {/* Explore */}
           <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>Explore</div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 h-[calc(100%-32px)]">
               {[
                 { label: 'Course Reviews', page: 'course-reviews' as Page, icon: <Star size={18} />, color: '#F59E0B', bg: '#FFFBEB' },
-                { label: 'Professor Reviews', page: 'professor-reviews' as Page, icon: <Award size={18} />, color: '#4338CA', bg: '#EEF2FF' },
+                { label: 'Professor Reviews', page: 'professor-reviews' as Page, icon: <Award size={18} />, color: 'var(--color-primary)', bg: 'var(--color-primary-light)' },
                 { label: 'Community', page: 'community' as Page, icon: <Users size={18} />, color: '#10B981', bg: '#ECFDF5' },
                 { label: 'My Profile', page: 'profile' as Page, icon: <Zap size={18} />, color: '#8B5CF6', bg: '#F5F3FF' },
               ].map((item) => (
                 <button
                   key={item.label}
                   onClick={() => setPage(item.page)}
-                  className="flex flex-col items-center gap-2 p-4 rounded-xl transition-all"
+                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl transition-all"
                   style={{ background: item.bg, border: `1px solid ${item.color}20` }}
                   onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 4px 12px ${item.color}25` }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
@@ -226,28 +193,6 @@ export default function Dashboard({ setPage }: DashboardProps) {
                   <div className="rounded-xl p-2.5" style={{ background: item.color + '25', color: item.color }}>{item.icon}</div>
                   <span style={{ fontSize: 12, fontWeight: 700, color: '#1E293B', textAlign: 'center' }}>{item.label}</span>
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Recent activity */}
-          <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <div className="flex items-center justify-between mb-4">
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Recent Activity</div>
-              <button onClick={() => setPage('community')} style={{ fontSize: 12, color: '#4338CA', fontWeight: 600 }}>View all</button>
-            </div>
-            <div className="flex flex-col gap-3">
-              {RECENT_ACTIVITY.map((a, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <span style={{ fontSize: 20, lineHeight: 1, marginTop: 1 }}>{a.icon}</span>
-                  <div className="flex-1">
-                    <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5 }}>{a.text}</div>
-                    <div className="flex items-center gap-1 mt-1">
-                      <Clock size={10} color="#94A3B8" />
-                      <span style={{ fontSize: 10, color: '#94A3B8' }}>{a.time}</span>
-                    </div>
-                  </div>
-                </div>
               ))}
             </div>
           </div>

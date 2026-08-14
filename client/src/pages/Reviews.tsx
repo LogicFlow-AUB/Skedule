@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { Search, Star, ThumbsUp, Flag, Filter, TrendingUp, BookOpen, Users, Award, ChevronRight, X, Bookmark, GitCompare, CheckCircle } from 'lucide-react'
+import type { Page } from '../App'
+import { AppContext } from '../context'
 
 interface CourseCard {
+  id: string;
   code: string
   name: string
   department: string
@@ -17,12 +20,13 @@ interface CourseCard {
 }
 
 const COURSES: CourseCard[] = [
-  { code: 'EECE 330', name: 'Digital Systems', department: 'Electrical & Computer Eng', professor: 'Dr. Hassan', rating: 4.8, difficulty: 3.2, workload: 3.5, recommendation: 94, avgGpa: '3.4', enrolled: 145, attribute: 'Engineering', reviews: 87 },
-  { code: 'MATH 201', name: 'Calculus III', department: 'Mathematics', professor: 'Dr. Khalil', rating: 4.6, difficulty: 4.1, workload: 4.0, recommendation: 88, avgGpa: '3.1', enrolled: 210, attribute: 'Natural Science', reviews: 124 },
-  { code: 'PHYS 211', name: 'Physics II', department: 'Physics', professor: 'Dr. Nassif', rating: 4.9, difficulty: 3.8, workload: 3.6, recommendation: 96, avgGpa: '3.5', enrolled: 178, attribute: 'Natural Science', reviews: 156 },
-  { code: 'ENGL 210', name: 'Technical Writing', department: 'English', professor: 'Dr. Saad', rating: 4.2, difficulty: 2.1, workload: 3.0, recommendation: 82, avgGpa: '3.7', enrolled: 95, attribute: 'Writing', reviews: 63 },
-  { code: 'HIST 101', name: 'World Civilizations', department: 'History', professor: 'Dr. Moussa', rating: 4.5, difficulty: 2.5, workload: 2.8, recommendation: 90, avgGpa: '3.6', enrolled: 130, attribute: 'Humanities', reviews: 98 },
-  { code: 'ECON 201', name: 'Microeconomics', department: 'Economics', professor: 'Dr. Aziz', rating: 3.9, difficulty: 3.0, workload: 3.2, recommendation: 75, avgGpa: '3.0', enrolled: 180, attribute: 'Social Science', reviews: 112 },
+  { id: 'EECE 330-1', code: 'EECE 330', name: 'Digital Systems', department: 'Electrical & Computer Eng', professor: 'Dr. Hassan', rating: 4.8, difficulty: 3.2, workload: 3.5, recommendation: 94, avgGpa: '3.4', enrolled: 145, attribute: 'Engineering', reviews: 87 },
+  { id: 'EECE 330-2', code: 'EECE 330', name: 'Digital Systems', department: 'Electrical & Computer Eng', professor: 'Dr. Nasser', rating: 3.8, difficulty: 4.2, workload: 4.5, recommendation: 65, avgGpa: '2.8', enrolled: 120, attribute: 'Engineering', reviews: 45 },
+  { id: 'MATH 201-1', code: 'MATH 201', name: 'Calculus III', department: 'Mathematics', professor: 'Dr. Khalil', rating: 4.6, difficulty: 4.1, workload: 4.0, recommendation: 88, avgGpa: '3.1', enrolled: 210, attribute: 'Natural Science', reviews: 124 },
+  { id: 'PHYS 211-1', code: 'PHYS 211', name: 'Physics II', department: 'Physics', professor: 'Dr. Nassif', rating: 4.9, difficulty: 3.8, workload: 3.6, recommendation: 96, avgGpa: '3.5', enrolled: 178, attribute: 'Natural Science', reviews: 156 },
+  { id: 'ENGL 210-1', code: 'ENGL 210', name: 'Technical Writing', department: 'English', professor: 'Dr. Saad', rating: 4.2, difficulty: 2.1, workload: 3.0, recommendation: 82, avgGpa: '3.7', enrolled: 95, attribute: 'Writing', reviews: 63 },
+  { id: 'HIST 101-1', code: 'HIST 101', name: 'World Civilizations', department: 'History', professor: 'Dr. Moussa', rating: 4.5, difficulty: 2.5, workload: 2.8, recommendation: 90, avgGpa: '3.6', enrolled: 130, attribute: 'Humanities', reviews: 98 },
+  { id: 'ECON 201-1', code: 'ECON 201', name: 'Microeconomics', department: 'Economics', professor: 'Dr. Aziz', rating: 3.9, difficulty: 3.0, workload: 3.2, recommendation: 75, avgGpa: '3.0', enrolled: 180, attribute: 'Social Science', reviews: 112 },
 ]
 
 const COURSE_REVIEWS: Record<string, { author: string; semester: string; rating: number; text: string; tags: string[]; likes: number }[]> = {
@@ -139,9 +143,34 @@ function RatingBar({ label, value, color }: { label: string; value: number; colo
 
 // ----- Course Review Modal -----
 function CourseReviewModal({ course, onClose }: { course: CourseCard; onClose: () => void }) {
-  const reviews = COURSE_REVIEWS[course.code] ?? []
+  const { userName } = useContext(AppContext)
+  const initialReviews = COURSE_REVIEWS[course.code] ?? []
+  const [localReviews, setLocalReviews] = useState(initialReviews)
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [reviewText, setReviewText] = useState('')
+  const [reviewRating, setReviewRating] = useState(5)
+  const [reviewSemester, setReviewSemester] = useState('Fall 2025')
+  const [reviewProf, setReviewProf] = useState(course.professor)
+
+  const handleSubmit = () => {
+    if (!reviewText.trim()) return
+    const formattedName = userName.split(' ').map((n: string, i: number) => i === 0 ? n : n[0] + '.').join(' ')
+    const newReview = {
+      author: formattedName,
+      semester: reviewSemester,
+      rating: reviewRating,
+      text: reviewText,
+      tags: [reviewProf],
+      likes: 0
+    }
+    setLocalReviews([newReview, ...localReviews])
+    setShowReviewForm(false)
+    setReviewText('')
+    setReviewRating(5)
+  }
+
   const gradeData = [{ grade: 'A', pct: 38 }, { grade: 'B', pct: 30 }, { grade: 'C', pct: 18 }, { grade: 'D', pct: 9 }, { grade: 'F', pct: 5 }]
-  const barColors = ['#4338CA', '#6366F1', '#A5B4FC', '#C7D2FE', '#E0E7FF']
+  const barColors = ['var(--color-primary)', 'var(--color-primary-grad)', '#A5B4FC', 'var(--color-primary-border)', '#E0E7FF']
   const maxPct = Math.max(...gradeData.map((g) => g.pct))
 
   return (
@@ -150,11 +179,11 @@ function CourseReviewModal({ course, onClose }: { course: CourseCard; onClose: (
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ width: 560, maxHeight: '85vh', background: '#FFFFFF' }}>
         {/* Header */}
-        <div className="px-6 py-5" style={{ background: '#EEF2FF', borderBottom: '1px solid #F1F5F9' }}>
+        <div className="px-6 py-5" style={{ background: 'var(--color-primary-light)', borderBottom: '1px solid #F1F5F9' }}>
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="rounded-md px-2 py-0.5" style={{ fontSize: 11, fontWeight: 700, background: '#4338CA', color: 'white' }}>{course.code}</span>
+                <span className="rounded-md px-2 py-0.5" style={{ fontSize: 11, fontWeight: 700, background: 'var(--color-primary)', color: 'white' }}>{course.code}</span>
                 <span style={{ fontSize: 11, color: '#64748B' }}>{course.attribute}</span>
               </div>
               <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>{course.name}</h2>
@@ -170,11 +199,10 @@ function CourseReviewModal({ course, onClose }: { course: CourseCard; onClose: (
 
         <div className="overflow-y-auto flex-1 px-6 py-5">
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-3 mb-5">
+          <div className="grid grid-cols-2 gap-3 mb-5">
             {[
-              { label: 'Overall Rating', value: course.rating.toString(), color: '#4338CA' },
-              { label: 'Avg GPA', value: course.avgGpa, color: '#059669' },
-              { label: '% Recommend', value: `${course.recommendation}%`, color: '#D97706' },
+              { label: 'Overall Rating', value: course.rating.toString(), color: 'var(--color-primary)' },
+              { label: '% Recommend', value: `${course.recommendation}%`, color: '#059669' },
             ].map((s) => (
               <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
@@ -188,26 +216,54 @@ function CourseReviewModal({ course, onClose }: { course: CourseCard; onClose: (
             <RatingBar label="Workload" value={course.workload} color="#7C3AED" />
           </div>
 
-          {/* Grade distribution */}
-          <div className="mb-5">
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Grade Distribution</div>
-            <div className="flex items-end gap-2" style={{ height: 60 }}>
-              {gradeData.map((g, i) => (
-                <div key={g.grade} className="flex-1 flex flex-col items-center gap-1">
-                  <div style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>{g.pct}%</div>
-                  <div className="w-full rounded-t-md" style={{ height: `${(g.pct / maxPct) * 44}px`, background: barColors[i] }} />
-                  <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700 }}>{g.grade}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Reviews */}
           <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Student Reviews ({reviews.length})</div>
-            {reviews.length === 0 && <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '16px 0' }}>No reviews yet.</div>}
+            <div className="flex items-center justify-between mb-4">
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>Student Reviews ({localReviews.length})</div>
+              <button onClick={() => setShowReviewForm(!showReviewForm)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-semibold"
+                style={{ fontSize: 11, background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>
+                Rate Course
+              </button>
+            </div>
+
+            {showReviewForm && (
+              <div className="rounded-xl p-4 mb-4" style={{ background: '#F8FAFC', border: '1px solid #E0E7FF' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>Write a Review for {course.code}</div>
+                <div className="flex gap-4 mb-3">
+                  <div className="flex-1">
+                    <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, marginBottom: 4 }}>Professor</div>
+                    <input type="text" value={reviewProf} onChange={e => setReviewProf(e.target.value)} placeholder="Professor Name" className="w-full rounded-lg px-2 py-1.5 outline-none" style={{ fontSize: 12, border: '1px solid #E2E8F0', background: '#FFFFFF' }} />
+                  </div>
+                  <div className="flex-1">
+                    <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, marginBottom: 4 }}>Semester</div>
+                    <select value={reviewSemester} onChange={e => setReviewSemester(e.target.value)} className="w-full rounded-lg px-2 py-1.5 outline-none" style={{ fontSize: 12, border: '1px solid #E2E8F0', background: '#FFFFFF' }}>
+                      <option value="Fall 2025">Fall 2025</option>
+                      <option value="Spring 2025">Spring 2025</option>
+                      <option value="Fall 2024">Fall 2024</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>Rating:</span>
+                  <div className="flex gap-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star key={i} size={16} fill={i < reviewRating ? "#F59E0B" : "none"} color={i < reviewRating ? "#F59E0B" : "#CBD5E1"} className="cursor-pointer" onClick={() => setReviewRating(i + 1)} />
+                    ))}
+                  </div>
+                </div>
+                <textarea value={reviewText} onChange={(e) => setReviewText(e.target.value)} placeholder="Share your experience..." className="w-full rounded-xl p-3 outline-none resize-none"
+                  rows={3} style={{ fontSize: 12, border: '1px solid #E2E8F0', background: '#FFFFFF' }} />
+                <div className="flex gap-2 mt-3">
+                  <button onClick={handleSubmit} className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-opacity" style={{ background: 'var(--color-primary)', color: 'white', opacity: reviewText.trim() ? 1 : 0.5 }}>Submit</button>
+                  <button onClick={() => setShowReviewForm(false)} className="py-1.5 px-4 rounded-lg text-xs font-semibold" style={{ background: '#F1F5F9', color: '#64748B' }}>Cancel</button>
+                </div>
+              </div>
+            )}
+
+            {localReviews.length === 0 && <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '16px 0' }}>No reviews yet.</div>}
             <div className="flex flex-col gap-3">
-              {reviews.map((r, i) => (
+              {localReviews.map((r, i) => (
                 <div key={i} className="rounded-xl p-4" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
                   <div className="flex items-center justify-between mb-2">
                     <div>
@@ -239,10 +295,10 @@ function CourseReviewModal({ course, onClose }: { course: CourseCard; onClose: (
 
 // ----- Compare Courses Modal -----
 function CompareCoursesModal({ courses, initialA, initialB, onClose }: { courses: CourseCard[]; initialA: string; initialB: string; onClose: () => void }) {
-  const [codeA, setCodeA] = useState(initialA)
-  const [codeB, setCodeB] = useState(initialB)
-  const courseA = courses.find((c) => c.code === codeA)!
-  const courseB = courses.find((c) => c.code === codeB)!
+  const [idA, setIdA] = useState(initialA)
+  const [idB, setIdB] = useState(initialB)
+  const courseA = courses.find((c) => c.id === idA)!
+  const courseB = courses.find((c) => c.id === idB)!
 
   const COMPARE_FIELDS: { key: keyof CourseCard; label: string; higher: 'better' | 'worse' | 'neutral' }[] = [
     { key: 'rating', label: 'Overall Rating', higher: 'better' },
@@ -275,11 +331,11 @@ function CompareCoursesModal({ courses, initialA, initialB, onClose }: { courses
         <div className="overflow-y-auto flex-1 p-6">
           {/* Selectors */}
           <div className="grid grid-cols-2 gap-4 mb-6">
-            {[{ val: codeA, set: setCodeA }, { val: codeB, set: setCodeB }].map((s, i) => (
+            {[{ val: idA, set: setIdA }, { val: idB, set: setIdB }].map((s, i) => (
               <select key={i} value={s.val} onChange={(e) => s.set(e.target.value)}
                 className="w-full rounded-xl px-3 py-2 outline-none font-semibold"
                 style={{ fontSize: 13, border: '1px solid #E2E8F0', color: '#1E293B', background: '#F8FAFC' }}>
-                {courses.map((c) => <option key={c.code} value={c.code}>{c.code} — {c.name}</option>)}
+                {courses.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name} ({c.professor})</option>)}
               </select>
             ))}
           </div>
@@ -287,13 +343,13 @@ function CompareCoursesModal({ courses, initialA, initialB, onClose }: { courses
           {/* Course headers */}
           <div className="grid grid-cols-2 gap-4 mb-4">
             {[courseA, courseB].map((c) => (
-              <div key={c.code} className="rounded-2xl p-4" style={{ background: '#EEF2FF', border: '1px solid #C7D2FE' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#4338CA' }}>{c.code}</div>
+              <div key={c.id} className="rounded-2xl p-4" style={{ background: 'var(--color-primary-light)', border: '1px solid var(--color-primary-border)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary)' }}>{c.code}</div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>{c.name}</div>
-                <div style={{ fontSize: 11, color: '#64748B' }}>{c.professor}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginTop: 2 }}>{c.professor}</div>
                 <div className="flex items-center gap-1 mt-2">
                   <StarRating value={c.rating} size={13} />
-                  <span style={{ fontSize: 14, fontWeight: 800, color: '#4338CA', marginLeft: 4 }}>{c.rating}</span>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--color-primary)', marginLeft: 4 }}>{c.rating}</span>
                 </div>
               </div>
             ))}
@@ -333,8 +389,31 @@ function CompareCoursesModal({ courses, initialA, initialB, onClose }: { courses
 
 // ----- Professor Detail View -----
 function ProfessorDetailView({ prof, onClose }: { prof: Professor; onClose: () => void }) {
+  const { userName } = useContext(AppContext)
   const [showReviewForm, setShowReviewForm] = useState(false)
-  const barColors = ['#4338CA', '#6366F1', '#818CF8', '#A5B4FC', '#C7D2FE']
+  const [reviewText, setReviewText] = useState('')
+  const [reviewRating, setReviewRating] = useState(5)
+  const [reviewCourse, setReviewCourse] = useState(prof.courses[0] || 'General')
+  const [reviewSemester, setReviewSemester] = useState('Fall 2025')
+  const [localReviews, setLocalReviews] = useState(prof.reviews)
+
+  const handleSubmit = () => {
+    if (!reviewText.trim()) return
+    const formattedName = userName.split(' ').map((n: string, i: number) => i === 0 ? n : n[0] + '.').join(' ')
+    const newReview = {
+      author: formattedName,
+      course: reviewCourse,
+      semester: reviewSemester,
+      rating: reviewRating,
+      text: reviewText,
+      likes: 0
+    }
+    setLocalReviews([newReview, ...localReviews])
+    setShowReviewForm(false)
+    setReviewText('')
+    setReviewRating(5)
+  }
+
   const maxGrade = Math.max(...prof.gradeData.map((g) => g.pct))
 
   return (
@@ -352,7 +431,7 @@ function ProfessorDetailView({ prof, onClose }: { prof: Professor; onClose: () =
       <div className="p-6 max-w-4xl mx-auto">
         <div className="flex items-start gap-6 mb-6">
           <div className="rounded-2xl flex items-center justify-center shrink-0"
-            style={{ width: 88, height: 88, background: 'linear-gradient(135deg, #4338CA 0%, #8B5CF6 100%)', fontSize: 32, fontWeight: 800, color: 'white' }}>
+            style={{ width: 88, height: 88, background: 'linear-gradient(135deg, var(--color-primary) 0%, #8B5CF6 100%)', fontSize: 32, fontWeight: 800, color: 'white' }}>
             {prof.name.split(' ').map((w) => w[0]).join('').slice(1)}
           </div>
           <div className="flex-1">
@@ -366,15 +445,15 @@ function ProfessorDetailView({ prof, onClose }: { prof: Professor; onClose: () =
             </div>
           </div>
           <div className="text-center">
-            <div style={{ fontSize: 48, fontWeight: 800, color: '#4338CA', lineHeight: 1 }}>{prof.rating}</div>
+            <div style={{ fontSize: 48, fontWeight: 800, color: 'var(--color-primary)', lineHeight: 1 }}>{prof.rating}</div>
             <StarRating value={prof.rating} size={14} />
-            <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>{prof.reviews.length * 12} ratings</div>
+            <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 4 }}>{localReviews.length * 12} ratings</div>
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4 mb-6">
           {[
-            { label: 'Overall Rating', value: `${prof.rating}/5`, color: '#4338CA', sub: 'Excellent' },
+            { label: 'Overall Rating', value: `${prof.rating}/5`, color: 'var(--color-primary)', sub: 'Excellent' },
             { label: 'Difficulty', value: `${prof.difficulty}/5`, color: '#D97706', sub: 'Moderate' },
             { label: 'Would Retake', value: `${prof.wouldRetake}%`, color: '#059669', sub: 'Highly recommended' },
           ].map((s) => (
@@ -387,37 +466,15 @@ function ProfessorDetailView({ prof, onClose }: { prof: Professor; onClose: () =
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="mb-6">
           <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>Rating Breakdown</div>
             <div className="flex flex-col gap-2">
-              <RatingBar label="Helpfulness" value={4.8} color="#4338CA" />
-              <RatingBar label="Clarity" value={4.7} color="#6366F1" />
+              <RatingBar label="Helpfulness" value={4.8} color="var(--color-primary)" />
+              <RatingBar label="Clarity" value={4.7} color="var(--color-primary-grad)" />
               <RatingBar label="Fairness" value={4.5} color="#10B981" />
               <RatingBar label="Engagement" value={4.6} color="#0EA5E9" />
             </div>
-          </div>
-          <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>Grade Distribution</div>
-            <div className="flex items-end gap-2" style={{ height: 80 }}>
-              {prof.gradeData.map((g, i) => (
-                <div key={g.grade} className="flex-1 flex flex-col items-center gap-1">
-                  <div style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>{g.pct}%</div>
-                  <div className="w-full rounded-t-md" style={{ height: `${(g.pct / maxGrade) * 60}px`, background: barColors[i] }} />
-                  <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700 }}>{g.grade}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl p-5 mb-6" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 10 }}>Courses Taught</div>
-          <div className="flex gap-2 flex-wrap">
-            {prof.courses.map((c) => (
-              <span key={c} className="rounded-lg px-3 py-1.5"
-                style={{ fontSize: 12, fontWeight: 600, background: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE' }}>{c}</span>
-            ))}
           </div>
         </div>
 
@@ -426,7 +483,7 @@ function ProfessorDetailView({ prof, onClose }: { prof: Professor; onClose: () =
             <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>Student Reviews</div>
             <button onClick={() => setShowReviewForm(!showReviewForm)}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold"
-              style={{ fontSize: 12, background: '#4338CA', color: 'white' }}>
+              style={{ fontSize: 12, background: 'var(--color-primary)', color: 'white' }}>
               Rate Professor
             </button>
           </div>
@@ -434,30 +491,47 @@ function ProfessorDetailView({ prof, onClose }: { prof: Professor; onClose: () =
           {showReviewForm && (
             <div className="rounded-2xl p-5 mb-4" style={{ background: '#F8FAFC', border: '1px solid #E0E7FF' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>Write a Review</div>
+              <div className="flex gap-4 mb-3">
+                <div className="flex-1">
+                  <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, marginBottom: 4 }}>Course</div>
+                  <select value={reviewCourse} onChange={e => setReviewCourse(e.target.value)} className="w-full rounded-lg px-2 py-1.5 outline-none" style={{ fontSize: 12, border: '1px solid #E2E8F0', background: '#FFFFFF' }}>
+                    {prof.courses.map(c => <option key={c} value={c}>{c}</option>)}
+                    {!prof.courses.length && <option value="General">General</option>}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600, marginBottom: 4 }}>Semester</div>
+                  <select value={reviewSemester} onChange={e => setReviewSemester(e.target.value)} className="w-full rounded-lg px-2 py-1.5 outline-none" style={{ fontSize: 12, border: '1px solid #E2E8F0', background: '#FFFFFF' }}>
+                    <option value="Fall 2025">Fall 2025</option>
+                    <option value="Spring 2025">Spring 2025</option>
+                    <option value="Fall 2024">Fall 2024</option>
+                  </select>
+                </div>
+              </div>
               <div className="flex items-center gap-2 mb-3">
-                <span style={{ fontSize: 12, color: '#64748B' }}>Rating:</span>
+                <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>Rating:</span>
                 <div className="flex gap-1">
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} size={20} fill="#F59E0B" color="#F59E0B" className="cursor-pointer" />
+                    <Star key={i} size={20} fill={i < reviewRating ? "#F59E0B" : "none"} color={i < reviewRating ? "#F59E0B" : "#CBD5E1"} className="cursor-pointer" onClick={() => setReviewRating(i + 1)} />
                   ))}
                 </div>
               </div>
-              <textarea placeholder="Share your experience..." className="w-full rounded-xl p-3 outline-none resize-none"
+              <textarea value={reviewText} onChange={(e) => setReviewText(e.target.value)} placeholder="Share your experience..." className="w-full rounded-xl p-3 outline-none resize-none"
                 rows={3} style={{ fontSize: 12, border: '1px solid #E2E8F0', background: '#FFFFFF' }} />
               <div className="flex gap-2 mt-3">
-                <button className="flex-1 py-2 rounded-xl text-sm font-semibold" style={{ background: '#4338CA', color: 'white' }}>Submit</button>
+                <button onClick={handleSubmit} className="flex-1 py-2 rounded-xl text-sm font-semibold" style={{ background: 'var(--color-primary)', color: 'white', opacity: reviewText.trim() ? 1 : 0.5 }}>Submit</button>
                 <button onClick={() => setShowReviewForm(false)} className="py-2 px-4 rounded-xl text-sm font-semibold" style={{ background: '#F1F5F9', color: '#64748B' }}>Cancel</button>
               </div>
             </div>
           )}
 
           <div className="flex flex-col gap-4">
-            {prof.reviews.map((r, i) => (
+            {localReviews.map((r, i) => (
               <div key={i} className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <div className="rounded-full flex items-center justify-center"
-                      style={{ width: 32, height: 32, background: '#EEF2FF', fontSize: 12, fontWeight: 700, color: '#4338CA' }}>
+                      style={{ width: 32, height: 32, background: 'var(--color-primary-light)', fontSize: 12, fontWeight: 700, color: 'var(--color-primary)' }}>
                       {r.author.split(' ').map((w) => w[0]).join('')}
                     </div>
                     <div>
@@ -470,7 +544,7 @@ function ProfessorDetailView({ prof, onClose }: { prof: Professor; onClose: () =
                 <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.7 }}>{r.text}</p>
                 <div className="flex items-center gap-3 mt-3">
                   <button className="flex items-center gap-1.5 transition-colors" style={{ fontSize: 11, color: '#94A3B8' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = '#4338CA' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-primary)' }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = '#94A3B8' }}>
                     <ThumbsUp size={12} />{r.likes} helpful
                   </button>
@@ -490,8 +564,13 @@ function ProfessorDetailView({ prof, onClose }: { prof: Professor; onClose: () =
 }
 
 // ----- Main Reviews -----
-export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | 'professor-reviews' }) {
+export default function Reviews({ activeTab, setPage }: { activeTab: 'course-reviews' | 'professor-reviews', setPage?: (p: Page) => void }) {
   const [tab, setTab] = useState<'courses' | 'professors'>(activeTab === 'professor-reviews' ? 'professors' : 'courses')
+  
+  useEffect(() => {
+    setTab(activeTab === 'professor-reviews' ? 'professors' : 'courses')
+  }, [activeTab])
+
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState('Highest Rated')
   const [activeAttribute, setActiveAttribute] = useState('All')
@@ -533,9 +612,12 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
         <div className="flex items-center gap-3 mb-4">
           <div className="flex rounded-lg p-0.5" style={{ background: '#F1F5F9' }}>
             {[{ id: 'courses', label: 'Course Reviews', icon: <BookOpen size={13} /> }, { id: 'professors', label: 'Professor Reviews', icon: <Award size={13} /> }].map((t) => (
-              <button key={t.id} onClick={() => setTab(t.id as 'courses' | 'professors')}
+              <button key={t.id} onClick={() => {
+                setTab(t.id as 'courses' | 'professors')
+                if (setPage) setPage(t.id === 'courses' ? 'course-reviews' : 'professor-reviews')
+              }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-md transition-all"
-                style={{ fontSize: 13, fontWeight: 600, background: tab === t.id ? '#FFFFFF' : 'transparent', color: tab === t.id ? '#4338CA' : '#64748B', boxShadow: tab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                style={{ fontSize: 13, fontWeight: 600, background: tab === t.id ? '#FFFFFF' : 'transparent', color: tab === t.id ? 'var(--color-primary)' : '#64748B', boxShadow: tab === t.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
                 {t.icon}{t.label}
               </button>
             ))}
@@ -564,7 +646,7 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
           {FILTERS.map((f) => (
             <button key={f} onClick={() => setActiveFilter(f)}
               className="shrink-0 rounded-full px-3 py-1.5 transition-all"
-              style={{ fontSize: 12, fontWeight: 600, background: activeFilter === f ? '#4338CA' : '#F1F5F9', color: activeFilter === f ? 'white' : '#64748B', border: activeFilter === f ? '1px solid #4338CA' : '1px solid #E2E8F0' }}>
+              style={{ fontSize: 12, fontWeight: 600, background: activeFilter === f ? 'var(--color-primary)' : '#F1F5F9', color: activeFilter === f ? 'white' : '#64748B', border: activeFilter === f ? '1px solid var(--color-primary)' : '1px solid #E2E8F0' }}>
               {f}
             </button>
           ))}
@@ -572,7 +654,7 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
           {ATTRIBUTES.map((a) => (
             <button key={a} onClick={() => setActiveAttribute(a)}
               className="shrink-0 rounded-full px-3 py-1.5 transition-all"
-              style={{ fontSize: 12, fontWeight: 600, background: activeAttribute === a ? '#EEF2FF' : 'transparent', color: activeAttribute === a ? '#4338CA' : '#94A3B8', border: activeAttribute === a ? '1px solid #C7D2FE' : '1px solid transparent' }}>
+              style={{ fontSize: 12, fontWeight: 600, background: activeAttribute === a ? 'var(--color-primary-light)' : 'transparent', color: activeAttribute === a ? 'var(--color-primary)' : '#94A3B8', border: activeAttribute === a ? '1px solid var(--color-primary-border)' : '1px solid transparent' }}>
               {a}
             </button>
           ))}
@@ -586,22 +668,22 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
             {filteredCourses.map((c) => {
               const isSaved = savedCourses.has(c.code)
               return (
-                <div key={c.code}
+                <div key={c.id}
                   className="rounded-2xl p-5 flex flex-col gap-3 transition-all"
                   style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(67,56,202,0.1)'; e.currentTarget.style.border = '1px solid #C7D2FE' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(67,56,202,0.1)'; e.currentTarget.style.border = '1px solid var(--color-primary-border)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; e.currentTarget.style.border = '1px solid #F1F5F9' }}>
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="rounded-md px-2 py-0.5" style={{ fontSize: 11, fontWeight: 700, background: '#EEF2FF', color: '#4338CA' }}>{c.code}</span>
+                        <span className="rounded-md px-2 py-0.5" style={{ fontSize: 11, fontWeight: 700, background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>{c.code}</span>
                         <span className="rounded-full px-2 py-0.5" style={{ fontSize: 10, fontWeight: 600, background: '#F1F5F9', color: '#64748B' }}>{c.attribute}</span>
                       </div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>{c.name}</div>
                       <div style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>{c.professor} · {c.department}</div>
                     </div>
                     <div className="text-center">
-                      <div style={{ fontSize: 24, fontWeight: 800, color: '#4338CA' }}>{c.rating}</div>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-primary)' }}>{c.rating}</div>
                       <StarRating value={c.rating} size={10} />
                     </div>
                   </div>
@@ -612,14 +694,6 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-                      <TrendingUp size={11} color="#16A34A" />
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#15803D' }}>Avg GPA {c.avgGpa}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-                      <Users size={11} color="#64748B" />
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#64748B' }}>{c.enrolled} enrolled</span>
-                    </div>
                     <div className="flex items-center gap-1 ml-auto">
                       <div className="rounded-full" style={{ width: 8, height: 8, background: '#10B981' }} />
                       <span style={{ fontSize: 11, fontWeight: 600, color: '#059669' }}>{c.recommendation}% recommend</span>
@@ -631,32 +705,21 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
                     <button
                       onClick={() => setViewReviewCourse(c)}
                       className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                      style={{ background: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE' }}
+                      style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary-border)' }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = '#E0E7FF' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = '#EEF2FF' }}>
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-primary-light)' }}>
                       View Reviews
                     </button>
                     <button
                       onClick={() => {
-                        const otherCode = filteredCourses.find((x) => x.code !== c.code)?.code ?? filteredCourses[0].code
-                        setCompareModal({ codeA: c.code, codeB: otherCode })
+                        const otherCode = filteredCourses.find((x) => x.id !== c.id)?.id ?? filteredCourses[0].id
+                        setCompareModal({ codeA: c.id, codeB: otherCode })
                       }}
                       className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1"
                       style={{ background: '#F8FAFC', color: '#64748B', border: '1px solid #F1F5F9' }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#374151' }}
                       onMouseLeave={(e) => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.color = '#64748B' }}>
                       <GitCompare size={11} />Compare
-                    </button>
-                    <button
-                      onClick={() => toggleSave(c.code)}
-                      className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1"
-                      style={{
-                        background: isSaved ? '#F0FDF4' : '#F8FAFC',
-                        color: isSaved ? '#15803D' : '#64748B',
-                        border: isSaved ? '1px solid #86EFAC' : '1px solid #F1F5F9',
-                      }}>
-                      <Bookmark size={11} fill={isSaved ? '#15803D' : 'none'} />
-                      {isSaved ? 'Saved' : 'Save'}
                     </button>
                   </div>
                 </div>
@@ -670,11 +733,11 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
                 className="rounded-2xl p-5 cursor-pointer transition-all"
                 style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
                 onClick={() => setSelectedProf(p)}
-                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(67,56,202,0.1)'; e.currentTarget.style.border = '1px solid #C7D2FE' }}
+                onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 4px 16px rgba(67,56,202,0.1)'; e.currentTarget.style.border = '1px solid var(--color-primary-border)' }}
                 onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; e.currentTarget.style.border = '1px solid #F1F5F9' }}>
                 <div className="flex items-start gap-4 mb-4">
                   <div className="rounded-2xl flex items-center justify-center shrink-0"
-                    style={{ width: 52, height: 52, background: 'linear-gradient(135deg, #4338CA 0%, #8B5CF6 100%)', fontSize: 18, fontWeight: 800, color: 'white' }}>
+                    style={{ width: 52, height: 52, background: 'linear-gradient(135deg, var(--color-primary) 0%, #8B5CF6 100%)', fontSize: 18, fontWeight: 800, color: 'white' }}>
                     {p.name.split(' ').map((w) => w[0]).join('').slice(1)}
                   </div>
                   <div className="flex-1">
@@ -683,7 +746,7 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
                     <div style={{ fontSize: 11, color: '#94A3B8' }}>{p.department}</div>
                   </div>
                   <div className="text-center">
-                    <div style={{ fontSize: 28, fontWeight: 800, color: '#4338CA' }}>{p.rating}</div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--color-primary)' }}>{p.rating}</div>
                     <StarRating value={p.rating} size={10} />
                   </div>
                 </div>
@@ -713,13 +776,11 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
                 </div>
 
                 <div className="flex gap-2">
-                  {['View Profile', 'Compare'].map((b, i) => (
-                    <button key={b}
-                      className="flex-1 py-2 rounded-xl text-sm font-semibold transition-colors"
-                      style={{ background: i === 0 ? '#4338CA' : '#F8FAFC', color: i === 0 ? 'white' : '#64748B', border: i === 0 ? 'none' : '1px solid #F1F5F9' }}>
-                      {b}
-                    </button>
-                  ))}
+                  <button
+                    className="w-full py-2 rounded-xl text-sm font-semibold transition-colors"
+                    style={{ background: 'var(--color-primary)', color: 'white' }}>
+                    View Profile
+                  </button>
                 </div>
               </div>
             ))}
