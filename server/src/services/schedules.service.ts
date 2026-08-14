@@ -124,7 +124,7 @@ function toOne<T>(value: T | T[] | null | undefined): T | null {
 }
 
 /** Parses a meeting-day string such as `MWF`, `TR`, or `Mon/Wed` into day indexes. */
-function parseDays(days: string | null): number[] {
+export function parseDays(days: string | null): number[] {
   if (!days) {
     return [];
   }
@@ -158,7 +158,7 @@ function parseDays(days: string | null): number[] {
   return [...parsed].sort((first, second) => first - second);
 }
 
-function parseMinutes(time: string | null): number | null {
+export function parseMinutes(time: string | null): number | null {
   if (!time) {
     return null;
   }

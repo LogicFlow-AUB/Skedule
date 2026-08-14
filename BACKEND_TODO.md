@@ -189,15 +189,15 @@ CLIENT_ORIGIN=http://localhost:8443
 
 ## Phase 9 — Friends & Social Graph
 
-- [ ] **9.1 Friend module**
-  - [ ] GET /api/friends
-  - [ ] GET /api/friends/suggested
-  - [ ] GET /api/friends/requests
-  - [ ] POST /api/friends/requests/:userId
-  - [ ] POST /api/friends/requests/:userId/accept
-  - [ ] POST /api/friends/requests/:userId/reject
-  - [ ] DELETE /api/friends/:userId
-  - [ ] GET /api/friends/common-free-time
+- [x] **9.1 Friend module**
+  - [x] GET /api/friends
+  - [x] GET /api/friends/suggested
+  - [x] GET /api/friends/requests
+  - [x] POST /api/friends/requests/:userId
+  - [x] POST /api/friends/requests/:userId/accept
+  - [x] POST /api/friends/requests/:userId/reject
+  - [x] DELETE /api/friends/:userId
+  - [x] GET /api/friends/common-free-time
 
 ---
 

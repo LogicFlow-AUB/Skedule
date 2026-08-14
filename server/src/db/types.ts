@@ -94,3 +94,11 @@ export type PostComment = {
   content: string;
   created_at: string;
 };
+
+export type Friendship = {
+  id: number;
+  user_id: string;
+  friend_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+};
