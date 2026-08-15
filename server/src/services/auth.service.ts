@@ -47,7 +47,7 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
 
   const email = input.email.trim().toLowerCase();
 
-  if (!email.endsWith('@aub.edu.lb')) {
+  if (!email.endsWith('@mail.aub.edu')) {
     throw new AppError(
       400,
       'AUB_EMAIL_REQUIRED',
