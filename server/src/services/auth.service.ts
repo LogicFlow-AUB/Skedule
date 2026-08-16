@@ -45,6 +45,16 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
     throw new AppError(400, 'PASSWORD_CONFIRMATION_MISMATCH', 'Passwords do not match.');
   }
 
+  const email = input.email.trim().toLowerCase();
+
+  if (!email.endsWith('@mail.aub.edu')) {
+    throw new AppError(
+      400,
+      'AUB_EMAIL_REQUIRED',
+      'Only AUB email addresses are allowed.',
+    );
+  }
+
   const db = requireSupabaseClient();
   const { data, error } = await db.auth.signUp({
     email: input.email,

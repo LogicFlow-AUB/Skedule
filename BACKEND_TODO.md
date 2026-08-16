@@ -203,20 +203,20 @@ CLIENT_ORIGIN=http://localhost:8443
 
 ## Phase 10 — Notifications
 
-- [ ] **10.1 Notification module**
-  - [ ] GET /api/notifications (paginated)
-  - [ ] GET /api/notifications/unread-count
-  - [ ] PUT /api/notifications/:id/read
-  - [ ] PUT /api/notifications/read-all
-  - [ ] Notification service (create + dispatch)
+- [x] **10.1 Notification module**
+  - [x] GET /api/notifications (paginated)
+  - [x] GET /api/notifications/unread-count
+  - [x] PUT /api/notifications/:id/read
+  - [x] PUT /api/notifications/read-all
+  - [x] Notification service (create + dispatch)
   - [ ] Trigger notifications for:
-    - [ ] Friend request received
-    - [ ] Friend request accepted
-    - [ ] Post liked
-    - [ ] Post commented
-    - [ ] Review liked
-    - [ ] Schedule shared
-    - [ ] Registration reminder
+    - [x] Friend request received
+    - [x] Friend request accepted
+    - [x] Post liked
+    - [x] Post commented
+    - [x] Review liked
+    - [x] Schedule shared
+    - [ ] Registration reminder (no cron/job runner exists yet to fire this automatically — `createNotification(userId, null, 'registration_reminder', ...)` is ready to be called once one does)
 
 ---
 

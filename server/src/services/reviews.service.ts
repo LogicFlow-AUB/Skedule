@@ -3,6 +3,7 @@ import type { CourseReview, ProfessorReview, User } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { getCourse } from './courses.service.js';
 import { trackActivity } from './activity.service.js';
+import { createNotification } from './notifications.service.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
 
 export type CreateCourseReviewInput = {
@@ -262,7 +263,7 @@ async function getProfessorReviewOrThrow(professorId: number, reviewId: number) 
   const db = requireSupabaseClient();
   const { data, error } = await db
     .from('professor_reviews')
-    .select('id')
+    .select('id, user_id')
     .eq('id', reviewId)
     .eq('professor_id', professorId)
     .maybeSingle();
@@ -274,6 +275,8 @@ async function getProfessorReviewOrThrow(professorId: number, reviewId: number) 
   if (!data) {
     throw new AppError(404, 'REVIEW_NOT_FOUND', 'Review not found.');
   }
+
+  return data as { id: number; user_id: string };
 }
 
 export async function likeProfessorReview(
@@ -281,7 +284,7 @@ export async function likeProfessorReview(
   professorId: number,
   reviewId: number,
 ): Promise<void> {
-  await getProfessorReviewOrThrow(professorId, reviewId);
+  const review = await getProfessorReviewOrThrow(professorId, reviewId);
 
   const db = requireSupabaseClient();
   const { error } = await db
@@ -291,6 +294,11 @@ export async function likeProfessorReview(
   if (error) {
     throw error;
   }
+
+  await createNotification(review.user_id, userId, 'review_liked', 'Someone liked your review.', {
+    reviewId,
+    professorId,
+  });
 }
 
 export async function reportProfessorReview(
