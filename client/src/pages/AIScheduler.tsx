@@ -3,14 +3,18 @@ import {
   Plus, X, Trash2, Sparkles, RotateCcw, Zap, GitCompare,
   Eye, ArrowLeftRight, Send, Bot, User, Info, AlertCircle,
   BookOpen, Clock, MapPin, Star, TrendingUp, Bookmark,
-  GripVertical, Search, CalendarDays,
+  GripVertical, Search, CalendarDays, CheckCircle,
 } from 'lucide-react'
 import type { Page } from '../App'
+import { api, type CourseSummary, type CourseSection, type CourseReview, type GradeDistributionRow } from '../lib/api'
+import { displayName, timeAgo } from '../lib/format'
 
 const HOUR_HEIGHT = 60 // px per hour
 const START_HOUR = 7   // 7 AM
 const END_HOUR = 21    // 9 PM
 const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => i + START_HOUR)
+
+const COURSE_COLORS = ['#4338CA', '#059669', '#0284C7', '#7C3AED', '#D97706', '#10B981', '#F59E0B', '#DC2626']
 
 interface Course {
   id: string
@@ -26,6 +30,7 @@ interface Course {
   color: string
   colorLight: string
   credits: number
+  sectionId: number | null
 }
 
 const SCHEDULE_1: Course[] = [
@@ -43,6 +48,7 @@ const SCHEDULE_1: Course[] = [
     color: '#4338CA',
     colorLight: '#EEF2FF',
     credits: 3,
+    sectionId: null,
   },
   {
     id: 'math201',
@@ -58,6 +64,7 @@ const SCHEDULE_1: Course[] = [
     color: '#059669',
     colorLight: '#ECFDF5',
     credits: 3,
+    sectionId: null,
   },
   {
     id: 'phys211',
@@ -73,6 +80,7 @@ const SCHEDULE_1: Course[] = [
     color: '#0284C7',
     colorLight: '#F0F9FF',
     credits: 3,
+    sectionId: null,
   },
   {
     id: 'eece351',
@@ -88,6 +96,7 @@ const SCHEDULE_1: Course[] = [
     color: '#7C3AED',
     colorLight: '#F5F3FF',
     credits: 3,
+    sectionId: null,
   },
   {
     id: 'chem201',
@@ -103,6 +112,7 @@ const SCHEDULE_1: Course[] = [
     color: '#D97706',
     colorLight: '#FFFBEB',
     credits: 3,
+    sectionId: null,
   },
 ]
 
@@ -144,17 +154,93 @@ function courseStartTime(c: Course) {
   return label
 }
 
+function parseDays(days: string | null): number[] {
+  if (!days) {
+    return []
+  }
+  return days
+    .split(',')
+    .map((d) => Number(d.trim()))
+    .filter((n) => !Number.isNaN(n))
+}
+
+function parseTime(t: string | null): { hours: number; minutes: number } | null {
+  if (!t) {
+    return null
+  }
+  const [h, m] = t.split(':').map(Number)
+  if (Number.isNaN(h)) {
+    return null
+  }
+  return { hours: h, minutes: m ?? 0 }
+}
+
+function daysLabel(days: number[]): string {
+  if (days.length === 0) {
+    return '—'
+  }
+  return days.map((d) => DAYS[d] ?? `Day ${d}`).join('/')
+}
+
+function timeLabel(t: string | null): string {
+  if (!t) {
+    return '—'
+  }
+  const [h, m] = t.split(':').map(Number)
+  const period = h >= 12 ? 'PM' : 'AM'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:${String(m ?? 0).padStart(2, '0')} ${period}`
+}
+
+function durationMinutes(start: string | null, end: string | null): number {
+  const s = parseTime(start)
+  const e = parseTime(end)
+  if (!s || !e) {
+    return 60
+  }
+  return e.hours * 60 + e.minutes - (s.hours * 60 + s.minutes)
+}
+
 // ----- Course Detail Modal -----
-function CourseModal({ course, onClose }: { course: Course; onClose: () => void }) {
-  const reviews = [
-    { author: 'Lara M.', semester: 'Spring 2025', rating: 5, text: "Best professor for this subject. Clear lectures, fair exams. Highly recommend!", tags: ['Helpful', 'Clear'] },
-    { author: 'Omar K.', semester: 'Fall 2024', rating: 4, text: 'Good course, content is dense but Dr. Hassan explains well. Midterm was tough.', tags: ['Exam Heavy', 'Project Based'] },
-    { author: 'Jana R.', semester: 'Fall 2024', rating: 5, text: 'Loved this course. The labs were challenging but rewarding.', tags: ['Helpful', 'Lab Intensive'] },
-  ]
-  const gradeData = [
-    { grade: 'A', pct: 38 }, { grade: 'B', pct: 30 }, { grade: 'C', pct: 18 },
-    { grade: 'D', pct: 9 }, { grade: 'F', pct: 5 },
-  ]
+function CourseModal({ course, onSwap, onClose }: { course: Course; onSwap?: (c: Course) => void; onClose: () => void }) {
+  const [summary, setSummary] = useState<CourseSummary | null>(null)
+  const [reviews, setReviews] = useState<CourseReview[]>([])
+  const [grades, setGrades] = useState<GradeDistributionRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    Promise.all([
+      api.courses.get(course.code),
+      api.courses.reviews(course.code, 1, 3),
+      api.courses.gradeDistribution(course.code),
+    ])
+      .then(([sum, revs, dist]) => {
+        if (cancelled) {
+          return
+        }
+        setSummary(sum.data)
+        setReviews(revs.data)
+        setGrades(dist.data)
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load course data.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [course.code])
+
   const barColors = ['#4338CA', '#6366F1', '#A5B4FC', '#C7D2FE', '#E0E7FF']
 
   return (
@@ -194,7 +280,7 @@ function CourseModal({ course, onClose }: { course: Course; onClose: () => void 
               <Clock size={12} />{courseStartTime(course)} – {courseEndTime(course)}
             </span>
             <span className="flex items-center gap-1" style={{ fontSize: 12, color: '#64748B' }}>
-              <MapPin size={12} />{course.room}
+              <MapPin size={12} />{course.room || '—'}
             </span>
             <span className="flex items-center gap-1" style={{ fontSize: 12, color: '#64748B' }}>
               <BookOpen size={12} />{course.credits} credits
@@ -203,77 +289,212 @@ function CourseModal({ course, onClose }: { course: Course; onClose: () => void 
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-5">
-          {/* Ratings row */}
-          <div className="grid grid-cols-3 gap-3 mb-5">
-            {[
-              { label: 'Overall Rating', value: '4.7', sub: 'out of 5', color: '#4338CA' },
-              { label: 'Difficulty', value: '3.2', sub: 'out of 5', color: '#D97706' },
-              { label: 'Would Retake', value: '89%', sub: 'of students', color: '#059669' },
-            ].map((r) => (
-              <div key={r.label} className="rounded-xl p-3 text-center" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: r.color }}>{r.value}</div>
-                <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>{r.label}</div>
-                <div style={{ fontSize: 10, color: '#94A3B8' }}>{r.sub}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Grade distribution */}
-          <div className="mb-5">
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Grade Distribution</div>
-            <div className="flex items-end gap-2" style={{ height: 60 }}>
-              {gradeData.map((g, i) => (
-                <div key={g.grade} className="flex-1 flex flex-col items-center gap-1">
-                  <div style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>{g.pct}%</div>
-                  <div
-                    className="w-full rounded-t-md"
-                    style={{ height: `${g.pct * 1.2}px`, background: barColors[i] }}
-                  />
-                  <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700 }}>{g.grade}</div>
-                </div>
-              ))}
+          {error && (
+            <div className="rounded-xl px-4 py-3 mb-4" style={{ background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 12, fontWeight: 600, color: '#B91C1C' }}>
+              {error}
             </div>
-          </div>
+          )}
+          {loading && (
+            <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '24px 0' }}>Loading course data...</div>
+          )}
 
-          {/* Reviews */}
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Student Reviews</div>
-            <div className="flex flex-col gap-3">
-              {reviews.map((r, i) => (
-                <div key={i} className="rounded-xl p-4" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#1E293B' }}>{r.author}</span>
-                      <span style={{ fontSize: 11, color: '#94A3B8', marginLeft: 6 }}>{r.semester}</span>
-                    </div>
-                    <div className="flex items-center gap-0.5">
-                      {Array.from({ length: 5 }).map((_, j) => (
-                        <Star key={j} size={11} fill={j < r.rating ? '#F59E0B' : 'none'} color={j < r.rating ? '#F59E0B' : '#CBD5E1'} />
-                      ))}
-                    </div>
+          {!loading && summary && (
+            <>
+              {/* Ratings row */}
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                {[
+                  { label: 'Overall Rating', value: summary.averageRating === null ? '—' : summary.averageRating.toFixed(1), sub: 'out of 5', color: '#4338CA' },
+                  { label: 'Difficulty', value: summary.averageDifficulty === null ? '—' : summary.averageDifficulty.toFixed(1), sub: 'out of 5', color: '#D97706' },
+                  { label: 'Would Retake', value: summary.wouldRetakePercentage === null ? '—' : `${Math.round(summary.wouldRetakePercentage)}%`, sub: 'of students', color: '#059669' },
+                ].map((r) => (
+                  <div key={r.label} className="rounded-xl p-3 text-center" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: r.color }}>{r.value}</div>
+                    <div style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>{r.label}</div>
+                    <div style={{ fontSize: 10, color: '#94A3B8' }}>{r.sub}</div>
                   </div>
-                  <p style={{ fontSize: 12, color: '#475569', lineHeight: 1.6 }}>{r.text}</p>
-                  <div className="flex gap-1.5 mt-2">
-                    {r.tags.map((t) => (
-                      <span key={t} className="rounded-full px-2 py-0.5" style={{ fontSize: 10, fontWeight: 600, background: '#F1F5F9', color: '#64748B' }}>{t}</span>
+                ))}
+              </div>
+
+              {/* Grade distribution */}
+              {grades.length > 0 && (
+                <div className="mb-5">
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Grade Distribution</div>
+                  <div className="flex items-end gap-2" style={{ height: 60 }}>
+                    {grades.map((g, i) => (
+                      <div key={g.grade} className="flex-1 flex flex-col items-center gap-1">
+                        <div style={{ fontSize: 10, color: '#64748B', fontWeight: 600 }}>{g.percentage ?? 0}%</div>
+                        <div
+                          className="w-full rounded-t-md"
+                          style={{ height: `${(g.percentage ?? 0) * 1.2}px`, background: barColors[i % barColors.length] }}
+                        />
+                        <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700 }}>{g.grade}</div>
+                      </div>
                     ))}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+              )}
+
+              {/* Reviews */}
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8 }}>Student Reviews</div>
+                <div className="flex flex-col gap-3">
+                  {reviews.length === 0 && <div style={{ fontSize: 12, color: '#94A3B8' }}>No reviews yet.</div>}
+                  {reviews.map((r) => (
+                    <div key={r.id} className="rounded-xl p-4" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#1E293B' }}>{displayName(r.author?.firstName, r.author?.lastName)}</span>
+                          <span style={{ fontSize: 11, color: '#94A3B8', marginLeft: 6 }}>{timeAgo(r.createdAt)}</span>
+                        </div>
+                        <div className="flex items-center gap-0.5">
+                          {Array.from({ length: 5 }).map((_, j) => (
+                            <Star key={j} size={11} fill={j < r.rating ? '#F59E0B' : 'none'} color={j < r.rating ? '#F59E0B' : '#CBD5E1'} />
+                          ))}
+                        </div>
+                      </div>
+                      <p style={{ fontSize: 12, color: '#475569', lineHeight: 1.6 }}>{r.comment || 'No comment.'}</p>
+                      {r.difficulty !== null && (
+                        <div className="flex gap-1.5 mt-2">
+                          <span className="rounded-full px-2 py-0.5" style={{ fontSize: 10, fontWeight: 600, background: '#F1F5F9', color: '#64748B' }}>
+                            Difficulty {r.difficulty}/5
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Actions */}
         <div className="px-6 py-4 flex gap-2" style={{ borderTop: '1px solid #F1F5F9' }}>
-          <button className="flex-1 py-2 rounded-lg text-sm font-semibold transition-colors"
-            style={{ background: '#EEF2FF', color: '#4338CA' }}>
+          <button
+            onClick={onClose}
+            className="flex-1 py-2 rounded-lg text-sm font-semibold transition-colors"
+            style={{ background: '#EEF2FF', color: '#4338CA' }}
+          >
             View Full Reviews
           </button>
-          <button className="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-colors"
-            style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}>
-            Replace Section
+          {onSwap && (
+            <button
+              onClick={() => onSwap(course)}
+              className="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-colors"
+              style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}
+            >
+              Replace Section
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ----- Section Picker Modal -----
+function SectionPickerModal({
+  title,
+  code,
+  currentSection,
+  onPick,
+  onClose,
+}: {
+  title: string
+  code: string
+  currentSection?: string
+  onPick: (sec: CourseSection) => void
+  onClose: () => void
+}) {
+  const [sections, setSections] = useState<CourseSection[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    api.courses
+      .sections(code)
+      .then((res) => {
+        if (!cancelled) {
+          setSections(res.data)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load sections.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [code])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+        style={{ width: 480, maxHeight: '85vh', background: '#FFFFFF' }}>
+        <div className="px-5 py-4 flex items-center justify-between"
+          style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
+          <div>
+            <span className="rounded-md px-2 py-0.5 text-xs font-bold" style={{ background: '#4338CA', color: 'white' }}>{code}</span>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{title}</div>
+            {currentSection && <div style={{ fontSize: 12, color: '#64748B' }}>Current: Section {currentSection}</div>}
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5" style={{ color: '#64748B' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
+            <X size={18} />
           </button>
+        </div>
+        <div className="overflow-y-auto p-5 flex flex-col gap-3">
+          {error && (
+            <div className="rounded-xl px-4 py-3" style={{ background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 12, fontWeight: 600, color: '#B91C1C' }}>
+              {error}
+            </div>
+          )}
+          {loading && <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>Loading sections...</div>}
+          {!loading && sections.length === 0 && !error && (
+            <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No sections available this semester.</div>
+          )}
+          {sections.map((sec) => {
+            const isCurrent = sec.section_number === currentSection
+            const start = parseTime(sec.start_time)
+            const end = parseTime(sec.end_time)
+            const startLabel = start ? `${timeLabel(sec.start_time)}` : '—'
+            const endLabel = end ? timeLabel(sec.end_time) : '—'
+            const seatsLeft = sec.seats_total !== null && sec.seats_remaining !== null ? sec.seats_remaining : null
+            return (
+              <button
+                key={sec.id}
+                onClick={() => onPick(sec)}
+                className="flex items-start gap-4 p-4 rounded-xl text-left transition-all"
+                style={{ background: '#F8FAFC', border: '1px solid #F1F5F9', cursor: isCurrent ? 'default' : 'pointer', opacity: isCurrent ? 0.75 : 1 }}
+                onMouseEnter={(e) => { if (!isCurrent) { e.currentTarget.style.border = '1px solid #4338CA50'; e.currentTarget.style.background = '#EEF2FF' } }}
+                onMouseLeave={(e) => { e.currentTarget.style.border = '1px solid #F1F5F9'; e.currentTarget.style.background = '#F8FAFC' }}
+              >
+                <div className="rounded-lg px-2 py-1 shrink-0" style={{ background: '#4338CA20', color: '#4338CA', fontSize: 12, fontWeight: 800 }}>
+                  §{sec.section_number}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{displayName(sec.professors?.first_name, sec.professors?.last_name) || 'Unknown instructor'}</div>
+                  <div style={{ fontSize: 11, color: '#64748B' }}>{daysLabel(parseDays(sec.days))} · {startLabel} – {endLabel} · {sec.room || 'TBA'}</div>
+                  <div style={{ fontSize: 11, color: seatsLeft !== null && seatsLeft > 0 ? '#059669' : '#94A3B8', marginTop: 2 }}>
+                    {seatsLeft !== null ? `${seatsLeft} seats open` : 'Seats N/A'}
+                  </div>
+                </div>
+                <div className="ml-auto text-xs font-semibold" style={{ color: '#4338CA' }}>{isCurrent ? 'Current' : 'Select →'}</div>
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>
@@ -637,6 +858,7 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
     setMessages((p) => [...p, userMsg])
     setInput('')
     setLoading(true)
+    // TODO(frontend): no AI conversation endpoint yet — response is a UI placeholder.
     setTimeout(() => {
       setMessages((p) => [...p, {
         role: 'ai',
@@ -803,122 +1025,105 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
   )
 }
 
-// ----- Section Swap Modal -----
-const ALTERNATE_SECTIONS: Record<string, { section: string; professor: string; days: string; time: string }[]> = {
-  'EECE 330': [
-    { section: '02', professor: 'Dr. Hassan', days: 'Tue/Thu', time: '11:00 AM – 12:15 PM' },
-    { section: '03', professor: 'Dr. Nasser', days: 'Mon/Wed', time: '2:00 PM – 3:15 PM' },
-  ],
-  'MATH 201': [
-    { section: '01', professor: 'Dr. Khalil', days: 'Mon/Wed', time: '8:00 AM – 9:15 AM' },
-    { section: '04', professor: 'Dr. Salem', days: 'Tue/Thu', time: '1:00 PM – 2:15 PM' },
-  ],
-  'PHYS 211': [
-    { section: '01', professor: 'Dr. Nassif', days: 'Mon/Wed/Fri', time: '9:00 AM – 10:00 AM' },
-    { section: '03', professor: 'Dr. Haddad', days: 'Tue/Thu', time: '3:30 PM – 5:00 PM' },
-  ],
-  'EECE 351': [
-    { section: '02', professor: 'Dr. Farhat', days: 'Mon/Wed', time: '9:00 AM – 10:30 AM' },
-  ],
-  'CHEM 201': [
-    { section: '01', professor: 'Dr. Ibrahim', days: 'Mon/Wed', time: '10:00 AM – 11:00 AM' },
-    { section: '03', professor: 'Dr. Youssef', days: 'Tue/Thu', time: '2:00 PM – 3:00 PM' },
-  ],
-}
-
-function SectionSwapModal({ course, onSwap, onClose }: { course: Course; onSwap: (c: Course, section: string, professor: string) => void; onClose: () => void }) {
-  const alts = ALTERNATE_SECTIONS[course.code] ?? []
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="rounded-2xl shadow-2xl overflow-hidden" style={{ width: 420, background: '#FFFFFF' }}>
-        <div className="px-5 py-4" style={{ background: course.colorLight, borderBottom: '1px solid #F1F5F9' }}>
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="rounded-md px-2 py-0.5 text-xs font-bold" style={{ background: course.color, color: 'white' }}>{course.code}</span>
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>Change Section</div>
-              <div style={{ fontSize: 12, color: '#64748B' }}>Current: Section {course.section} with {course.professor}</div>
-            </div>
-            <button onClick={onClose} className="rounded-lg p-1.5" style={{ color: '#64748B' }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-        <div className="p-5 flex flex-col gap-3">
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 2 }}>Available Sections</div>
-          {alts.length === 0 && (
-            <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No other sections available this semester.</div>
-          )}
-          {alts.map((a) => (
-            <button
-              key={a.section}
-              onClick={() => onSwap(course, a.section, a.professor)}
-              className="flex items-start gap-4 p-4 rounded-xl text-left transition-all"
-              style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}
-              onMouseEnter={(e) => { e.currentTarget.style.border = `1px solid ${course.color}50`; e.currentTarget.style.background = course.colorLight }}
-              onMouseLeave={(e) => { e.currentTarget.style.border = '1px solid #F1F5F9'; e.currentTarget.style.background = '#F8FAFC' }}
-            >
-              <div className="rounded-lg px-2 py-1 shrink-0" style={{ background: course.color + '20', color: course.color, fontSize: 12, fontWeight: 800 }}>
-                §{a.section}
-              </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{a.professor}</div>
-                <div style={{ fontSize: 11, color: '#64748B' }}>{a.days} · {a.time}</div>
-              </div>
-              <div className="ml-auto text-xs font-semibold" style={{ color: course.color }}>Select →</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ----- Manual Builder -----
-function ManualBuilder() {
+function ManualBuilder({
+  courses,
+  setCourses,
+}: {
+  courses: Course[]
+  setCourses: React.Dispatch<React.SetStateAction<Course[]>>
+}) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [manualCourses, setManualCourses] = useState<Course[]>([...SCHEDULE_1])
+  const [available, setAvailable] = useState<CourseSummary[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
   const [viewCourse, setViewCourse] = useState<Course | null>(null)
+  const [picking, setPicking] = useState<{ code: string; title: string; credits: number } | null>(null)
   const [changeCourse, setChangeCourse] = useState<Course | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
 
-  const ALL_AVAILABLE = [
-    { code: 'EECE 330', name: 'Digital Systems', sections: 3, color: '#4338CA' },
-    { code: 'MATH 201', name: 'Calculus III', sections: 5, color: '#059669' },
-    { code: 'PHYS 211', name: 'Physics II', sections: 4, color: '#0284C7' },
-    { code: 'EECE 351', name: 'Signals & Systems', sections: 2, color: '#7C3AED' },
-    { code: 'CHEM 201', name: 'General Chemistry', sections: 6, color: '#D97706' },
-    { code: 'ENGL 210', name: 'Technical Writing', sections: 4, color: '#059669' },
-    { code: 'CS 201', name: 'Data Structures', sections: 3, color: '#0284C7' },
-  ]
+  useEffect(() => {
+    let cancelled = false
+    setSearchLoading(true)
+    const timer = setTimeout(() => {
+      api.courses
+        .list({ search: searchTerm.trim() || undefined, limit: 20 })
+        .then((res) => {
+          if (!cancelled) {
+            setAvailable(res.data)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setAvailable([])
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setSearchLoading(false)
+          }
+        })
+    }, 250)
 
-  const availableCourses = ALL_AVAILABLE.filter(
-    (c) => c.code.toLowerCase().includes(searchTerm.toLowerCase()) || c.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [searchTerm])
 
   const handleRemove = (id: string) => {
-    setManualCourses((p) => p.filter((c) => c.id !== id))
+    setCourses((p) => p.filter((c) => c.id !== id))
   }
 
-  const handleChange = (course: Course) => {
-    setChangeCourse(course)
+  const buildCourse = (src: { code: string; title: string; credits: number }, sec: CourseSection): Course => {
+    const color = COURSE_COLORS[courses.length % COURSE_COLORS.length]
+    const start = parseTime(sec.start_time)
+    const end = parseTime(sec.end_time)
+    return {
+      id: `sec-${sec.id}`,
+      code: src.code,
+      name: src.title,
+      section: sec.section_number,
+      professor: displayName(sec.professors?.first_name, sec.professors?.last_name),
+      room: sec.room ?? '',
+      days: parseDays(sec.days),
+      startHour: start?.hours ?? 8,
+      startMin: start?.minutes ?? 0,
+      durationMin: start && end ? durationMinutes(sec.start_time, sec.end_time) : 60,
+      color,
+      colorLight: color + '15',
+      credits: src.credits,
+      sectionId: sec.id,
+    }
   }
 
-  const handleSwap = (target: Course, newSection: string, newProfessor: string) => {
-    setManualCourses((p) =>
-      p.map((c) => c.id === target.id ? { ...c, section: newSection, professor: newProfessor } : c)
+  const handlePick = (sec: CourseSection) => {
+    if (!picking) {
+      return
+    }
+    setCourses((p) => [...p, buildCourse(picking, sec)])
+    setPicking(null)
+  }
+
+  const handleSwap = (target: Course, sec: CourseSection) => {
+    const start = parseTime(sec.start_time)
+    const end = parseTime(sec.end_time)
+    setCourses((p) =>
+      p.map((c) => c.id === target.id ? {
+        ...c,
+        section: sec.section_number,
+        professor: displayName(sec.professors?.first_name, sec.professors?.last_name),
+        room: sec.room ?? '',
+        days: parseDays(sec.days),
+        startHour: start?.hours ?? c.startHour,
+        startMin: start?.minutes ?? c.startMin,
+        durationMin: start && end ? durationMinutes(sec.start_time, sec.end_time) : c.durationMin,
+        sectionId: sec.id,
+      } : c)
     )
     setChangeCourse(null)
   }
 
-  const addCourse = (code: string) => {
-    const found = SCHEDULE_1.find((c) => c.code === code)
-    if (found && !manualCourses.find((c) => c.code === code)) {
-      setManualCourses((p) => [...p, { ...found, id: found.id + '_added' }])
-    }
-  }
+  const totalCredits = courses.reduce((acc, c) => acc + c.credits, 0)
 
   return (
     <div className="flex h-full">
@@ -938,33 +1143,39 @@ function ManualBuilder() {
           </div>
         </div>
         <div className="flex-1 p-3 flex flex-col gap-2 overflow-y-auto">
-          {availableCourses.map((c) => {
-            const alreadyAdded = manualCourses.some((m) => m.code === c.code)
+          {searchLoading && <div style={{ fontSize: 11, color: '#94A3B8', textAlign: 'center', padding: '16px 0' }}>Searching...</div>}
+          {!searchLoading && available.length === 0 && (
+            <div style={{ fontSize: 11, color: '#94A3B8', textAlign: 'center', padding: '16px 0' }}>No courses found. Try another search.</div>
+          )}
+          {available.map((c, i) => {
+            const color = COURSE_COLORS[i % COURSE_COLORS.length]
+            const alreadyAdded = courses.some((m) => m.code === c.code)
             return (
               <div
                 key={c.code}
                 draggable
                 className="flex items-center gap-2.5 rounded-xl p-3 transition-all"
-                style={{ background: alreadyAdded ? c.color + '10' : '#F8FAFC', border: `1px solid ${alreadyAdded ? c.color + '40' : '#F1F5F9'}`, cursor: alreadyAdded ? 'default' : 'grab', opacity: alreadyAdded ? 0.7 : 1 }}
-                onMouseEnter={(e) => { if (!alreadyAdded) { e.currentTarget.style.border = `1px solid ${c.color}40`; e.currentTarget.style.background = '#FFFFFF' } }}
+                style={{ background: alreadyAdded ? color + '10' : '#F8FAFC', border: `1px solid ${alreadyAdded ? color + '40' : '#F1F5F9'}`, cursor: alreadyAdded ? 'default' : 'grab', opacity: alreadyAdded ? 0.7 : 1 }}
+                onMouseEnter={(e) => { if (!alreadyAdded) { e.currentTarget.style.border = `1px solid ${color}40`; e.currentTarget.style.background = '#FFFFFF' } }}
                 onMouseLeave={(e) => { if (!alreadyAdded) { e.currentTarget.style.border = '1px solid #F1F5F9'; e.currentTarget.style.background = '#F8FAFC' } }}
               >
                 <GripVertical size={12} color="#CBD5E1" />
-                <div className="rounded-md" style={{ width: 28, height: 28, background: c.color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <BookOpen size={12} color={c.color} />
+                <div className="rounded-md" style={{ width: 28, height: 28, background: color + '20', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <BookOpen size={12} color={color} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div style={{ fontSize: 11, fontWeight: 700, color: c.color }}>{c.code}</div>
-                  <div style={{ fontSize: 11, color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color }}>{c.code}</div>
+                  <div style={{ fontSize: 11, color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.title}</div>
                 </div>
                 {alreadyAdded ? (
                   <span style={{ fontSize: 9, fontWeight: 700, color: '#059669', background: '#ECFDF5', borderRadius: 4, padding: '1px 4px' }}>Added</span>
                 ) : (
-                  <button onClick={() => addCourse(c.code)}
+                  <button
+                    onClick={() => setPicking({ code: c.code, title: c.title, credits: parseInt(c.credits, 10) || 3 })}
                     className="rounded-full p-1 transition-colors"
-                    style={{ color: c.color, background: c.color + '15' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = c.color + '30' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = c.color + '15' }}>
+                    style={{ color, background: color + '15' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = color + '30' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = color + '15' }}>
                     <Plus size={11} />
                   </button>
                 )}
@@ -974,9 +1185,16 @@ function ManualBuilder() {
         </div>
         <div className="p-3" style={{ borderTop: '1px solid #F1F5F9' }}>
           <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 6, textAlign: 'center' }}>
-            {manualCourses.length} courses · {manualCourses.length * 3} credits
+            {courses.length} courses · {totalCredits} credits
           </div>
+          {notice && (
+            <div className="rounded-lg px-3 py-2 mb-2" style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', fontSize: 11, color: '#0284C7', textAlign: 'center' }}>
+              {notice}
+            </div>
+          )}
+          {/* TODO(frontend): automatic conflict fixing not wired — no backend endpoint for unsaved builders. */}
           <button
+            onClick={() => setNotice('Automatic conflict fixing isn\'t wired yet. Review your calendar or adjust sections manually.')}
             className="w-full py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2"
             style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)', color: 'white', fontSize: 13 }}
           >
@@ -1000,18 +1218,34 @@ function ManualBuilder() {
           </div>
         </div>
         <WeeklyCalendar
-          courses={manualCourses}
+          courses={courses}
           onCourseClick={setViewCourse}
           onRemove={handleRemove}
-          onChange={handleChange}
+          onChange={setChangeCourse}
         />
       </div>
 
-      {viewCourse && <CourseModal course={viewCourse} onClose={() => setViewCourse(null)} />}
+      {viewCourse && (
+        <CourseModal
+          course={viewCourse}
+          onSwap={(c) => { setViewCourse(null); setChangeCourse(c) }}
+          onClose={() => setViewCourse(null)}
+        />
+      )}
+      {picking && (
+        <SectionPickerModal
+          title="Pick a section"
+          code={picking.code}
+          onPick={handlePick}
+          onClose={() => setPicking(null)}
+        />
+      )}
       {changeCourse && (
-        <SectionSwapModal
-          course={changeCourse}
-          onSwap={handleSwap}
+        <SectionPickerModal
+          title="Change Section"
+          code={changeCourse.code}
+          currentSection={changeCourse.section}
+          onPick={(sec) => handleSwap(changeCourse, sec)}
           onClose={() => setChangeCourse(null)}
         />
       )}
@@ -1020,13 +1254,27 @@ function ManualBuilder() {
 }
 
 // ----- Main AIScheduler -----
+function Toast({ message, onDone }: { message: string; onDone: () => void }) {
+  setTimeout(onDone, 3000)
+  return (
+    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-3 shadow-xl"
+      style={{ background: '#1E293B', color: 'white', fontSize: 13, fontWeight: 600, animation: 'none' }}>
+      <CheckCircle size={16} color="#10B981" />
+      {message}
+    </div>
+  )
+}
+
 export default function AIScheduler({ activeMode }: { activeMode: Page; setPage: (p: Page) => void }) {
   const [mode, setMode] = useState<'ai' | 'manual'>(activeMode === 'manual-builder' ? 'manual' : 'ai')
   const [scheduleTab, setScheduleTab] = useState(0)
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [generating, setGenerating] = useState(false)
   const [_currentScheduleIdx, setCurrentScheduleIdx] = useState(0)
+  const [manualCourses, setManualCourses] = useState<Course[]>([])
+  const [toast, setToast] = useState<string | null>(null)
 
+  // TODO(frontend): no schedule-generation endpoint yet (Phase 9 unchecked) — AI preview stays a UI placeholder.
   const handleGenerate = () => {
     setGenerating(true)
     setTimeout(() => {
@@ -1036,6 +1284,30 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
   }
 
   const activeCourses = SCHEDULES[scheduleTab] ?? SCHEDULE_1
+  const currentCredits = mode === 'manual'
+    ? manualCourses.reduce((acc, c) => acc + c.credits, 0)
+    : activeCourses.reduce((acc, c) => acc + c.credits, 0)
+
+  async function handleSave() {
+    if (mode === 'ai') {
+      setToast('AI-generated previews aren\'t saved yet — build a schedule in Manual Builder to save.')
+      return
+    }
+    const ids = manualCourses.map((c) => c.sectionId).filter((x): x is number => x != null)
+    if (ids.length === 0) {
+      setToast('Add at least one course before saving.')
+      return
+    }
+    try {
+      await api.schedules.create({
+        name: `My Schedule ${new Date().toLocaleDateString()}`,
+        sectionIds: ids,
+      })
+      setToast('Schedule saved successfully!')
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : 'Could not save schedule.')
+    }
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -1095,10 +1367,13 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
           {/* Credits count */}
           <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
             <TrendingUp size={12} color="#16A34A" />
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#15803D' }}>15 Credits</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#15803D' }}>{currentCredits} Credits</span>
           </div>
-          <button className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
-            style={{ fontSize: 12, fontWeight: 600, background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#64748B' }}>
+          <button
+            onClick={() => void handleSave()}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
+            style={{ fontSize: 12, fontWeight: 600, background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#64748B' }}
+          >
             <Bookmark size={12} />
             Save
           </button>
@@ -1128,13 +1403,14 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
-          <ManualBuilder />
+          <ManualBuilder courses={manualCourses} setCourses={setManualCourses} />
         </div>
       )}
 
       {selectedCourse && (
         <CourseModal course={selectedCourse} onClose={() => setSelectedCourse(null)} />
       )}
+      {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Search, ChevronDown, Bell, MessageSquare, Sparkles, ChevronRight } from 'lucide-react'
+import { Search, ChevronDown, Bell, MessageSquare, Sparkles, ChevronRight, LogOut } from 'lucide-react'
 import type { Page } from '../App'
+import { useAuth } from '../lib/auth'
 
 const PAGE_TITLES: Record<Page, string> = {
   dashboard: 'Dashboard',
@@ -16,8 +17,12 @@ const PAGE_TITLES: Record<Page, string> = {
 }
 
 export default function TopBar({ activePage }: { activePage: Page }) {
+  const { user, logout } = useAuth()
   const [search, setSearch] = useState('')
   const [showNotifications, setShowNotifications] = useState(false)
+
+  const localPart = user?.email ? user.email.split('@')[0] ?? '' : ''
+  const initials = (localPart.slice(0, 2) || 'ST').toUpperCase()
 
   return (
     <header
@@ -159,7 +164,19 @@ export default function TopBar({ activePage }: { activePage: Page }) {
           className="rounded-full flex items-center justify-center ml-1"
           style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', fontSize: 12, fontWeight: 700, color: 'white' }}
         >
-          AH
+          {initials}
+        </button>
+
+        {/* Logout */}
+        <button
+          onClick={() => void logout()}
+          title="Sign out"
+          className="flex items-center justify-center rounded-lg transition-colors"
+          style={{ width: 34, height: 34, color: '#64748B' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+        >
+          <LogOut size={15} />
         </button>
       </div>
     </header>

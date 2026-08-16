@@ -12,6 +12,7 @@ import {
   GraduationCap,
 } from 'lucide-react'
 import type { Page } from '../App'
+import { useAuth } from '../lib/auth'
 
 const NAV_ITEMS: { id: Page; label: string; icon: React.ReactNode; section: string; badge?: { text: string; color: string; bg: string } }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={16} />, section: 'main' },
@@ -38,8 +39,11 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
+  const { user } = useAuth()
   // Profile and Settings both resolve to the same page
   const effectivePage = activePage === 'settings' ? 'profile' : activePage
+
+  const displayName = user?.email ? user.email.split('@')[0] ?? 'Student' : 'Student'
 
   return (
     <aside
@@ -131,8 +135,8 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
             <GraduationCap size={16} color="white" />
           </div>
           <div className="flex-1 min-w-0">
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#0F172A' }}>Alex Hassan</div>
-            <div style={{ fontSize: 11, color: '#64748B' }}>CS • Fall 2025</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
+            <div style={{ fontSize: 11, color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email ?? ''}</div>
           </div>
           <button className="shrink-0" style={{ color: '#94A3B8' }}>
             <Bell size={14} />

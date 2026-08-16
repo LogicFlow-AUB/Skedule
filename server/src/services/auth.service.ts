@@ -57,9 +57,11 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
 
   const db = requireSupabaseClient();
   const { data, error } = await db.auth.signUp({
-    email: input.email,
+    email: email,
     password: input.password,
   });
+
+  console.log('SIGNUP RESULT:', { data, error });
 
   if (error) {
     if (error.code === 'user_already_exists') {
@@ -79,10 +81,10 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
     throw new AppError(500, 'AUTH_SIGNUP_FAILED', 'Account was not created.');
   }
 
-  await ensureProfile(user.id, user.email ?? input.email);
+  await ensureProfile(user.id, user.email ?? email);
 
   const response: AuthResponse = {
-    user: { id: user.id, email: user.email ?? input.email },
+    user: { id: user.id, email: user.email ?? email },
   };
 
   if (data.session) {
@@ -100,6 +102,14 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
   });
 
   if (error) {
+    if (error.code === 'email_not_confirmed') {
+      throw new AppError(
+        401,
+        'EMAIL_NOT_CONFIRMED',
+        'Please confirm your email address before signing in.',
+      );
+    }
+
     throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
   }
 
@@ -108,8 +118,6 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
   if (!user) {
     throw new AppError(500, 'AUTH_SESSION_MISSING', 'Login could not be completed.');
   }
-
-  await ensureProfile(user.id, user.email ?? input.email);
 
   return {
     user: { id: user.id, email: user.email ?? input.email },

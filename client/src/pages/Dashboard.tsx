@@ -1,31 +1,103 @@
+import { useEffect, useState } from 'react'
 import { Sparkles, CalendarDays, BookmarkCheck, Star, Users, TrendingUp, Clock, ChevronRight, Calendar, Zap, Award } from 'lucide-react'
 import type { Page } from '../App'
+import { api } from '../lib/api'
+import { formatDateTime, timeAgo } from '../lib/format'
+import { useAuth } from '../lib/auth'
 
 interface DashboardProps {
   setPage: (p: Page) => void
 }
 
-const QUICK_STATS = [
-  { label: 'Credits Enrolled', value: '15', sub: 'Fall 2025', color: '#4338CA', bg: '#EEF2FF' },
-  { label: 'Saved Schedules', value: '3', sub: 'View all →', color: '#059669', bg: '#ECFDF5' },
-  { label: 'Courses Reviewed', value: '14', sub: 'Community rank #12', color: '#F59E0B', bg: '#FFFBEB' },
-  { label: 'Friends Online', value: '3', sub: '5 total friends', color: '#0EA5E9', bg: '#F0F9FF' },
-]
+type StatCard = { label: string; value: string; sub: string; color: string; bg: string }
+type UpcomingItem = { event: string; date: string; type: string; color: string; bg: string }
+type ActivityItem = { text: string; time: string; icon: string }
 
-const UPCOMING = [
-  { event: 'Fall 2025 Registration', date: 'Nov 3, 9:00 AM', type: 'registration', color: '#EF4444', bg: '#FEF2F2' },
-  { event: 'Add/Drop Period Ends', date: 'Nov 17, 5:00 PM', type: 'deadline', color: '#D97706', bg: '#FFFBEB' },
-  { event: 'EECE 330 Lab Section', date: 'Oct 28, 2:00 PM', type: 'class', color: '#4338CA', bg: '#EEF2FF' },
-  { event: 'MATH 201 Midterm', date: 'Nov 5, 10:00 AM', type: 'exam', color: '#7C3AED', bg: '#F5F3FF' },
-]
+const EVENT_STYLES: Record<string, { color: string; bg: string }> = {
+  registration: { color: '#EF4444', bg: '#FEF2F2' },
+  deadline: { color: '#D97706', bg: '#FFFBEB' },
+  class: { color: '#4338CA', bg: '#EEF2FF' },
+  exam: { color: '#7C3AED', bg: '#F5F3FF' },
+}
 
-const RECENT_ACTIVITY = [
-  { text: 'Sarah K. shared her Fall 2025 schedule with you', time: '2h ago', icon: '📅' },
-  { text: 'New review posted for Dr. Nassif (PHYS 211)', time: '5h ago', icon: '⭐' },
-  { text: 'EECE 330 seat availability: 3 seats left in Section 01', time: '1d ago', icon: '⚠️' },
+const ACTIVITY_ICONS: Record<string, string> = {
+  course_review_created: '⭐',
+  professor_review_created: '🎓',
+  post_created: '📣',
+  post_commented: '💬',
+  schedule_created: '📅',
+  friend_request_accepted: '🤝',
+  friend_request_sent: '👋',
+}
+
+const DEFAULT_STAT_CARDS: StatCard[] = [
+  { label: 'Credits Enrolled', value: '—', sub: 'Latest schedule', color: '#4338CA', bg: '#EEF2FF' },
+  { label: 'Saved Schedules', value: '—', sub: 'View all →', color: '#059669', bg: '#ECFDF5' },
+  { label: 'Courses Reviewed', value: '—', sub: 'Across courses & professors', color: '#F59E0B', bg: '#FFFBEB' },
+  { label: 'Friends Online', value: '—', sub: 'Total friends', color: '#0EA5E9', bg: '#F0F9FF' },
 ]
 
 export default function Dashboard({ setPage }: DashboardProps) {
+  const { user } = useAuth()
+  const [quickStats, setQuickStats] = useState<StatCard[]>(DEFAULT_STAT_CARDS)
+  const [upcoming, setUpcoming] = useState<UpcomingItem[]>([])
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([])
+
+  const localPart = user?.email ? user.email.split('@')[0] ?? 'student' : 'student'
+  const firstName = localPart.charAt(0).toUpperCase() + localPart.slice(1)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      try {
+        const [statsRes, upcomingRes, activityRes] = await Promise.all([
+          api.dashboard.stats(),
+          api.dashboard.upcoming(),
+          api.dashboard.activity(1, 10),
+        ])
+
+        if (cancelled) {
+          return
+        }
+
+        const s = statsRes.data
+        setQuickStats([
+          { label: 'Credits Enrolled', value: String(s.creditsEnrolled), sub: 'Latest schedule', color: '#4338CA', bg: '#EEF2FF' },
+          { label: 'Saved Schedules', value: String(s.savedSchedules), sub: 'View all →', color: '#059669', bg: '#ECFDF5' },
+          { label: 'Courses Reviewed', value: String(s.coursesReviewed), sub: 'Across courses & professors', color: '#F59E0B', bg: '#FFFBEB' },
+          { label: 'Friends Online', value: String(s.friendsOnline), sub: `${s.friendCount} total friends`, color: '#0EA5E9', bg: '#F0F9FF' },
+        ])
+
+        setUpcoming(upcomingRes.data.map((event) => {
+          const style = EVENT_STYLES[event.type ?? ''] ?? { color: '#4338CA', bg: '#EEF2FF' }
+          return {
+            event: event.title,
+            date: formatDateTime(event.starts_at),
+            type: event.type ?? '',
+            color: style.color,
+            bg: style.bg,
+          }
+        }))
+
+        setRecentActivity(activityRes.data.map((activity) => ({
+          text: activity.message,
+          time: timeAgo(activity.created_at),
+          icon: ACTIVITY_ICONS[activity.type] ?? '📌',
+        })))
+      } catch {
+        if (!cancelled) {
+          setQuickStats(DEFAULT_STAT_CARDS)
+        }
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
   return (
     <div className="h-full overflow-y-auto" style={{ background: '#F8FAFC' }}>
       {/* Welcome banner */}
@@ -42,7 +114,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
         <div className="relative z-10 flex items-center justify-between">
           <div>
             <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 500, marginBottom: 4 }}>
-              Good morning, Alex 👋
+              Good morning, {firstName} 👋
             </div>
             <h1 style={{ fontSize: 26, fontWeight: 800, color: '#FFFFFF', lineHeight: 1.2 }}>
               Build your perfect semester.
@@ -79,7 +151,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
       <div className="px-8 py-6 flex flex-col gap-6">
         {/* Quick stats */}
         <div className="grid grid-cols-4 gap-4">
-          {QUICK_STATS.map((s) => (
+          {quickStats.map((s) => (
             <button
               key={s.label}
               onClick={() => s.label === 'Saved Schedules' ? setPage('saved-schedules') : undefined}
@@ -189,7 +261,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              {UPCOMING.map((u, i) => (
+              {upcoming.map((u, i) => (
                 <div key={i} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: u.bg, border: `1px solid ${u.color}20` }}>
                   <div className="rounded-lg p-1.5 shrink-0" style={{ background: u.color + '20' }}>
                     <Calendar size={13} color={u.color} />
@@ -237,7 +309,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
               <button onClick={() => setPage('community')} style={{ fontSize: 12, color: '#4338CA', fontWeight: 600 }}>View all</button>
             </div>
             <div className="flex flex-col gap-3">
-              {RECENT_ACTIVITY.map((a, i) => (
+              {recentActivity.map((a, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <span style={{ fontSize: 20, lineHeight: 1, marginTop: 1 }}>{a.icon}</span>
                   <div className="flex-1">

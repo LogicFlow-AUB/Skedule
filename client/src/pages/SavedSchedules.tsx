@@ -1,9 +1,13 @@
-import { useState } from 'react'
-import { BookmarkCheck, GitCompare, Eye, FileDown, X, Calendar, Clock, MapPin, BookOpen, CheckCircle } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { BookmarkCheck, GitCompare, Eye, FileDown, X, Calendar, Clock, BookOpen, CheckCircle } from 'lucide-react'
+import { api, type ScheduleSummary, type ScheduleDetail } from '../lib/api'
+import { displayName, formatDate } from '../lib/format'
 
 const HOUR_HEIGHT = 60
 const START_HOUR = 7
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+
+const COURSE_COLORS = ['#4338CA', '#059669', '#0284C7', '#7C3AED', '#D97706', '#10B981', '#F59E0B', '#DC2626']
 
 interface Course {
   id: string
@@ -19,33 +23,34 @@ interface Course {
   color: string
 }
 
-const SCHEDULE_COURSES: Record<string, Course[]> = {
-  'Schedule A': [
-    { id: 'e330', code: 'EECE 330', name: 'Digital Systems', section: '01', professor: 'Dr. Hassan', room: 'BE-301', days: [0, 2], startHour: 10, startMin: 0, durationMin: 75, color: '#4338CA' },
-    { id: 'm201', code: 'MATH 201', name: 'Calculus III', section: '03', professor: 'Dr. Khalil', room: 'SCC-210', days: [1, 3], startHour: 9, startMin: 0, durationMin: 75, color: '#059669' },
-    { id: 'p211', code: 'PHYS 211', name: 'Physics II', section: '02', professor: 'Dr. Nassif', room: 'SCC-315', days: [0, 2, 4], startHour: 13, startMin: 0, durationMin: 60, color: '#0284C7' },
-    { id: 'e351', code: 'EECE 351', name: 'Signals & Systems', section: '01', professor: 'Dr. Farhat', room: 'BE-402', days: [1, 3], startHour: 11, startMin: 30, durationMin: 90, color: '#7C3AED' },
-    { id: 'c201', code: 'CHEM 201', name: 'General Chemistry', section: '05', professor: 'Dr. Ibrahim', room: 'SCC-110', days: [4], startHour: 8, startMin: 0, durationMin: 60, color: '#D97706' },
-  ],
-  'Schedule B': [
-    { id: 'e330b', code: 'EECE 330', name: 'Digital Systems', section: '02', professor: 'Dr. Hassan', room: 'BE-205', days: [1, 3], startHour: 11, startMin: 0, durationMin: 75, color: '#4338CA' },
-    { id: 'm201b', code: 'MATH 201', name: 'Calculus III', section: '01', professor: 'Dr. Khalil', room: 'SCC-108', days: [0, 2], startHour: 14, startMin: 0, durationMin: 75, color: '#059669' },
-    { id: 'p211b', code: 'PHYS 211', name: 'Physics II', section: '04', professor: 'Dr. Nassif', room: 'SCC-220', days: [1, 3], startHour: 15, startMin: 0, durationMin: 60, color: '#0284C7' },
-    { id: 'e351b', code: 'EECE 351', name: 'Signals & Systems', section: '03', professor: 'Dr. Farhat', room: 'BE-301', days: [0, 2], startHour: 9, startMin: 0, durationMin: 90, color: '#7C3AED' },
-  ],
-  'Schedule C': [
-    { id: 'm201c', code: 'MATH 201', name: 'Calculus III', section: '02', professor: 'Dr. Khalil', room: 'SCC-108', days: [1, 3], startHour: 10, startMin: 0, durationMin: 75, color: '#059669' },
-    { id: 'p211c', code: 'PHYS 211', name: 'Physics II', section: '01', professor: 'Dr. Nassif', room: 'SCC-315', days: [0, 2], startHour: 11, startMin: 0, durationMin: 60, color: '#0284C7' },
-    { id: 'eng', code: 'ENGL 210', name: 'Technical Writing', section: '02', professor: 'Dr. Saad', room: 'FAS-101', days: [1, 3], startHour: 14, startMin: 0, durationMin: 75, color: '#10B981' },
-    { id: 'hist', code: 'HIST 101', name: 'World Civilizations', section: '01', professor: 'Dr. Moussa', room: 'FAS-205', days: [4], startHour: 9, startMin: 0, durationMin: 90, color: '#F59E0B' },
-  ],
+function toCourses(detail?: ScheduleDetail): Course[] {
+  if (!detail) {
+    return []
+  }
+  return detail.courses.map((c, i) => {
+    const sec = c.section
+    return {
+      id: `${c.courseId ?? 'c'}-${sec.id}`,
+      code: c.code ?? '—',
+      name: c.title ?? '',
+      section: sec.sectionNumber,
+      professor: displayName(c.professor?.firstName, c.professor?.lastName),
+      room: sec.room ?? '',
+      days: sec.days,
+      startHour: Math.floor((sec.startMinutes ?? 0) / 60),
+      startMin: (sec.startMinutes ?? 0) % 60,
+      durationMin: sec.durationMinutes ?? 60,
+      color: COURSE_COLORS[i % COURSE_COLORS.length],
+    }
+  })
 }
 
-const SAVED_SCHEDULES = [
-  { key: 'Schedule A', name: 'Schedule A — Preferred', credits: 15, days: 'Mon–Fri', saved: 'Oct 15', notes: 'Best balance of professors and timing. Highest-rated faculty.' },
-  { key: 'Schedule B', name: 'Schedule B — Friday Free', credits: 15, days: 'Mon–Thu', saved: 'Oct 12', notes: 'Keeps Friday free. Slightly less preferred sections.' },
-  { key: 'Schedule C', name: 'Schedule C — Light Load', credits: 12, days: 'Mon–Thu (light)', saved: 'Oct 8', notes: 'Lighter workload. Missing CHEM 201 and EECE courses.' },
-]
+function formatDays(days: number[]): string {
+  if (days.length === 0) {
+    return '—'
+  }
+  return days.map((d) => DAYS[d] ?? `Day ${d}`).join(' · ')
+}
 
 const HOURS = Array.from({ length: 14 }, (_, i) => i + START_HOUR)
 
@@ -99,8 +104,8 @@ function MiniCalendar({ courses }: { courses: Course[] }) {
 }
 
 // Full calendar modal
-function ScheduleViewModal({ schedule: s, onClose }: { schedule: typeof SAVED_SCHEDULES[0]; onClose: () => void }) {
-  const courses = SCHEDULE_COURSES[s.key] ?? []
+function ScheduleViewModal({ detail, onClose }: { detail: ScheduleDetail; onClose: () => void }) {
+  const courses = toCourses(detail)
   const totalHours = 14
 
   return (
@@ -111,8 +116,8 @@ function ScheduleViewModal({ schedule: s, onClose }: { schedule: typeof SAVED_SC
         style={{ width: 800, maxHeight: '88vh', background: '#FFFFFF' }}>
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
           <div>
-            <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A' }}>{s.name}</h2>
-            <p style={{ fontSize: 12, color: '#64748B' }}>{s.credits} credits · {s.days} · Saved {s.saved}</p>
+            <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A' }}>{detail.name ?? `Schedule #${detail.id}`}</h2>
+            <p style={{ fontSize: 12, color: '#64748B' }}>{detail.totalCredits} credits · {formatDays(detail.days)} · {detail.courseCount} courses</p>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5" style={{ color: '#64748B' }}
             onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9' }}
@@ -159,7 +164,7 @@ function ScheduleViewModal({ schedule: s, onClose }: { schedule: typeof SAVED_SC
             })}
           </div>
         </div>
-        <div className="flex items-center gap-2 px-6 py-3" style={{ borderTop: '1px solid #F1F5F9' }}>
+        <div className="flex items-center gap-2 px-6 py-3 flex-wrap" style={{ borderTop: '1px solid #F1F5F9' }}>
           {courses.map((c) => (
             <span key={c.id} className="flex items-center gap-1.5 rounded-full px-2.5 py-1">
               <div className="rounded-full" style={{ width: 8, height: 8, background: c.color }} />
@@ -173,14 +178,18 @@ function ScheduleViewModal({ schedule: s, onClose }: { schedule: typeof SAVED_SC
 }
 
 // Compare modal
-function CompareModal({ schedules, onClose }: { schedules: typeof SAVED_SCHEDULES; onClose: () => void }) {
-  const [leftKey, setLeftKey] = useState(schedules[0].key)
-  const [rightKey, setRightKey] = useState(schedules[1].key)
+function CompareModal({ summaries, details, onClose }: { summaries: ScheduleSummary[]; details: Record<number, ScheduleDetail>; onClose: () => void }) {
+  const [leftId, setLeftId] = useState(summaries[0]?.id ?? 0)
+  const [rightId, setRightId] = useState(summaries[1]?.id ?? summaries[0]?.id ?? 0)
 
-  const leftSchedule = schedules.find((s) => s.key === leftKey)!
-  const rightSchedule = schedules.find((s) => s.key === rightKey)!
-  const leftCourses = SCHEDULE_COURSES[leftKey] ?? []
-  const rightCourses = SCHEDULE_COURSES[rightKey] ?? []
+  const leftSummary = summaries.find((s) => s.id === leftId) ?? summaries[0]
+  const rightSummary = summaries.find((s) => s.id === rightId) ?? summaries[1]
+  if (!leftSummary || !rightSummary) {
+    return null
+  }
+
+  const leftCourses = toCourses(details[leftSummary.id])
+  const rightCourses = toCourses(details[rightSummary.id])
 
   const leftCodes = new Set(leftCourses.map((c) => c.code))
   const rightCodes = new Set(rightCourses.map((c) => c.code))
@@ -204,12 +213,15 @@ function CompareModal({ schedules, onClose }: { schedules: typeof SAVED_SCHEDULE
         <div className="overflow-y-auto flex-1 p-6">
           {/* Selectors */}
           <div className="grid grid-cols-2 gap-6 mb-6">
-            {[{ key: leftKey, set: setLeftKey }, { key: rightKey, set: setRightKey }].map((s, i) => (
+            {[
+              { id: leftId, set: setLeftId },
+              { id: rightId, set: setRightId },
+            ].map((s, i) => (
               <div key={i}>
-                <select value={s.key} onChange={(e) => s.set(e.target.value)}
+                <select value={s.id} onChange={(e) => s.set(Number(e.target.value))}
                   className="w-full rounded-xl px-3 py-2 outline-none font-semibold"
                   style={{ fontSize: 13, border: '1px solid #E2E8F0', color: '#1E293B', background: '#F8FAFC' }}>
-                  {schedules.map((sc) => <option key={sc.key} value={sc.key}>{sc.name}</option>)}
+                  {summaries.map((sc) => <option key={sc.id} value={sc.id}>{sc.name ?? `Schedule #${sc.id}`}</option>)}
                 </select>
               </div>
             ))}
@@ -218,13 +230,13 @@ function CompareModal({ schedules, onClose }: { schedules: typeof SAVED_SCHEDULE
           {/* Side-by-side comparison */}
           <div className="grid grid-cols-2 gap-6 mb-6">
             {[
-              { sched: leftSchedule, courses: leftCourses, otherCodes: rightCodes },
-              { sched: rightSchedule, courses: rightCourses, otherCodes: leftCodes },
+              { sched: leftSummary, courses: leftCourses, otherCodes: rightCodes },
+              { sched: rightSummary, courses: rightCourses, otherCodes: leftCodes },
             ].map(({ sched, courses, otherCodes }) => (
-              <div key={sched.key} className="rounded-2xl overflow-hidden" style={{ border: '1px solid #F1F5F9' }}>
+              <div key={sched.id} className="rounded-2xl overflow-hidden" style={{ border: '1px solid #F1F5F9' }}>
                 <div className="px-4 py-3" style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1E293B' }}>{sched.name}</div>
-                  <div style={{ fontSize: 11, color: '#64748B' }}>{sched.credits} credits · {sched.days}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1E293B' }}>{sched.name ?? `Schedule #${sched.id}`}</div>
+                  <div style={{ fontSize: 11, color: '#64748B' }}>{sched.totalCredits} credits · {sched.courseCount} courses</div>
                 </div>
                 <MiniCalendar courses={courses} />
                 <div className="p-4 flex flex-col gap-2">
@@ -280,13 +292,67 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 }
 
 export default function SavedSchedules() {
-  const [viewSchedule, setViewSchedule] = useState<typeof SAVED_SCHEDULES[0] | null>(null)
+  const [viewDetail, setViewDetail] = useState<ScheduleDetail | null>(null)
   const [showCompare, setShowCompare] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [schedules, setSchedules] = useState(SAVED_SCHEDULES)
+  const [summaries, setSummaries] = useState<ScheduleSummary[]>([])
+  const [details, setDetails] = useState<Record<number, ScheduleDetail>>({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const handlePDF = (s: typeof SAVED_SCHEDULES[0]) => {
-    setToast(`Downloading "${s.name}" as PDF...`)
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      try {
+        const { data } = await api.schedules.list(1, 50)
+        if (cancelled) {
+          return
+        }
+        setSummaries(data)
+        const loaded = await Promise.all(data.map((s) => api.schedules.get(s.id)))
+        if (!cancelled) {
+          const map: Record<number, ScheduleDetail> = {}
+          for (const res of loaded) {
+            map[res.data.id] = res.data
+          }
+          setDetails(map)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load schedules.')
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  async function handleDelete(id: number) {
+    try {
+      await api.schedules.remove(id)
+      setSummaries((prev) => prev.filter((s) => s.id !== id))
+      setDetails((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete schedule.')
+    }
+  }
+
+  // TODO(frontend): real PDF export not wired yet.
+  const handlePDF = (name: string) => {
+    setToast(`Downloading "${name}" as PDF...`)
   }
 
   return (
@@ -296,14 +362,15 @@ export default function SavedSchedules() {
         <div className="flex items-center justify-between">
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A' }}>Saved Schedules</h1>
-            <p style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>{schedules.length} schedules saved for Fall 2025</p>
+            <p style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>{loading ? 'Loading...' : `${summaries.length} schedules saved`}</p>
           </div>
           <button
             onClick={() => setShowCompare(true)}
+            disabled={summaries.length < 2}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold transition-all"
-            style={{ fontSize: 13, background: '#4338CA', color: 'white' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#3730A3' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#4338CA' }}
+            style={{ fontSize: 13, background: summaries.length >= 2 ? '#4338CA' : '#E2E8F0', color: summaries.length >= 2 ? 'white' : '#94A3B8' }}
+            onMouseEnter={(e) => { if (summaries.length >= 2) e.currentTarget.style.background = '#3730A3' }}
+            onMouseLeave={(e) => { if (summaries.length >= 2) e.currentTarget.style.background = '#4338CA' }}
           >
             <GitCompare size={15} />
             Compare All
@@ -313,37 +380,47 @@ export default function SavedSchedules() {
 
       {/* Schedule cards */}
       <div className="px-8 py-6 flex flex-col gap-5">
-        {schedules.map((s) => {
-          const courses = SCHEDULE_COURSES[s.key] ?? []
+        {error && (
+          <div className="rounded-xl px-4 py-3" style={{ background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 12, fontWeight: 600, color: '#B91C1C' }}>
+            {error}
+          </div>
+        )}
+
+        {summaries.map((s) => {
+          const courses = toCourses(details[s.id])
           return (
-            <div key={s.key} className="rounded-2xl overflow-hidden"
+            <div key={s.id} className="rounded-2xl overflow-hidden"
               style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
               <div className="flex gap-6 p-5">
                 {/* Mini calendar preview */}
                 <div style={{ width: 340, flexShrink: 0 }}>
-                  <MiniCalendar courses={courses} />
+                  {courses.length > 0 ? <MiniCalendar courses={courses} /> : (
+                    <div className="flex items-center justify-center rounded-xl" style={{ height: 160, background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
+                      <div style={{ fontSize: 12, color: '#94A3B8' }}>Loading preview...</div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Info + actions */}
                 <div className="flex-1 flex flex-col">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A' }}>{s.name}</h3>
+                      <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A' }}>{s.name ?? `Schedule #${s.id}`}</h3>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="flex items-center gap-1" style={{ fontSize: 12, color: '#64748B' }}>
-                          <BookOpen size={12} />{s.credits} credits
+                          <BookOpen size={12} />{s.totalCredits} credits
                         </span>
                         <span className="flex items-center gap-1" style={{ fontSize: 12, color: '#64748B' }}>
-                          <Calendar size={12} />{s.days}
+                          <Calendar size={12} />{formatDays(s.days)}
                         </span>
                         <span className="flex items-center gap-1" style={{ fontSize: 12, color: '#64748B' }}>
-                          <Clock size={12} />Saved {s.saved}
+                          <Clock size={12} />Saved {formatDate(s.createdAt)}
                         </span>
                       </div>
-                      <p style={{ fontSize: 12, color: '#94A3B8', marginTop: 6, lineHeight: 1.5 }}>{s.notes}</p>
+                      {s.notes && <p style={{ fontSize: 12, color: '#94A3B8', marginTop: 6, lineHeight: 1.5 }}>{s.notes}</p>}
                     </div>
                     <button
-                      onClick={() => setSchedules((p) => p.filter((x) => x.key !== s.key))}
+                      onClick={() => void handleDelete(s.id)}
                       className="rounded-lg p-1.5 transition-colors"
                       style={{ color: '#CBD5E1' }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#EF4444' }}
@@ -364,10 +441,10 @@ export default function SavedSchedules() {
                     ))}
                   </div>
 
-                  {/* Action buttons — NO Register button */}
+                  {/* Action buttons */}
                   <div className="flex gap-2 mt-auto">
                     <button
-                      onClick={() => setViewSchedule(s)}
+                      onClick={() => { const d = details[s.id]; if (d) setViewDetail(d) }}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all"
                       style={{ fontSize: 12, background: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE' }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = '#E0E7FF' }}
@@ -378,16 +455,17 @@ export default function SavedSchedules() {
                     </button>
                     <button
                       onClick={() => setShowCompare(true)}
+                      disabled={summaries.length < 2}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all"
-                      style={{ fontSize: 12, background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#374151' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.color = '#64748B' }}
+                      style={{ fontSize: 12, background: '#F8FAFC', color: summaries.length >= 2 ? '#64748B' : '#CBD5E1', border: '1px solid #E2E8F0' }}
+                      onMouseEnter={(e) => { if (summaries.length >= 2) { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#374151' } }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = '#F8FAFC'; if (summaries.length >= 2) e.currentTarget.style.color = '#64748B' }}
                     >
                       <GitCompare size={13} />
                       Compare
                     </button>
                     <button
-                      onClick={() => handlePDF(s)}
+                      onClick={() => handlePDF(s.name ?? `Schedule #${s.id}`)}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all"
                       style={{ fontSize: 12, background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#374151' }}
@@ -403,7 +481,7 @@ export default function SavedSchedules() {
           )
         })}
 
-        {schedules.length === 0 && (
+        {!loading && summaries.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20">
             <BookmarkCheck size={48} color="#CBD5E1" />
             <div style={{ fontSize: 16, fontWeight: 700, color: '#94A3B8', marginTop: 12 }}>No saved schedules</div>
@@ -412,8 +490,8 @@ export default function SavedSchedules() {
         )}
       </div>
 
-      {viewSchedule && <ScheduleViewModal schedule={viewSchedule} onClose={() => setViewSchedule(null)} />}
-      {showCompare && <CompareModal schedules={schedules} onClose={() => setShowCompare(false)} />}
+      {viewDetail && <ScheduleViewModal detail={viewDetail} onClose={() => setViewDetail(null)} />}
+      {showCompare && <CompareModal summaries={summaries} details={details} onClose={() => setShowCompare(false)} />}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>
   )
