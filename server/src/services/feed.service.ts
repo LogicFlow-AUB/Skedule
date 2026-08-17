@@ -2,6 +2,7 @@ import { requireSupabaseClient } from '../db/supabase.js';
 import type { Post, PostComment, User } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { trackActivity } from './activity.service.js';
+import { notifyPostLiked, notifyPostCommented } from './notifications.service.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
 
 export type PostType = 'schedule' | 'review' | 'question' | 'tip';
@@ -237,7 +238,7 @@ export async function deletePost(userId: string, postId: number): Promise<void> 
 }
 
 export async function likePost(userId: string, postId: number): Promise<void> {
-  await getPostRowOrThrow(postId);
+  const post = await getPostRowOrThrow(postId);
 
   const db = requireSupabaseClient();
   const { error } = await db
@@ -246,6 +247,10 @@ export async function likePost(userId: string, postId: number): Promise<void> {
 
   if (error) {
     throw error;
+  }
+
+  if (post.user_id !== userId) {
+    await notifyPostLiked(post.user_id, userId, postId);
   }
 }
 
@@ -318,7 +323,7 @@ export async function getComments(
 }
 
 export async function createComment(userId: string, postId: number, input: CreateCommentInput) {
-  await getPostRowOrThrow(postId);
+  const post = await getPostRowOrThrow(postId);
 
   const db = requireSupabaseClient();
   const { data, error } = await db
@@ -336,6 +341,10 @@ export async function createComment(userId: string, postId: number, input: Creat
     postId,
     commentId: comment.id,
   });
+
+  if (post.user_id !== userId) {
+    await notifyPostCommented(post.user_id, userId, postId);
+  }
 
   return commentResponse(comment);
 }

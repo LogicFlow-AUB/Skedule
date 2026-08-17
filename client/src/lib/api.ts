@@ -389,6 +389,26 @@ export type UserReview = {
   professor: { id: number; firstName: string; lastName: string } | null
 }
 
+export type Notification = {
+  id: number
+  type: string
+  message: string
+  data: Record<string, unknown>
+  actor: { id: string; firstName: string | null; lastName: string | null } | null
+  read: boolean
+  createdAt: string
+}
+
+export type NotificationPreferences = {
+  friendRequests: boolean
+  friendAcceptances: boolean
+  postLikes: boolean
+  postComments: boolean
+  reviewLikes: boolean
+  scheduleShares: boolean
+  registrationReminders: boolean
+}
+
 export type ListCoursesQuery = {
   search?: string
   attribute?: string
@@ -562,6 +582,15 @@ export const api = {
       request<void>(`/friends/requests/${userId}/reject`, { method: 'POST' }),
     remove: (userId: string) => request<void>(`/friends/${userId}`, { method: 'DELETE' }),
     commonFreeTime: () => request<{ data: CommonFreeTime }>('/friends/common-free-time'),
+  },
+
+  notifications: {
+    list: (page = 1, limit = 20) =>
+      request<Page<Notification>>(`/notifications?page=${page}&limit=${limit}`),
+    unreadCount: () => request<{ data: { count: number } }>('/notifications/unread-count'),
+    markRead: (id: number) => request<void>(`/notifications/${id}/read`, { method: 'PUT' }),
+    markAllRead: () => request<void>('/notifications/read-all', { method: 'PUT' }),
+    preferences: () => request<{ data: NotificationPreferences }>('/notifications/preferences'),
   },
 
   users: {

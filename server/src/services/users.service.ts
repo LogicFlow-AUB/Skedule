@@ -2,6 +2,7 @@ import { requireSupabaseClient } from '../db/supabase.js';
 import type { CourseReview, ProfessorReview, User } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
+import * as notificationsService from './notifications.service.js';
 
 export type ProfileUpdateInput = {
   firstName?: string;
@@ -222,19 +223,8 @@ export async function updateProfile(
   return toProfile(data);
 }
 
-export async function updateNotificationSettings(
-  _userId: string,
-  _input: NotificationSettingsInput,
-) {
-  return {
-    friendRequests: true,
-    friendAcceptances: true,
-    postLikes: true,
-    postComments: true,
-    reviewLikes: true,
-    scheduleShares: true,
-    registrationReminders: true,
-  };
+export async function updateNotificationSettings(userId: string, input: NotificationSettingsInput) {
+  return notificationsService.updatePreferences(userId, input);
 }
 
 export async function updatePrivacySettings(_userId: string, _input: PrivacySettingsInput) {

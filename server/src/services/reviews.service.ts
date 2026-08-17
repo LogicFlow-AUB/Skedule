@@ -3,6 +3,7 @@ import type { CourseReview, ProfessorReview, User } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { getCourse } from './courses.service.js';
 import { trackActivity } from './activity.service.js';
+import { notifyReviewLiked } from './notifications.service.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
 
 export type CreateCourseReviewInput = {
@@ -284,12 +285,27 @@ export async function likeProfessorReview(
   await getProfessorReviewOrThrow(professorId, reviewId);
 
   const db = requireSupabaseClient();
+
+  const { data: reviewRow, error: fetchError } = await db
+    .from('professor_reviews')
+    .select('user_id')
+    .eq('id', reviewId)
+    .maybeSingle();
+
+  if (fetchError) {
+    throw fetchError;
+  }
+
   const { error } = await db
     .from('professor_review_likes')
     .upsert({ review_id: reviewId, user_id: userId }, { onConflict: 'review_id,user_id' });
 
   if (error) {
     throw error;
+  }
+
+  if (reviewRow && (reviewRow as { user_id: string }).user_id !== userId) {
+    await notifyReviewLiked((reviewRow as { user_id: string }).user_id, userId, reviewId);
   }
 }
 

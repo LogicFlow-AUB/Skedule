@@ -102,3 +102,25 @@ export type Friendship = {
   status: 'pending' | 'accepted' | 'rejected';
   created_at: string;
 };
+
+export type Notification = {
+  id: number;
+  user_id: string;
+  type: string;
+  message: string;
+  data: Record<string, unknown>;
+  actor_id: string | null;
+  read: boolean;
+  created_at: string;
+};
+
+export type NotificationPreference = {
+  user_id: string;
+  friend_requests: boolean;
+  friend_acceptances: boolean;
+  post_likes: boolean;
+  post_comments: boolean;
+  review_likes: boolean;
+  schedule_shares: boolean;
+  registration_reminders: boolean;
+};

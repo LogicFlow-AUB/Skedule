@@ -3,7 +3,7 @@ import {
   Star, BookOpen, Edit3, Heart, MessageSquare, Bookmark, Trophy, Target,
   GraduationCap, Bell, Lock, Eye, Palette, Shield, ChevronRight, X, CheckCircle, Users,
 } from 'lucide-react'
-import { api, type UserProfile, type UserStats, type UserReview, type ScheduleSummary } from '../lib/api'
+import { api, type UserProfile, type UserStats, type UserReview, type ScheduleSummary, type NotificationPreferences } from '../lib/api'
 import { displayName, formatDate, timeAgo } from '../lib/format'
 import { useAuth } from '../lib/auth'
 
@@ -77,6 +77,7 @@ export default function Profile() {
   const [savingPw, setSavingPw] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences | null>(null)
 
   const userId = user?.id
   const localPart = user?.email?.split('@')[0] ?? 'ST'
@@ -93,11 +94,12 @@ export default function Profile() {
     async function load() {
       setLoading(true)
       try {
-        const [p, s, r, sched] = await Promise.all([
+        const [p, s, r, sched, np] = await Promise.all([
           api.users.profile(userId),
           api.users.stats(userId),
           api.users.reviews(userId, 1, 50),
           api.schedules.list(1, 50),
+          api.notifications.preferences(),
         ])
         if (cancelled) {
           return
@@ -106,6 +108,7 @@ export default function Profile() {
         setStats(s.data)
         setReviews(r.data)
         setSchedules(sched.data)
+        setNotifPrefs(np.data)
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Could not load profile.')
@@ -429,11 +432,11 @@ export default function Profile() {
                 <Bell size={16} color="#4338CA" />
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Notifications</div>
               </div>
-              <NotifToggle label="Registration reminders" sub="Alert when registration opens for your courses" on={false} onToggle={(v) => void api.users.updateNotifications({ registrationReminders: v })} />
-              <NotifToggle label="Friend schedule shared" sub="When a friend shares their schedule with you" on={false} onToggle={(v) => void api.users.updateNotifications({ scheduleShares: v })} />
-              <NotifToggle label="New professor reviews" sub="Reviews posted for professors you follow" on={false} onToggle={(v) => void api.users.updateNotifications({ reviewLikes: v })} />
-              <NotifToggle label="Community mentions" sub="When someone mentions you in a post" on={false} onToggle={(v) => void api.users.updateNotifications({ postComments: v })} />
-              <NotifToggle label="Study group updates" sub="Activity in groups you have joined" on={false} onToggle={(v) => void api.users.updateNotifications({ friendRequests: v })} />
+              <NotifToggle key={notifPrefs ? 'loaded' : 'loading'} label="Registration reminders" sub="Alert when registration opens for your courses" on={notifPrefs?.registrationReminders ?? false} onToggle={(v) => void api.users.updateNotifications({ registrationReminders: v })} />
+              <NotifToggle key={notifPrefs ? 'loaded' : 'loading'} label="Friend schedule shared" sub="When a friend shares their schedule with you" on={notifPrefs?.scheduleShares ?? false} onToggle={(v) => void api.users.updateNotifications({ scheduleShares: v })} />
+              <NotifToggle key={notifPrefs ? 'loaded' : 'loading'} label="New professor reviews" sub="Reviews posted for professors you follow" on={notifPrefs?.reviewLikes ?? false} onToggle={(v) => void api.users.updateNotifications({ reviewLikes: v })} />
+              <NotifToggle key={notifPrefs ? 'loaded' : 'loading'} label="Community mentions" sub="When someone mentions you in a post" on={notifPrefs?.postComments ?? false} onToggle={(v) => void api.users.updateNotifications({ postComments: v })} />
+              <NotifToggle key={notifPrefs ? 'loaded' : 'loading'} label="Study group updates" sub="Activity in groups you have joined" on={notifPrefs?.friendRequests ?? false} onToggle={(v) => void api.users.updateNotifications({ friendRequests: v })} />
             </div>
 
             {/* Privacy */}

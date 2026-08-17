@@ -203,18 +203,18 @@ CLIENT_ORIGIN=http://localhost:8443
 
 ## Phase 10 — Notifications
 
-- [ ] **10.1 Notification module**
-  - [ ] GET /api/notifications (paginated)
-  - [ ] GET /api/notifications/unread-count
-  - [ ] PUT /api/notifications/:id/read
-  - [ ] PUT /api/notifications/read-all
-  - [ ] Notification service (create + dispatch)
-  - [ ] Trigger notifications for:
-    - [ ] Friend request received
-    - [ ] Friend request accepted
-    - [ ] Post liked
-    - [ ] Post commented
-    - [ ] Review liked
+- [x] **10.1 Notification module**
+  - [x] GET /api/notifications (paginated)
+  - [x] GET /api/notifications/unread-count
+  - [x] PUT /api/notifications/:id/read
+  - [x] PUT /api/notifications/read-all
+  - [x] Notification service (create + dispatch)
+  - [x] Trigger notifications for:
+    - [x] Friend request received
+    - [x] Friend request accepted
+    - [x] Post liked
+    - [x] Post commented
+    - [x] Review liked
     - [ ] Schedule shared
     - [ ] Registration reminder
 
