@@ -124,3 +124,39 @@ export type NotificationPreference = {
   schedule_shares: boolean;
   registration_reminders: boolean;
 };
+
+export type Event = {
+  id: number;
+  title: string;
+  type: string;
+  starts_at: string;
+  ends_at: string | null;
+  description: string | null;
+  location: string | null;
+  term_id: number | null;
+  created_at: string;
+};
+
+export type EventRsvp = {
+  event_id: number;
+  user_id: string;
+  created_at: string;
+};
+
+export type StudyGroup = {
+  id: number;
+  name: string;
+  course_code: string | null;
+  description: string | null;
+  meeting_time: string | null;
+  location: string | null;
+  host_user_id: string;
+  max_members: number | null;
+  created_at: string;
+};
+
+export type StudyGroupMember = {
+  study_group_id: number;
+  user_id: string;
+  joined_at: string;
+};

@@ -222,15 +222,18 @@ CLIENT_ORIGIN=http://localhost:8443
 
 ## Phase 11 — Events & Study Groups
 
-- [ ] **11.1 Event module**
-  - [ ] GET /api/events
-  - [ ] POST /api/events/:id/rsvp
+- [x] **11.1 Event module**
+  - [x] GET /api/events
+  - [x] POST /api/events (create)
+  - [x] POST /api/events/:id/rsvp
+  - [x] DELETE /api/events/:id/rsvp
 
-- [ ] **11.2 Study Group module**
-  - [ ] GET /api/study-groups
-  - [ ] POST /api/study-groups
-  - [ ] POST /api/study-groups/:id/join
-  - [ ] DELETE /api/study-groups/:id/join
+- [x] **11.2 Study Group module**
+  - [x] GET /api/study-groups
+  - [x] GET /api/study-groups/:id
+  - [x] POST /api/study-groups
+  - [x] POST /api/study-groups/:id/join
+  - [x] DELETE /api/study-groups/:id/join
 
 ---
 

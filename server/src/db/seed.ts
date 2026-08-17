@@ -479,6 +479,32 @@ async function createEvents() {
   console.log('  ✓ 5 events created');
 }
 
+async function createEventRsvps() {
+  console.log('Creating event RSVPs…');
+  if ((await count('event_rsvps')) > 0) {
+    console.log('  (event_rsvps already exist, skipping)');
+    return;
+  }
+
+  const ids = createdUsers.map((u) => u.id);
+  const eventIds = await getExistingIds('events');
+
+  if (eventIds.length === 0) {
+    console.log('  (no events found, skipping)');
+    return;
+  }
+
+  const rsvps: { event_id: number; user_id: string }[] = [];
+  for (const eventId of eventIds.slice(0, 3)) {
+    for (const userId of ids.slice(0, 3)) {
+      rsvps.push({ event_id: eventId, user_id: userId });
+    }
+  }
+
+  await insert('event_rsvps', rsvps);
+  console.log(`  ✓ ${rsvps.length} event RSVPs created`);
+}
+
 // ---------------------------------------------------------------------------
 // Activities
 // ---------------------------------------------------------------------------
@@ -591,6 +617,72 @@ async function createNotificationPreferences() {
 }
 
 // ---------------------------------------------------------------------------
+// Study groups + members
+// ---------------------------------------------------------------------------
+
+async function createStudyGroups() {
+  console.log('Creating study groups…');
+  if ((await count('study_groups')) > 0) {
+    console.log('  (study_groups already exist, skipping)');
+    return;
+  }
+
+  const ids = createdUsers.map((u) => u.id);
+
+  const groups = await insert('study_groups', [
+    {
+      name: 'CMPS 330 — HW 5',
+      course_code: 'CMPS 330',
+      description: 'Working through the database normalization homework together.',
+      meeting_time: 'Tonight 8 PM',
+      location: 'Library Room 204',
+      host_user_id: ids[0],
+      max_members: 10,
+    },
+    {
+      name: 'MATH 201 — Finals',
+      course_code: 'MATH 201',
+      description: 'Preparing for the calculus II final exam.',
+      meeting_time: 'Sat 2 PM',
+      location: 'AUB Science Hall',
+      host_user_id: ids[1],
+      max_members: 15,
+    },
+    {
+      name: 'CMPS 214 — Project',
+      course_code: 'CMPS 214',
+      description: 'Final project collaboration for Data Structures.',
+      meeting_time: 'Wed 5 PM',
+      location: 'Online (Zoom)',
+      host_user_id: ids[2],
+      max_members: 6,
+    },
+  ]);
+
+  const groupIds = groups.map((g) => g.id as number);
+
+  // Add members
+  const members: { study_group_id: number; user_id: string }[] = [];
+  const [g0, g1, g2] = groupIds;
+  const [u0, u1, u2, u3] = ids;
+  if (g0 && u1 && u2) {
+    members.push({ study_group_id: g0, user_id: u1 });
+    members.push({ study_group_id: g0, user_id: u2 });
+  }
+  if (g1 && u0 && u2 && u3) {
+    members.push({ study_group_id: g1, user_id: u0 });
+    members.push({ study_group_id: g1, user_id: u2 });
+    members.push({ study_group_id: g1, user_id: u3 });
+  }
+  if (g2 && u0) {
+    members.push({ study_group_id: g2, user_id: u0 });
+  }
+
+  await insert('study_group_members', members);
+  console.log(`  ✓ ${groups.length} study groups with ${members.length} memberships`);
+}
+
+// ---------------------------------------------------------------------------
 // Grade distributions
 // ---------------------------------------------------------------------------
 
@@ -648,10 +740,12 @@ async function main() {
   await createFriendships();
   await createPosts();
   await createEvents();
+  await createEventRsvps();
   await createActivities();
   await createGradeDistributions();
   await createNotifications();
   await createNotificationPreferences();
+  await createStudyGroups();
 
   console.log('\n✅ Seed complete!\n');
   console.log('Test accounts (all passwords: TestPass123!):');

@@ -1,5 +1,5 @@
 /**
- * End-to-end smoke test for all 10 backend phases.
+ * End-to-end smoke test for all 11 backend phases.
  *
  * Starts the server, hits every endpoint category, and reports results.
  * Run:  npx tsx src/e2e-smoke.test.ts
@@ -612,6 +612,118 @@ async function testUsers() {
   }
 }
 
+async function testEventsAndStudyGroups() {
+  console.log('\n── Phase 11: Events & Study Groups ──');
+
+  if (!aliceToken) {
+    fail('Phase 11', 'Events & Study Groups (skipped — no auth token)', 'login failed');
+    return;
+  }
+
+  const eventList = await req('GET', '/api/events?page=1&limit=5');
+  if (eventList.status === 200) {
+    const b = eventList.body as Record<string, unknown>;
+    const data = b.data as unknown[];
+    ok('Phase 11', `GET /api/events → ${data.length} events`);
+  } else {
+    fail('Phase 11', 'GET /api/events', `status ${eventList.status}`);
+  }
+
+  const groupList = await req('GET', '/api/study-groups?page=1&limit=5');
+  if (groupList.status === 200) {
+    const b = groupList.body as Record<string, unknown>;
+    const data = b.data as unknown[];
+    ok('Phase 11', `GET /api/study-groups → ${data.length} groups`);
+  } else {
+    fail('Phase 11', 'GET /api/study-groups', `status ${groupList.status}`);
+  }
+
+  const createGroup = await req(
+    'POST',
+    '/api/study-groups',
+    {
+      name: 'E2E Test Group',
+      courseCode: 'CMPS 214',
+      description: 'Created by e2e smoke test.',
+      maxMembers: 5,
+    },
+    aliceToken,
+  );
+  if (createGroup.status === 201) {
+    const body = createGroup.body as Record<string, unknown>;
+    const groupId = body.id as number;
+    ok('Phase 11', `POST /api/study-groups → id ${groupId}`);
+
+    // Host is auto-joined on create, so join returns 409 (already a member)
+    const joinGroup = await req('POST', `/api/study-groups/${groupId}/join`, undefined, aliceToken);
+    if (joinGroup.status === 204 || joinGroup.status === 409) {
+      ok(
+        'Phase 11',
+        `POST /api/study-groups/${groupId}/join → ${joinGroup.status === 204 ? 'joined' : 'already member'}`,
+      );
+    } else {
+      fail('Phase 11', `POST /api/study-groups/${groupId}/join`, `status ${joinGroup.status}`);
+    }
+
+    // Host cannot leave their own group (400)
+    const leaveGroup = await req(
+      'DELETE',
+      `/api/study-groups/${groupId}/join`,
+      undefined,
+      aliceToken,
+    );
+    if (leaveGroup.status === 204 || leaveGroup.status === 400) {
+      ok(
+        'Phase 11',
+        `DELETE /api/study-groups/${groupId}/join → ${leaveGroup.status === 204 ? 'left' : 'host cannot leave'}`,
+      );
+    } else {
+      fail('Phase 11', `DELETE /api/study-groups/${groupId}/join`, `status ${leaveGroup.status}`);
+    }
+
+    const getGroup = await req('GET', `/api/study-groups/${groupId}`);
+    if (getGroup.status === 200) {
+      ok('Phase 11', `GET /api/study-groups/${groupId}`);
+    } else {
+      fail('Phase 11', `GET /api/study-groups/${groupId}`, `status ${getGroup.status}`);
+    }
+  } else {
+    fail('Phase 11', 'POST /api/study-groups', `status ${createGroup.status}`);
+  }
+
+  // Event RSVP test (events must exist from seed)
+  const eventsRes = await req('GET', '/api/events?page=1&limit=1');
+  if (eventsRes.status === 200) {
+    const body = eventsRes.body as Record<string, unknown>;
+    const data = body.data as Record<string, unknown>[];
+    if (data.length > 0) {
+      const eventId = data[0]!.id as number;
+
+      // May already be RSVPed from seed — accept both 204 and 409
+      const rsvp = await req('POST', `/api/events/${eventId}/rsvp`, undefined, aliceToken);
+      if (rsvp.status === 204 || rsvp.status === 409) {
+        ok(
+          'Phase 11',
+          `POST /api/events/${eventId}/rsvp → ${rsvp.status === 204 ? 'RSVPed' : 'already RSVPed'}`,
+        );
+      } else {
+        fail('Phase 11', `POST /api/events/${eventId}/rsvp`, `status ${rsvp.status}`);
+      }
+
+      // Cancel RSVP — should succeed or return 404 if not RSVPed
+      const cancelRsvp = await req('DELETE', `/api/events/${eventId}/rsvp`, undefined, aliceToken);
+      if (cancelRsvp.status === 204 || cancelRsvp.status === 404) {
+        ok(
+          'Phase 11',
+          `DELETE /api/events/${eventId}/rsvp → ${cancelRsvp.status === 204 ? 'cancelled' : 'no RSVP to cancel'}`,
+        );
+      } else {
+        fail('Phase 11', `DELETE /api/events/${eventId}/rsvp`, `status ${cancelRsvp.status}`);
+      }
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -675,6 +787,7 @@ async function main() {
     await testFeed();
     await testFriends();
     await testNotifications();
+    await testEventsAndStudyGroups();
   } finally {
     stopServer();
   }
