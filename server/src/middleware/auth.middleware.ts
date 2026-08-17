@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 
-import { requireSupabaseClient } from '../db/supabase.js';
+import { requireAuthClient } from '../db/supabase.js';
 import { AppError } from '../utils/app-error.js';
 
 export const requireAuth: RequestHandler = async (req, _res, next) => {
@@ -19,8 +19,8 @@ export const requireAuth: RequestHandler = async (req, _res, next) => {
   }
 
   try {
-    const db = requireSupabaseClient();
-    const { data, error } = await db.auth.getUser(token);
+    const authDb = requireAuthClient();
+    const { data, error } = await authDb.auth.getUser(token);
 
     if (error || !data.user) {
       return next(

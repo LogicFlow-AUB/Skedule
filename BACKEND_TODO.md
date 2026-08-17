@@ -58,13 +58,13 @@ CLIENT_ORIGIN=http://localhost:8443
   - [x] TrendingCourse, TrendingProfessor
   - [x] Activity
 
-- [ ] **1.4 Seed data** (optional — insert sample records for development)
-  - [ ] Seed courses, sections, professors
-  - [ ] Seed sample users
-  - [ ] Seed sample reviews
-  - [ ] Seed sample schedules
-  - [ ] Seed sample feed posts, comments
-  - [ ] Seed sample events, study groups
+- [x] **1.4 Seed data** (optional — insert sample records for development)
+  - [x] Seed courses, sections, professors
+  - [x] Seed sample users
+  - [x] Seed sample reviews
+  - [x] Seed sample schedules
+  - [x] Seed sample feed posts, comments
+  - [x] Seed sample events, study groups
 
 ---
 

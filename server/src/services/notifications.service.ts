@@ -44,7 +44,10 @@ export async function listNotifications(
   const db = requireSupabaseClient();
   const { data, error, count } = await db
     .from('notifications')
-    .select(`${NOTIFICATION_COLUMNS}, users(id, first_name, last_name)`, { count: 'exact' })
+    .select(
+      `${NOTIFICATION_COLUMNS}, users!notifications_actor_id_fkey(id, first_name, last_name)`,
+      { count: 'exact' },
+    )
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .range(pagination.offset, pagination.offset + pagination.limit - 1);

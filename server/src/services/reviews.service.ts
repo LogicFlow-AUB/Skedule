@@ -220,7 +220,9 @@ export async function createProfessorReview(
       would_retake: input.wouldRetake ?? null,
       comment: input.comment ?? null,
     })
-    .select('*, users(id, first_name, last_name, email, major, level)')
+    .select(
+      '*, users!professor_reviews_user_id_fkey(id, first_name, last_name, email, major, level)',
+    )
     .single();
 
   if (error) {
@@ -243,7 +245,10 @@ export async function getProfessorReviews(
   const db = requireSupabaseClient();
   const { data, error, count } = await db
     .from('professor_reviews')
-    .select('*, users(id, first_name, last_name, email, major, level)', { count: 'exact' })
+    .select(
+      '*, users!professor_reviews_user_id_fkey(id, first_name, last_name, email, major, level)',
+      { count: 'exact' },
+    )
     .eq('professor_id', professorId)
     .order('created_at', { ascending: false })
     .range(pagination.offset, pagination.offset + pagination.limit - 1);
