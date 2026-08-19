@@ -9,6 +9,8 @@ import friendsRoutes from './routes/friends.routes.js';
 import notificationsRoutes from './routes/notifications.routes.js';
 import professorsRoutes from './routes/professors.routes.js';
 import schedulesRoutes from './routes/schedules.routes.js';
+import searchRoutes from './routes/search.routes.js';
+import trendingRoutes from './routes/trending.routes.js';
 import usersRoutes from './routes/users.routes.js';
 import type { ApiHealthResponse } from './types.js';
 
@@ -34,5 +36,7 @@ api.use('/schedules', schedulesRoutes);
 api.use('/feed', feedRoutes);
 api.use('/friends', friendsRoutes);
 api.use('/notifications', notificationsRoutes);
+api.use('/search', searchRoutes);
+api.use('/trending', trendingRoutes);
 
 export default api;

@@ -1,4 +1,4 @@
-import { requireSupabaseClient } from '../db/supabase.js';
+import { createAuthClient, requireSupabaseClient } from '../db/supabase.js';
 import type { CourseReview, ProfessorReview, User } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
@@ -252,9 +252,8 @@ export async function changePassword(userId: string, input: PasswordChangeInput)
   }
 
   const user = await getUserOrThrow(userId);
-  const db = requireSupabaseClient();
 
-  const { error: verifyError } = await db.auth.signInWithPassword({
+  const { error: verifyError } = await createAuthClient().auth.signInWithPassword({
     email: user.email,
     password: input.currentPassword,
   });
@@ -263,6 +262,7 @@ export async function changePassword(userId: string, input: PasswordChangeInput)
     throw new AppError(401, 'INVALID_PASSWORD', 'Current password is incorrect.');
   }
 
+  const db = requireSupabaseClient();
   const { error: updateError } = await db.auth.admin.updateUserById(userId, {
     password: input.password,
   });

@@ -1,6 +1,7 @@
 import type { RequestHandler } from 'express';
 
 import { getValidated } from '../middleware/validation.middleware.js';
+import { generateSchedulePdf } from '../services/schedule-export.service.js';
 import * as schedulesService from '../services/schedules.service.js';
 import { AppError } from '../utils/app-error.js';
 import { parseOffsetPagination } from '../utils/pagination.js';
@@ -97,4 +98,15 @@ export const getScheduleConflicts: RequestHandler = async (req, res) => {
   const data = await schedulesService.getScheduleConflicts(getUserId(req), id);
 
   res.status(200).json({ data });
+};
+
+export const exportSchedulePdf: RequestHandler = async (req, res) => {
+  const { id } = getValidated<ScheduleIdParams>(res, 'params');
+  const schedule = await schedulesService.getSchedule(getUserId(req), id);
+  const pdf = await generateSchedulePdf(schedule);
+  const fileName = (schedule.name ?? 'schedule').replace(/[^a-z0-9-_ ]/gi, '').trim() || 'schedule';
+
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${fileName}.pdf"`);
+  res.status(200).send(pdf);
 };

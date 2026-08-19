@@ -236,22 +236,22 @@ CLIENT_ORIGIN=http://localhost:8443
 
 ## Phase 12 — Search & Trending
 
-- [ ] **12.1 Search module**
-  - [ ] GET /api/search (unified across courses, professors, users, posts)
-  - [ ] Full-text search index setup (if not already in Supabase)
+- [x] **12.1 Search module**
+  - [x] GET /api/search (unified across courses, professors, users, posts)
+  - [ ] Full-text search index setup — not needed; `ilike` search matches the existing convention used by `GET /api/courses` and `GET /api/professors`, which is sufficient at this data scale
 
-- [ ] **12.2 Trending module**
-  - [ ] GET /api/trending/courses
-  - [ ] GET /api/trending/professors
-  - [ ] Trending computation service (cron job or on-the-fly)
+- [x] **12.2 Trending module**
+  - [x] GET /api/trending/courses
+  - [x] GET /api/trending/professors
+  - [x] Trending computation service (on-the-fly — no cron/job runner exists yet, same as the deferred registration-reminder notification in Phase 10)
 
 ---
 
 ## Phase 13 — Export
 
-- [ ] **13.1 Export module**
-  - [ ] GET /api/schedules/:id/export/pdf
-  - [ ] PDF template + generation service
+- [x] **13.1 Export module**
+  - [x] GET /api/schedules/:id/export/pdf
+  - [x] PDF template + generation service (`pdfkit`, `services/schedule-export.service.ts`)
 
 ---
 

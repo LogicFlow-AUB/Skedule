@@ -6,6 +6,7 @@ import {
   compareSchedules,
   createSchedule,
   deleteSchedule,
+  exportSchedulePdf,
   getSchedule,
   getScheduleConflicts,
   listSchedules,
@@ -90,6 +91,12 @@ router.get(
   requireAuth,
   validateParams(scheduleIdParams),
   asyncHandler(getScheduleConflicts),
+);
+router.get(
+  '/:id/export/pdf',
+  requireAuth,
+  validateParams(scheduleIdParams),
+  asyncHandler(exportSchedulePdf),
 );
 router.get('/:id', requireAuth, validateParams(scheduleIdParams), asyncHandler(getSchedule));
 router.put(

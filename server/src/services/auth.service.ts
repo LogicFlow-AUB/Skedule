@@ -1,4 +1,4 @@
-import { requireSupabaseClient } from '../db/supabase.js';
+import { createAuthClient, requireSupabaseClient } from '../db/supabase.js';
 import { AppError } from '../utils/app-error.js';
 
 export type RegisterInput = {
@@ -48,15 +48,10 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
   const email = input.email.trim().toLowerCase();
 
   if (!email.endsWith('@mail.aub.edu')) {
-    throw new AppError(
-      400,
-      'AUB_EMAIL_REQUIRED',
-      'Only AUB email addresses are allowed.',
-    );
+    throw new AppError(400, 'AUB_EMAIL_REQUIRED', 'Only AUB email addresses are allowed.');
   }
 
-  const db = requireSupabaseClient();
-  const { data, error } = await db.auth.signUp({
+  const { data, error } = await createAuthClient().auth.signUp({
     email: input.email,
     password: input.password,
   });
@@ -93,8 +88,7 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
 }
 
 export async function login(input: LoginInput): Promise<AuthResponse> {
-  const db = requireSupabaseClient();
-  const { data, error } = await db.auth.signInWithPassword({
+  const { data, error } = await createAuthClient().auth.signInWithPassword({
     email: input.email,
     password: input.password,
   });
@@ -123,8 +117,9 @@ export async function logout(userId: string): Promise<void> {
 }
 
 export async function refresh(refreshToken: string): Promise<AuthTokens> {
-  const db = requireSupabaseClient();
-  const { data, error } = await db.auth.refreshSession({ refresh_token: refreshToken });
+  const { data, error } = await createAuthClient().auth.refreshSession({
+    refresh_token: refreshToken,
+  });
 
   if (error || !data.session) {
     throw new AppError(401, 'INVALID_TOKEN', 'Authentication token is invalid or expired.');
@@ -134,8 +129,7 @@ export async function refresh(refreshToken: string): Promise<AuthTokens> {
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  const db = requireSupabaseClient();
-  const { error } = await db.auth.resetPasswordForEmail(email);
+  const { error } = await createAuthClient().auth.resetPasswordForEmail(email);
 
   if (error) {
     throw error;
@@ -151,8 +145,7 @@ export async function resetPassword(
     throw new AppError(400, 'PASSWORD_CONFIRMATION_MISMATCH', 'Passwords do not match.');
   }
 
-  const db = requireSupabaseClient();
-  const { data, error } = await db.auth.verifyOtp({
+  const { data, error } = await createAuthClient().auth.verifyOtp({
     type: 'recovery',
     token_hash: tokenHash,
   });
@@ -165,6 +158,7 @@ export async function resetPassword(
     );
   }
 
+  const db = requireSupabaseClient();
   const { error: updateError } = await db.auth.admin.updateUserById(data.user.id, {
     password,
   });
