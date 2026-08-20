@@ -5,6 +5,7 @@ import { pinoHttp } from 'pino-http';
 import api from './api.js';
 import config from './config.js';
 import { errorHandler, notFoundHandler } from './middleware/errors.middleware.js';
+import { startAubSyncJob } from './services/aub-sync.service.js';
 import { logger } from './utils/logger.js';
 
 const app = express();
@@ -23,4 +24,5 @@ app.use(errorHandler);
 
 app.listen(config.port, () => {
   logger.info({ port: config.port }, 'LogicFlow API listening');
+  startAubSyncJob();
 });

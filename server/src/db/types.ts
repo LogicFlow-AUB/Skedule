@@ -52,14 +52,19 @@ export type Professor = {
 export type Section = {
   id: number;
   course_id: number | null;
+  term_id: number | null;
   professor_id: number | null;
   section_number: string;
+  crn: string;
   days: string | null;
   start_time: string | null;
   end_time: string | null;
-  room: string | null;
+  schedule_type: string | null;
+  campus: string | null;
   seats_total: number | null;
   seats_remaining: number | null;
+  status: string | null;
+  room: string | null;
 };
 
 export type Schedule = {
