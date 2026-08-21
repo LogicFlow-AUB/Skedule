@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { Component, useState } from 'react'
+import type { ReactNode } from 'react'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import Dashboard from './pages/Dashboard'
@@ -7,7 +8,8 @@ import SavedSchedules from './pages/SavedSchedules'
 import Reviews from './pages/Reviews'
 import Community from './pages/Community'
 import Profile from './pages/Profile'
-import { AppContext } from './context'
+import Login from './pages/Login'
+import { AuthProvider, useAuth } from './lib/auth'
 
 export type Page =
   | 'dashboard'
@@ -21,32 +23,55 @@ export type Page =
   | 'profile'
   | 'settings'      // merged into profile
 
-const THEMES: Record<string, { primary: string, light: string, grad: string, border: string, dark: string }> = {
-  'Indigo': { primary: '#4338CA', light: '#EEF2FF', grad: '#6366F1', border: '#C7D2FE', dark: '#3730A3' },
-  'Emerald': { primary: '#059669', light: '#ECFDF5', grad: '#10B981', border: '#A7F3D0', dark: '#047857' },
-  'Sky': { primary: '#0284C7', light: '#F0F9FF', grad: '#38BDF8', border: '#BAE6FD', dark: '#0369A1' },
-  'Violet': { primary: '#7C3AED', light: '#F5F3FF', grad: '#8B5CF6', border: '#DDD6FE', dark: '#6D28D9' },
-  'Baby Pink': { primary: '#EC4899', light: '#FDF2F8', grad: '#F472B6', border: '#FBCFE8', dark: '#DB2777' },
-  'Baby Blue': { primary: '#38BDF8', light: '#F0F9FF', grad: '#7DD3FC', border: '#BAE6FD', dark: '#0284C7' },
-  'Navy': { primary: '#1E3A8A', light: '#EFF6FF', grad: '#1E40AF', border: '#BFDBFE', dark: '#172554' },
-  'Red': { primary: '#DC2626', light: '#FEF2F2', grad: '#EF4444', border: '#FECACA', dark: '#B91C1C' }
+export default function App() {
+  return (
+    <AuthProvider>
+      <ErrorBoundary>
+        <AppGate />
+      </ErrorBoundary>
+    </AuthProvider>
+  )
 }
 
-export default function App() {
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null }
+
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="h-screen flex items-center justify-center p-8" style={{ background: '#F8FAFC' }}>
+          <div className="max-w-xl w-full rounded-2xl p-6" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
+            <p style={{ fontSize: 14, fontWeight: 800, color: '#B91C1C', marginBottom: 8 }}>The app crashed</p>
+            <pre style={{ fontSize: 12, color: '#7F1D1D', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {String(this.state.error?.message ?? this.state.error)}
+            </pre>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+function AppGate() {
+  const { user, initializing } = useAuth()
   const [activePage, setActivePage] = useState<Page>('dashboard')
-  const [userName, setUserName] = useState('Alex Hassan')
-  const [aiName, setAiName] = useState('AI Assistant')
-  const [theme, setTheme] = useState('Indigo')
 
-  const activeTheme = THEMES[theme] || THEMES['Indigo']
+  if (initializing) {
+    return (
+      <div className="h-screen flex items-center justify-center" style={{ background: '#F8FAFC' }}>
+        <div className="rounded-xl p-3" style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }} />
+      </div>
+    )
+  }
 
-  useEffect(() => {
-    document.documentElement.style.setProperty('--color-primary', activeTheme.primary)
-    document.documentElement.style.setProperty('--color-primary-light', activeTheme.light)
-    document.documentElement.style.setProperty('--color-primary-grad', activeTheme.grad)
-    document.documentElement.style.setProperty('--color-primary-border', activeTheme.border)
-    document.documentElement.style.setProperty('--color-primary-dark', activeTheme.dark)
-  }, [theme])
+  if (!user) {
+    return <Login />
+  }
 
   const renderPage = () => {
     switch (activePage) {
@@ -59,7 +84,7 @@ export default function App() {
         return <SavedSchedules />
       case 'course-reviews':
       case 'professor-reviews':
-        return <Reviews activeTab={activePage as 'course-reviews' | 'professor-reviews'} setPage={setActivePage} />
+        return <Reviews activeTab={activePage as 'course-reviews' | 'professor-reviews'} />
       case 'community':
       case 'friends':
         return <Community />
@@ -72,17 +97,15 @@ export default function App() {
   }
 
   return (
-    <AppContext.Provider value={{ userName, setUserName, aiName, setAiName, theme, setTheme }}>
-      <div
-        className="flex h-screen overflow-hidden"
-        style={{ background: '#F8FAFC', fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}
-      >
-        <Sidebar activePage={activePage} setActivePage={setActivePage} />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <TopBar activePage={activePage} />
-          <main className="flex-1 overflow-hidden">{renderPage()}</main>
-        </div>
+    <div
+      className="flex h-screen overflow-hidden"
+      style={{ background: '#F8FAFC', fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}
+    >
+      <Sidebar activePage={activePage} setActivePage={setActivePage} />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopBar activePage={activePage} />
+        <main className="flex-1 overflow-hidden">{renderPage()}</main>
       </div>
-    </AppContext.Provider>
+    </div>
   )
 }

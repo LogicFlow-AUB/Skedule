@@ -2,8 +2,7 @@ import { requireSupabaseClient } from '../db/supabase.js';
 import type { Post, PostComment, User } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { trackActivity } from './activity.service.js';
-import { listFriends } from './friends.service.js';
-import { createNotification } from './notifications.service.js';
+import { notifyPostLiked, notifyPostCommented } from './notifications.service.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
 
 export type PostType = 'schedule' | 'review' | 'question' | 'tip';
@@ -214,21 +213,6 @@ export async function createPost(userId: string, input: CreatePostInput) {
   const post = data as Post;
   await trackActivity(userId, 'post_created', 'You shared a new post.', { postId: post.id });
 
-  if (input.scheduleId !== undefined) {
-    const friends = await listFriends(userId);
-    await Promise.all(
-      friends.map((friend) =>
-        createNotification(
-          friend.id,
-          userId,
-          'schedule_shared',
-          'A friend shared a new schedule.',
-          { postId: post.id, scheduleId: input.scheduleId },
-        ),
-      ),
-    );
-  }
-
   const [response] = await getPostResponses([post]);
   return response;
 }
@@ -265,9 +249,9 @@ export async function likePost(userId: string, postId: number): Promise<void> {
     throw error;
   }
 
-  await createNotification(post.user_id, userId, 'post_liked', 'Someone liked your post.', {
-    postId,
-  });
+  if (post.user_id !== userId) {
+    await notifyPostLiked(post.user_id, userId, postId);
+  }
 }
 
 export async function unlikePost(userId: string, postId: number): Promise<void> {
@@ -357,13 +341,10 @@ export async function createComment(userId: string, postId: number, input: Creat
     postId,
     commentId: comment.id,
   });
-  await createNotification(
-    post.user_id,
-    userId,
-    'post_commented',
-    'Someone commented on your post.',
-    { postId, commentId: comment.id },
-  );
+
+  if (post.user_id !== userId) {
+    await notifyPostCommented(post.user_id, userId, postId);
+  }
 
   return commentResponse(comment);
 }

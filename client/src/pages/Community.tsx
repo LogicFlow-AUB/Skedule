@@ -1,118 +1,11 @@
-import { useState, useContext } from 'react'
-import { Heart, Bookmark, MoreHorizontal, UserPlus, Calendar, Star, MessageCircle, TrendingUp, CheckCircle, X, BookOpen, Clock } from 'lucide-react'
-import { AppContext } from '../context'
-
-interface Post {
-  id: string
-  author: string
-  major: string
-  year: string
-  semester: string
-  avatar: string
-  badges: { label: string; color: string }[]
-  time: string
-  content: string
-  tags: string[]
-  likes: number
-  comments: number
-  shares: number
-  liked: boolean
-  saved: boolean
-  type: 'schedule' | 'review' | 'question' | 'tip'
-  schedulePreview?: { days: string; courses: string[] }
-}
-
-const POSTS: Post[] = [
-  {
-    id: '1',
-    author: 'Sarah K.',
-    major: 'Computer Science',
-    year: 'Junior',
-    semester: 'Fall 2025',
-    avatar: 'SK',
-    badges: [{ label: 'CS Student', color: 'var(--color-primary)' }],
-    time: '2h ago',
-    content: "Just finalized my Fall 2025 schedule! Managed to get all EECE courses with top-rated professors and keep Fridays free 🎉 Pro tip: use the AI Scheduler and set priority to 'Highest rated professors' — it worked perfectly for me.",
-    tags: ['Schedule Tips', 'EECE', 'Fall 2025'],
-    likes: 47,
-    comments: 12,
-    shares: 8,
-    liked: false,
-    saved: false,
-    type: 'schedule',
-    schedulePreview: { days: 'Mon-Thu', courses: ['EECE 330', 'EECE 351', 'MATH 201', 'PHYS 211'] },
-  },
-  {
-    id: '2',
-    author: 'Omar K.',
-    major: 'Electrical Engineering',
-    year: 'Senior',
-    semester: 'Fall 2025',
-    avatar: 'OK',
-    badges: [{ label: 'Senior', color: '#7C3AED' }],
-    time: '5h ago',
-    content: 'Just finished Dr. Nassif\'s PHYS 211 — absolute legend of a professor. Gave us a study guide for the final and curved the midterm by 15 points. 100% recommend, rating him 5/5 without hesitation. Also great for students who learn better visually.',
-    tags: ['Professor Reviews', 'PHYS 211', 'Nassif'],
-    likes: 89,
-    comments: 24,
-    shares: 15,
-    liked: true,
-    saved: false,
-    type: 'review',
-  },
-  {
-    id: '3',
-    author: 'Jana R.',
-    major: 'Mathematics',
-    year: 'Sophomore',
-    semester: 'Fall 2025',
-    avatar: 'JR',
-    badges: [],
-    time: '1d ago',
-    content: "Does anyone know if ENGL 210 with Dr. Saad counts as a Writing attribute? I need one more writing course and I've heard great things but can't find confirmation in the course catalog. Also is it hard to get into?",
-    tags: ['Question', 'ENGL 210', 'Attributes'],
-    likes: 13,
-    comments: 7,
-    shares: 0,
-    liked: false,
-    saved: true,
-    type: 'question',
-  },
-  {
-    id: '4',
-    author: 'Karim A.',
-    major: 'Computer Science',
-    year: 'Junior',
-    semester: 'Fall 2025',
-    avatar: 'KA',
-    badges: [{ label: 'CS Student', color: 'var(--color-primary)' }],
-    time: '2d ago',
-    content: 'Registration tip for CS majors: EECE 330 fills up in the first 10 minutes. Have the section number and CRN ready before registration opens. Also, Section 01 with Dr. Hassan is the best — worth waking up early for.',
-    tags: ['Registration Tips', 'EECE 330', 'CS Majors'],
-    likes: 134,
-    comments: 41,
-    shares: 67,
-    liked: true,
-    saved: true,
-    type: 'tip',
-  },
-]
-
-const FRIENDS = [
-  { name: 'Sarah K.', major: 'CS', year: 'Junior', status: 'online', sharedCourses: 2, avatar: 'SK', avatarColor: 'var(--color-primary)' },
-  { name: 'Karim A.', major: 'CS', year: 'Junior', status: 'online', sharedCourses: 3, avatar: 'KA', avatarColor: '#059669' },
-  { name: 'Lara M.', major: 'EECE', year: 'Senior', status: 'away', sharedCourses: 1, avatar: 'LM', avatarColor: '#7C3AED' },
-  { name: 'Nour H.', major: 'Math', year: 'Sophomore', status: 'offline', sharedCourses: 2, avatar: 'NH', avatarColor: '#D97706' },
-  { name: 'Ziad T.', major: 'Physics', year: 'Junior', status: 'online', sharedCourses: 1, avatar: 'ZT', avatarColor: '#0EA5E9' },
-]
-
-const SUGGESTED = [
-  { name: 'Dina F.', major: 'CS', year: 'Junior', mutual: 5, avatar: 'DF', avatarColor: '#EC4899' },
-  { name: 'Rami S.', major: 'EECE', year: 'Sophomore', mutual: 3, avatar: 'RS', avatarColor: 'var(--color-primary-grad)' },
-]
+import { useEffect, useState } from 'react'
+import { Heart, MessageCircle, Bookmark, MoreHorizontal, Send, UserPlus, Users, Calendar, TrendingUp, Star, CheckCircle } from 'lucide-react'
+import { api, type Post as ApiPost, type FriendProfile } from '../lib/api'
+import { displayName, formatDateTime, timeAgo } from '../lib/format'
+import { useAuth } from '../lib/auth'
 
 const TAG_COLORS: Record<string, { bg: string; text: string }> = {
-  'Schedule Tips': { bg: 'var(--color-primary-light)', text: 'var(--color-primary)' },
+  'Schedule Tips': { bg: '#EEF2FF', text: '#4338CA' },
   'Professor Reviews': { bg: '#FFF7ED', text: '#C2410C' },
   'Question': { bg: '#F0FDF4', text: '#15803D' },
   'Registration Tips': { bg: '#FEF9C3', text: '#92400E' },
@@ -126,20 +19,77 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
 }
 
 const TYPE_COLORS: Record<string, string> = {
-  schedule: 'var(--color-primary)',
+  schedule: '#4338CA',
   review: '#F59E0B',
   question: '#059669',
   tip: '#D97706',
 }
 
-function PostCard({ post }: { post: Post }) {
-  const [liked, setLiked] = useState(post.liked)
-  const [saved, setSaved] = useState(post.saved)
-  const [likeCount, setLikeCount] = useState(post.likes)
+const AVATAR_COLORS = ['#4338CA', '#059669', '#7C3AED', '#D97706', '#0EA5E9', '#EC4899', '#6366F1', '#DC2626']
 
-  const toggleLike = () => {
-    setLiked(!liked)
-    setLikeCount((p) => p + (liked ? -1 : 1))
+const STATUS_COLORS: Record<string, string> = { online: '#10B981', away: '#F59E0B', offline: '#CBD5E1' }
+
+const DAY_COLORS: Record<string, string> = { Mon: '#4338CA', Tue: '#059669', Wed: '#0EA5E9', Thu: '#7C3AED', Fri: '#10B981' }
+
+function initialsOf(firstName?: string | null, lastName?: string | null): string {
+  return ((firstName?.[0] ?? '') + (lastName?.[0] ?? '')).toUpperCase() || '?'
+}
+
+function PostCard({ post, currentUserInitials, onCommented }: { post: ApiPost; currentUserInitials: string; onCommented: (postId: number, content: string) => void }) {
+  const [liked, setLiked] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [likeCount, setLikeCount] = useState(post.likeCount)
+  const [commentCount, setCommentCount] = useState(post.commentCount)
+  const [showComment, setShowComment] = useState(false)
+  const [comment, setComment] = useState('')
+  const [postingComment, setPostingComment] = useState(false)
+
+  const toggleLike = async () => {
+    const next = !liked
+    setLiked(next)
+    setLikeCount((p) => p + (next ? 1 : -1))
+    try {
+      if (next) {
+        await api.feed.like(post.id)
+      } else {
+        await api.feed.unlike(post.id)
+      }
+    } catch {
+      setLiked(!next)
+      setLikeCount((p) => p + (next ? -1 : 1))
+    }
+  }
+
+  const toggleSave = async () => {
+    const next = !saved
+    setSaved(next)
+    try {
+      if (next) {
+        await api.feed.save(post.id)
+      } else {
+        await api.feed.unsave(post.id)
+      }
+    } catch {
+      setSaved(!next)
+    }
+  }
+
+  const submitComment = async () => {
+    const text = comment.trim()
+    if (!text || postingComment) {
+      return
+    }
+    setPostingComment(true)
+    try {
+      await api.feed.createComment(post.id, text)
+      setComment('')
+      setCommentCount((p) => p + 1)
+      onCommented(post.id, text)
+    } catch {
+      // best-effort
+    } finally {
+      setPostingComment(false)
+    }
   }
 
   return (
@@ -148,20 +98,16 @@ function PostCard({ post }: { post: Post }) {
       {/* Header */}
       <div className="flex items-start gap-3 p-4 pb-3">
         <div className="rounded-full flex items-center justify-center shrink-0 font-bold"
-          style={{ width: 40, height: 40, background: `linear-gradient(135deg, ${post.badges[0]?.color ?? 'var(--color-primary)'} 0%, ${post.badges[0]?.color ?? 'var(--color-primary-grad)'}BB 100%)`, color: 'white', fontSize: 14 }}>
-          {post.avatar}
+          style={{ width: 40, height: 40, background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', color: 'white', fontSize: 14 }}>
+          {initialsOf(post.author?.firstName, post.author?.lastName) || '?'}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span style={{ fontSize: 14, fontWeight: 700, color: '#1E293B' }}>{post.author}</span>
-            {post.badges.map((b) => (
-              <span key={b.label} className="rounded-full px-2 py-0.5"
-                style={{ fontSize: 10, fontWeight: 700, background: b.color + '20', color: b.color, border: `1px solid ${b.color}40` }}>
-                {b.label}
-              </span>
-            ))}
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#1E293B' }}>{displayName(post.author?.firstName, post.author?.lastName)}</span>
           </div>
-          <div style={{ fontSize: 11, color: '#94A3B8' }}>{post.major} · {post.year} · {post.semester} · {post.time}</div>
+          <div style={{ fontSize: 11, color: '#94A3B8' }}>
+            {[post.author?.major, post.author?.level].filter(Boolean).join(' · ') || 'AUB Student'} · {timeAgo(post.createdAt)}
+          </div>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="flex items-center gap-1 rounded-full px-2 py-1"
@@ -180,56 +126,200 @@ function PostCard({ post }: { post: Post }) {
         <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.7 }}>{post.content}</p>
       </div>
 
-      {/* Schedule preview */}
-      {post.schedulePreview && (
-        <div className="mx-4 mb-3 rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #E0E7FF' }}>
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar size={12} color="var(--color-primary)" />
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary)' }}>Schedule Preview · {post.schedulePreview.days}</span>
-          </div>
-          <div className="flex gap-1.5 flex-wrap">
-            {post.schedulePreview.courses.map((c) => (
-              <span key={c} className="rounded-lg px-2 py-1"
-                style={{ fontSize: 11, fontWeight: 700, background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>{c}</span>
-            ))}
-          </div>
+      {/* Tags */}
+      {post.tags && post.tags.length > 0 && (
+        <div className="flex gap-1.5 px-4 pb-3 flex-wrap">
+          {post.tags.map((t) => {
+            const tc = TAG_COLORS[t] ?? { bg: '#F1F5F9', text: '#64748B' }
+            return (
+              <span key={t} className="rounded-full px-2.5 py-0.5 cursor-pointer transition-colors"
+                style={{ fontSize: 11, fontWeight: 600, background: tc.bg, color: tc.text }}>
+                #{t.replace(/\s/g, '')}
+              </span>
+            )
+          })}
         </div>
       )}
 
-      {/* Tags */}
-      <div className="flex gap-1.5 px-4 pb-3 flex-wrap">
-        {post.tags.map((t) => {
-          const tc = TAG_COLORS[t] ?? { bg: '#F1F5F9', text: '#64748B' }
-          return (
-            <span key={t} className="rounded-full px-2.5 py-0.5 cursor-pointer transition-colors"
-              style={{ fontSize: 11, fontWeight: 600, background: tc.bg, color: tc.text }}>
-              #{t.replace(' ', '')}
-            </span>
-          )
-        })}
-      </div>
-
       {/* Actions */}
       <div className="flex items-center gap-1 px-4 py-3" style={{ borderTop: '1px solid #F8FAFC' }}>
-        <button onClick={toggleLike}
+        <button onClick={() => void toggleLike()}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
           style={{ color: liked ? '#EF4444' : '#64748B', background: liked ? '#FEF2F2' : 'transparent', fontSize: 12, fontWeight: liked ? 700 : 500 }}>
           <Heart size={14} fill={liked ? '#EF4444' : 'none'} /> {likeCount}
         </button>
+        <button onClick={() => setShowComment(!showComment)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors"
+          style={{ color: '#64748B', fontSize: 12 }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
+          <MessageCircle size={14} /> {commentCount}
+        </button>
+        <button onClick={() => void toggleSave()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg ml-auto transition-all"
+          style={{ color: saved ? '#4338CA' : '#64748B', background: saved ? '#EEF2FF' : 'transparent' }}>
+          <Bookmark size={14} fill={saved ? '#4338CA' : 'none'} />
+        </button>
       </div>
+
+      {/* Comment input */}
+      {showComment && (
+        <div className="flex items-center gap-2 px-4 pb-3">
+          <div className="rounded-full flex items-center justify-center shrink-0"
+            style={{ width: 28, height: 28, background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', fontSize: 10, fontWeight: 700, color: 'white' }}>
+            {currentUserInitials}
+          </div>
+          <div className="flex-1 flex items-center gap-2 rounded-xl px-3 py-1.5"
+            style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+            <input value={comment} onChange={(e) => setComment(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void submitComment() }}
+              placeholder="Write a comment..."
+              className="flex-1 outline-none bg-transparent"
+              style={{ fontSize: 12, color: '#374151' }} />
+            <button onClick={() => void submitComment()} style={{ color: comment ? '#4338CA' : '#CBD5E1' }} disabled={postingComment}>
+              <Send size={13} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 export default function Community() {
-  const { userName } = useContext(AppContext)
-  const initials = userName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+  const { user } = useAuth()
   const [activeCompose, setActiveCompose] = useState(false)
   const [composeText, setComposeText] = useState('')
-  const [addedFriends, setAddedFriends] = useState<Set<string>>(new Set())
-  const [selectedFriend, setSelectedFriend] = useState<typeof FRIENDS[0] | null>(null)
-  const [showSharedSchedule, setShowSharedSchedule] = useState(false)
-  const posts = POSTS
+  const [composeType, setComposeType] = useState<'schedule' | 'tip' | 'review' | 'question'>('schedule')
+  const [posting, setPosting] = useState(false)
+  const [posts, setPosts] = useState<ApiPost[]>([])
+  const [feedLoading, setFeedLoading] = useState(true)
+  const [friends, setFriends] = useState<FriendProfile[]>([])
+  const [suggested, setSuggested] = useState<FriendProfile[]>([])
+  const [events, setEvents] = useState<{ title: string; date: string; type: string; urgent: boolean }[]>([])
+  const [freeTime, setFreeTime] = useState<{ day: string; color: string; pct: number }[]>([])
+  const [trendingCourses, setTrendingCourses] = useState<{ code: string; name: string; trend: string; color: string }[]>([])
+  const [trendingProfs, setTrendingProfs] = useState<{ name: string; department: string; rating: string }[]>([])
+  const [joinedGroups, setJoinedGroups] = useState<Set<string>>(new Set())
+  const [groupModal, setGroupModal] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // TODO(backend): study groups have no API endpoint yet (Phase 11) — kept as local UI placeholder.
+  const STUDY_GROUPS = [
+    { name: 'EECE 330 — HW 5', members: 8, time: 'Tonight 8 PM', location: 'Library Room 204', host: 'Sarah K.' },
+    { name: 'MATH 201 — Finals', members: 12, time: 'Sat 2 PM', location: 'AUB Science Hall', host: 'Karim A.' },
+  ]
+
+  const localPart = user?.email ? user.email.split('@')[0] ?? 'ST' : 'ST'
+  const currentUserInitials = (localPart.slice(0, 2) || 'ST').toUpperCase()
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      try {
+        const [feedRes, friendsRes, suggestedRes, eventsRes, freeTimeRes, coursesRes, profsRes] = await Promise.all([
+          api.feed.list(1, 20),
+          api.friends.list(),
+          api.friends.suggested(10),
+          api.dashboard.upcoming(),
+          api.friends.commonFreeTime(),
+          api.courses.list({ sort: 'popularity', order: 'desc', limit: 3 }),
+          api.professors.list({ sort: 'rating', order: 'desc', limit: 2 }),
+        ])
+
+        if (cancelled) {
+          return
+        }
+
+        setPosts(feedRes.data)
+        setFriends(friendsRes.data)
+        setSuggested(suggestedRes.data)
+        setEvents(eventsRes.data.map((e) => ({
+          title: e.title,
+          date: formatDateTime(e.starts_at),
+          type: e.type ?? '',
+          urgent: e.type === 'registration',
+        })))
+        setFreeTime(freeTimeRes.data.days.map((d) => ({
+          day: d.label,
+          color: DAY_COLORS[d.label] ?? '#4338CA',
+          pct: d.freePercentage,
+        })))
+        setTrendingCourses(coursesRes.data.map((c) => ({
+          code: c.code,
+          name: c.title,
+          trend: `${c.reviewCount} reviews`,
+          color: '#4338CA',
+        })))
+        setTrendingProfs(profsRes.data.map((p) => ({
+          name: displayName(p.firstName, p.lastName),
+          department: p.department ?? '—',
+          rating: p.averageRating === null ? '—' : p.averageRating.toFixed(1),
+        })))
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Could not load community data.')
+        }
+      } finally {
+        if (!cancelled) {
+          setFeedLoading(false)
+        }
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const onlineCount = friends.filter((f) => f.presenceStatus === 'online').length
+  const onlineFriends = friends.filter((f) => f.presenceStatus === 'online')
+  const otherFriends = friends.filter((f) => f.presenceStatus !== 'online')
+
+  const handleJoinGroup = (name: string) => {
+    setJoinedGroups((prev) => {
+      const next = new Set(prev)
+      next.add(name)
+      return next
+    })
+    setGroupModal(name)
+    setTimeout(() => setGroupModal(null), 3000)
+  }
+
+  async function sendRequest(userId: string) {
+    try {
+      await api.friends.sendRequest(userId)
+      setSuggested((prev) => prev.filter((s) => s.id !== userId))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send friend request.')
+    }
+  }
+
+  async function submitPost() {
+    const content = composeText.trim()
+    if (!content || posting) {
+      return
+    }
+    setPosting(true)
+    try {
+      const { data: created } = await api.feed.create({ type: composeType, content })
+      setPosts((prev) => [created, ...prev])
+      setComposeText('')
+      setActiveCompose(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not share post.')
+    } finally {
+      setPosting(false)
+    }
+  }
+
+  const friendColor = (id: string, index: number) => {
+    const hash = id.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
+    return AVATAR_COLORS[(index + hash) % AVATAR_COLORS.length]
+  }
 
   return (
     <div className="flex h-full overflow-hidden" style={{ background: '#F8FAFC' }}>
@@ -238,69 +328,109 @@ export default function Community() {
         style={{ width: 220, background: '#FFFFFF', borderRight: '1px solid #F1F5F9' }}>
         <div className="px-4 py-3" style={{ borderBottom: '1px solid #F1F5F9' }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', marginBottom: 2 }}>Friends</div>
-          <div style={{ fontSize: 11, color: '#94A3B8' }}>{FRIENDS.length} friends</div>
+          <div style={{ fontSize: 11, color: '#94A3B8' }}>{onlineCount} online now</div>
         </div>
 
         <div className="px-3 py-3 flex-1">
-          {/* All Friends */}
-          {FRIENDS.map((f) => (
-            <button key={f.name} onClick={() => setSelectedFriend(f)} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, paddingLeft: 4 }}>
+            Online — {onlineCount}
+          </div>
+          {onlineFriends.map((f, i) => (
+            <button key={f.id} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
               style={{ textAlign: 'left' }}
               onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC' }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
               <div className="relative shrink-0">
                 <div className="rounded-full flex items-center justify-center"
-                  style={{ width: 32, height: 32, background: f.avatarColor + '20', color: f.avatarColor, fontSize: 11, fontWeight: 700 }}>
-                  {f.avatar}
+                  style={{ width: 32, height: 32, background: friendColor(f.id, i) + '20', color: friendColor(f.id, i), fontSize: 11, fontWeight: 700 }}>
+                  {initialsOf(f.firstName, f.lastName) || '?'}
                 </div>
+                <div className="absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-white"
+                  style={{ width: 10, height: 10, background: STATUS_COLORS[f.presenceStatus] ?? '#CBD5E1' }} />
               </div>
               <div className="flex-1 min-w-0">
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</div>
-                <div style={{ fontSize: 10, color: '#94A3B8' }}>{f.major} · {f.sharedCourses} shared</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName(f.firstName, f.lastName)}</div>
+                <div style={{ fontSize: 10, color: '#94A3B8' }}>{[f.major, f.level].filter(Boolean).join(' · ') || '—'}</div>
               </div>
             </button>
           ))}
+          {onlineFriends.length === 0 && !feedLoading && (
+            <div style={{ fontSize: 11, color: '#94A3B8', paddingLeft: 4 }}>No friends online.</div>
+          )}
 
-          {/* Pending */}
+          {otherFriends.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, paddingLeft: 4, marginTop: 12 }}>
+                Away / Offline
+              </div>
+              {otherFriends.map((f, i) => (
+                <button key={f.id} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
+                  style={{ textAlign: 'left', opacity: 0.6 }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.opacity = '1' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.opacity = '0.6' }}>
+                  <div className="relative shrink-0">
+                    <div className="rounded-full flex items-center justify-center"
+                      style={{ width: 32, height: 32, background: friendColor(f.id, i) + '20', color: friendColor(f.id, i), fontSize: 11, fontWeight: 700 }}>
+                      {initialsOf(f.firstName, f.lastName) || '?'}
+                    </div>
+                    <div className="absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-white"
+                      style={{ width: 10, height: 10, background: STATUS_COLORS[f.presenceStatus] ?? '#CBD5E1' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{displayName(f.firstName, f.lastName)}</div>
+                    <div style={{ fontSize: 10, color: '#94A3B8' }}>{[f.major, f.level].filter(Boolean).join(' · ') || '—'}</div>
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
+
           <div style={{ fontSize: 10, fontWeight: 700, color: '#94A3B8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6, paddingLeft: 4, marginTop: 12 }}>
             Suggested
           </div>
-          {SUGGESTED.map((s) => {
-            const added = addedFriends.has(s.name)
-            return (
-            <div key={s.name} className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
+          {suggested.map((s, i) => (
+            <div key={s.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl"
               style={{ background: '#F8FAFC', marginBottom: 4 }}>
               <div className="rounded-full flex items-center justify-center shrink-0"
-                style={{ width: 32, height: 32, background: s.avatarColor + '20', color: s.avatarColor, fontSize: 11, fontWeight: 700 }}>
-                {s.avatar}
+                style={{ width: 32, height: 32, background: friendColor(s.id, i) + '20', color: friendColor(s.id, i), fontSize: 11, fontWeight: 700 }}>
+                {initialsOf(s.firstName, s.lastName) || '?'}
               </div>
               <div className="flex-1 min-w-0">
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B' }}>{s.name}</div>
-                <div style={{ fontSize: 10, color: '#94A3B8' }}>{s.mutual} mutual friends</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B' }}>{displayName(s.firstName, s.lastName)}</div>
+                <div style={{ fontSize: 10, color: '#94A3B8' }}>{[s.major, s.level].filter(Boolean).join(' · ') || '—'}</div>
               </div>
-              <button onClick={() => setAddedFriends(p => new Set(p).add(s.name))} style={{ color: added ? '#10B981' : 'var(--color-primary)' }}>
-                {added ? <CheckCircle size={14} /> : <UserPlus size={14} />}
+              <button onClick={() => void sendRequest(s.id)} style={{ color: '#4338CA' }}>
+                <UserPlus size={14} />
               </button>
             </div>
-          )})}
+          ))}
+          {suggested.length === 0 && !feedLoading && (
+            <div style={{ fontSize: 11, color: '#94A3B8', paddingLeft: 4 }}>No suggestions right now.</div>
+          )}
         </div>
       </aside>
 
       {/* Center: Feed */}
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-5 flex flex-col gap-4">
+          {error && (
+            <div className="rounded-xl px-4 py-3" style={{ background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 12, fontWeight: 600, color: '#B91C1C' }}>
+              {error}
+            </div>
+          )}
+
           {/* Compose */}
           <div className="rounded-2xl p-4" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div className="flex items-center gap-3 mb-3">
               <div className="rounded-full flex items-center justify-center shrink-0"
-                style={{ width: 36, height: 36, background: 'linear-gradient(135deg, var(--color-primary-grad) 0%, #8B5CF6 100%)', fontSize: 12, fontWeight: 700, color: 'white' }}>
-                {initials}
+                style={{ width: 36, height: 36, background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', fontSize: 12, fontWeight: 700, color: 'white' }}>
+                {currentUserInitials}
               </div>
               <button
                 onClick={() => setActiveCompose(true)}
                 className="flex-1 rounded-xl px-4 py-2.5 text-left transition-colors"
                 style={{ fontSize: 13, color: '#94A3B8', background: '#F8FAFC', border: '1px solid #E2E8F0' }}
-                onMouseEnter={(e) => { e.currentTarget.style.border = '1px solid var(--color-primary-border)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.border = '1px solid #C7D2FE' }}
                 onMouseLeave={(e) => { e.currentTarget.style.border = '1px solid #E2E8F0' }}>
                 Share a schedule, tip, or question...
               </button>
@@ -318,9 +448,15 @@ export default function Community() {
                 />
                 <div className="flex items-center justify-between mt-2">
                   <div className="flex gap-1.5">
-                    {['Schedule', 'Tip', 'Review', 'Question'].map((type) => (
-                      <button key={type} className="rounded-full px-2.5 py-1"
-                        style={{ fontSize: 11, fontWeight: 600, background: '#F1F5F9', color: '#64748B' }}>
+                    {(['schedule', 'tip', 'review', 'question'] as const).map((type) => (
+                      <button key={type} onClick={() => setComposeType(type)}
+                        className="rounded-full px-2.5 py-1"
+                        style={{
+                          fontSize: 11, fontWeight: 600,
+                          background: composeType === type ? '#EEF2FF' : '#F1F5F9',
+                          color: composeType === type ? '#4338CA' : '#64748B',
+                          textTransform: 'capitalize',
+                        }}>
                         {type}
                       </button>
                     ))}
@@ -329,9 +465,11 @@ export default function Community() {
                     <button onClick={() => setActiveCompose(false)}
                       className="px-3 py-1.5 rounded-lg" style={{ fontSize: 12, color: '#64748B' }}>Cancel</button>
                     <button
+                      onClick={() => void submitPost()}
+                      disabled={!composeText.trim() || posting}
                       className="px-4 py-1.5 rounded-lg font-semibold"
-                      style={{ fontSize: 12, background: composeText ? 'var(--color-primary)' : '#E2E8F0', color: composeText ? 'white' : '#94A3B8' }}>
-                      Post
+                      style={{ fontSize: 12, background: composeText.trim() ? '#4338CA' : '#E2E8F0', color: composeText.trim() ? 'white' : '#94A3B8' }}>
+                      {posting ? 'Posting...' : 'Post'}
                     </button>
                   </div>
                 </div>
@@ -340,104 +478,135 @@ export default function Community() {
           </div>
 
           {/* Posts */}
+          {feedLoading && <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '24px 0' }}>Loading feed...</div>}
+          {!feedLoading && posts.length === 0 && <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '24px 0' }}>No posts yet. Share something!</div>}
           {posts.map((post) => (
-            <PostCard key={post.id} post={post} />
+            <PostCard
+              key={post.id}
+              post={post}
+              currentUserInitials={currentUserInitials}
+              onCommented={(postId, content) => {
+                // Keep feed data fresh when a comment is added.
+                void api.feed.comments(postId, 1, 1).catch(() => { void content })
+              }}
+            />
           ))}
         </div>
       </main>
 
-      {/* Selected Friend Modal */}
-      {selectedFriend && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }} onClick={() => setSelectedFriend(null)}>
-          <div className="rounded-2xl p-6" style={{ background: '#FFFFFF', width: 400 }} onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex items-center gap-3">
-                <div className="rounded-full flex items-center justify-center" style={{ width: 48, height: 48, background: selectedFriend.avatarColor + '20', color: selectedFriend.avatarColor, fontSize: 16, fontWeight: 700 }}>
-                  {selectedFriend.avatar}
-                </div>
-                <div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0F172A' }}>{selectedFriend.name}</div>
-                  <div style={{ fontSize: 13, color: '#64748B' }}>{selectedFriend.major}</div>
-                </div>
+      {/* Right: Sidebar */}
+      <aside className="flex flex-col shrink-0 h-full overflow-y-auto"
+        style={{ width: 240, borderLeft: '1px solid #F1F5F9', background: '#FFFFFF' }}>
+        {/* Events */}
+        <div className="p-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Upcoming Events</div>
+          {events.length === 0 && !feedLoading && <div style={{ fontSize: 11, color: '#94A3B8' }}>No upcoming events.</div>}
+          {events.map((e, i) => (
+            <div key={i} className="flex items-start gap-2.5 mb-3 last:mb-0">
+              <div className="rounded-lg p-1.5 mt-0.5 shrink-0"
+                style={{ background: e.urgent ? '#FEF2F2' : '#F0F9FF', color: e.urgent ? '#EF4444' : '#0284C7' }}>
+                {e.type === 'registration' ? <CheckCircle size={12} /> : <Users size={12} />}
               </div>
-              <button onClick={() => setSelectedFriend(null)} className="p-2 rounded-lg hover:bg-slate-100">
-                <X size={20} color="#64748B" />
-              </button>
-            </div>
-            
-            <div className="mb-6">
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Shared Schedules</h3>
-              <div className="rounded-xl p-3 flex items-center justify-between" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-                <div className="flex items-center gap-2">
-                  <Calendar size={16} color="var(--color-primary)" />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>Fall 2025 Schedule</span>
-                </div>
-                <button onClick={() => setShowSharedSchedule(true)} className="text-xs font-semibold px-3 py-1.5 rounded-lg" style={{ background: 'var(--color-primary-light)', color: 'var(--color-primary)' }}>View</button>
-              </div>
-            </div>
-
-            <div>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Common Free Time</h3>
-              <div className="flex flex-col gap-2">
-                <div className="rounded-xl p-3" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#15803D' }}>Mondays & Wednesdays</div>
-                  <div style={{ fontSize: 12, color: '#16A34A' }}>10:00 AM – 1:00 PM</div>
-                </div>
-                <div className="rounded-xl p-3" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#15803D' }}>Fridays</div>
-                  <div style={{ fontSize: 12, color: '#16A34A' }}>All Day</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Shared Schedule Modal */}
-      {showSharedSchedule && selectedFriend && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }} onClick={() => setShowSharedSchedule(false)}>
-          <div className="rounded-2xl shadow-2xl overflow-hidden flex flex-col" style={{ width: 560, maxHeight: '85vh', background: '#FFFFFF' }} onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
               <div>
-                <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A' }}>{selectedFriend.name}'s Schedule</h2>
-                <p style={{ fontSize: 12, color: '#64748B' }}>15 credits · Mon–Thu</p>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B', lineHeight: 1.3 }}>{e.title}</div>
+                <div style={{ fontSize: 11, color: '#94A3B8' }}>{e.date}</div>
               </div>
-              <button onClick={() => setShowSharedSchedule(false)} className="rounded-lg p-1.5" style={{ color: '#64748B' }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
-                <X size={18} />
-              </button>
             </div>
-            
-            <div className="p-6 flex flex-col gap-3 overflow-y-auto">
-              {[
-                { code: 'EECE 330', name: 'Digital Systems', prof: 'Dr. Hassan', time: '10:00 AM - 11:15 AM', days: 'Mon, Wed', color: '#4338CA' },
-                { code: 'MATH 201', name: 'Calculus III', prof: 'Dr. Khalil', time: '9:00 AM - 10:15 AM', days: 'Tue, Thu', color: '#059669' },
-                { code: 'PHYS 211', name: 'Physics II', prof: 'Dr. Nassif', time: '1:00 PM - 2:00 PM', days: 'Mon, Wed, Fri', color: '#0284C7' },
-                { code: 'EECE 351', name: 'Signals & Systems', prof: 'Dr. Farhat', time: '11:30 AM - 1:00 PM', days: 'Tue, Thu', color: '#7C3AED' },
-              ].map((c, i) => (
-                <div key={i} className="flex items-center gap-4 rounded-xl p-4" style={{ border: '1px solid #F1F5F9', background: '#F8FAFC' }}>
-                  <div className="rounded-full flex items-center justify-center shrink-0" style={{ width: 40, height: 40, background: c.color + '20', color: c.color }}>
-                    <BookOpen size={18} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold" style={{ fontSize: 14, color: '#1E293B' }}>{c.code}</span>
-                      <span style={{ fontSize: 13, color: '#64748B' }}>{c.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center gap-1" style={{ fontSize: 12, color: '#64748B' }}>
-                        <Clock size={12} /> {c.time}
-                      </span>
-                      <span className="flex items-center gap-1" style={{ fontSize: 12, color: '#64748B' }}>
-                        <Calendar size={12} /> {c.days}
-                      </span>
-                    </div>
-                  </div>
+          ))}
+        </div>
+
+        {/* Study groups */}
+        <div className="p-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Study Groups</div>
+          {STUDY_GROUPS.map((g, i) => {
+            const joined = joinedGroups.has(g.name)
+            return (
+              <div key={i} className="rounded-xl p-3 mb-2 last:mb-0 transition-all"
+                style={{ background: joined ? '#F0FDF4' : '#F8FAFC', border: `1px solid ${joined ? '#BBF7D0' : '#F1F5F9'}` }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B' }}>{g.name}</div>
+                <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 1 }}>{g.location} · Hosted by {g.host}</div>
+                <div className="flex items-center justify-between mt-1.5">
+                  <div style={{ fontSize: 11, color: '#94A3B8' }}>{joined ? g.members + 1 : g.members} members · {g.time}</div>
+                  <button
+                    onClick={() => { if (!joined) handleJoinGroup(g.name) }}
+                    className="rounded-full px-2.5 py-0.5 transition-all"
+                    style={{
+                      fontSize: 10, fontWeight: 700,
+                      background: joined ? '#DCFCE7' : '#EEF2FF',
+                      color: joined ? '#15803D' : '#4338CA',
+                      cursor: joined ? 'default' : 'pointer',
+                    }}>
+                    {joined ? '✓ Joined' : 'Join Group'}
+                  </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Common free time */}
+        <div className="p-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Common Free Time</div>
+          <div className="flex flex-col gap-1.5">
+            {freeTime.map((d) => (
+              <div key={d.day} className="flex items-center gap-2">
+                <span style={{ fontSize: 11, color: '#64748B', width: 28, fontWeight: 600 }}>{d.day}</span>
+                <div className="flex-1 rounded-full h-2" style={{ background: '#F1F5F9' }}>
+                  <div className="h-2 rounded-full" style={{ width: `${d.pct}%`, background: d.color }} />
+                </div>
+                <span style={{ fontSize: 10, color: '#94A3B8', width: 24, textAlign: 'right' }}>{d.pct}%</span>
+              </div>
+            ))}
+            {freeTime.length === 0 && !feedLoading && <div style={{ fontSize: 11, color: '#94A3B8' }}>No data yet.</div>}
           </div>
+          <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 6 }}>% of friends free</div>
+        </div>
+
+        {/* Trending */}
+        <div className="p-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Trending Courses</div>
+          {trendingCourses.map((c) => (
+            <div key={c.code} className="flex items-center gap-2.5 mb-2.5 last:mb-0">
+              <div className="rounded-lg px-1.5 py-0.5"
+                style={{ background: c.color + '20', color: c.color, fontSize: 10, fontWeight: 700, flexShrink: 0 }}>
+                {c.code}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                <div style={{ fontSize: 10, color: '#10B981', fontWeight: 600 }}>{c.trend}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Trending profs */}
+        <div className="p-4">
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#0F172A', marginBottom: 8 }}>Top Professors</div>
+          {trendingProfs.map((p) => (
+            <div key={p.name} className="flex items-center gap-2.5 mb-3 last:mb-0">
+              <div className="rounded-full flex items-center justify-center shrink-0"
+                style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #4338CA 0%, #8B5CF6 100%)', fontSize: 11, fontWeight: 700, color: 'white' }}>
+                {initialsOf(p.name.split(' ')[0], p.name.split(' ')[1]) || '?'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B' }}>{p.name}</div>
+                <div style={{ fontSize: 10, color: '#94A3B8' }}>{p.department}</div>
+              </div>
+              <div className="flex items-center gap-0.5">
+                <Star size={11} fill="#F59E0B" color="#F59E0B" />
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#F59E0B' }}>{p.rating}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
+
+      {/* Join confirmation toast */}
+      {groupModal && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-3 shadow-xl"
+          style={{ background: '#1E293B', color: 'white', fontSize: 13, fontWeight: 600 }}>
+          <CheckCircle size={16} color="#10B981" />
+          Joined "{groupModal}" — you'll receive updates in your messages.
         </div>
       )}
     </div>

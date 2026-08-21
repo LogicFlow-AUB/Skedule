@@ -116,9 +116,15 @@ async function getCourseSummaries(courses: Course[]): Promise<CourseSummary[]> {
   }
 
   for (const row of (attributesResult.data ?? []) as CourseAttribute[]) {
-    const attributes = attributesByCourse.get(row.course_id) ?? [];
-    attributes.push(...row.attributes.map((attribute) => attribute.name));
-    attributesByCourse.set(row.course_id, attributes);
+    const attr = row.attributes;
+    const names: string[] = Array.isArray(attr)
+      ? attr.map((a: { name: string }) => a.name)
+      : attr && typeof attr === 'object'
+        ? [(attr as { name: string }).name]
+        : [];
+    const existing = attributesByCourse.get(row.course_id) ?? [];
+    existing.push(...names);
+    attributesByCourse.set(row.course_id, existing);
   }
 
   return courses.map((course) => {
@@ -219,17 +225,17 @@ export async function getCourse(code: string): Promise<CourseSummary> {
     .select('*')
     .eq('subject', subject)
     .eq('course_number', courseNumber)
-    .maybeSingle();
+    .limit(1);
 
   if (error) {
     throw error;
   }
 
-  if (!data) {
+  if (!data || data.length === 0) {
     throw new AppError(404, 'COURSE_NOT_FOUND', 'Course not found.');
   }
 
-  const [summary] = await getCourseSummaries([data as Course]);
+  const [summary] = await getCourseSummaries([data[0] as Course]);
 
   if (!summary) {
     throw new AppError(500, 'COURSE_SUMMARY_MISSING', 'Course summary could not be created.');

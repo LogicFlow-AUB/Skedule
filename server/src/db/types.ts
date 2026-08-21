@@ -52,14 +52,19 @@ export type Professor = {
 export type Section = {
   id: number;
   course_id: number | null;
+  term_id: number | null;
   professor_id: number | null;
   section_number: string;
+  crn: string;
   days: string | null;
   start_time: string | null;
   end_time: string | null;
-  room: string | null;
+  schedule_type: string | null;
+  campus: string | null;
   seats_total: number | null;
   seats_remaining: number | null;
+  status: string | null;
+  room: string | null;
 };
 
 export type Schedule = {
@@ -106,10 +111,57 @@ export type Friendship = {
 export type Notification = {
   id: number;
   user_id: string;
-  actor_id: string | null;
   type: string;
   message: string;
   data: Record<string, unknown>;
-  read_at: string | null;
+  actor_id: string | null;
+  read: boolean;
   created_at: string;
+};
+
+export type NotificationPreference = {
+  user_id: string;
+  friend_requests: boolean;
+  friend_acceptances: boolean;
+  post_likes: boolean;
+  post_comments: boolean;
+  review_likes: boolean;
+  schedule_shares: boolean;
+  registration_reminders: boolean;
+};
+
+export type Event = {
+  id: number;
+  title: string;
+  type: string;
+  starts_at: string;
+  ends_at: string | null;
+  description: string | null;
+  location: string | null;
+  term_id: number | null;
+  created_at: string;
+};
+
+export type EventRsvp = {
+  event_id: number;
+  user_id: string;
+  created_at: string;
+};
+
+export type StudyGroup = {
+  id: number;
+  name: string;
+  course_code: string | null;
+  description: string | null;
+  meeting_time: string | null;
+  location: string | null;
+  host_user_id: string;
+  max_members: number | null;
+  created_at: string;
+};
+
+export type StudyGroupMember = {
+  study_group_id: number;
+  user_id: string;
+  joined_at: string;
 };

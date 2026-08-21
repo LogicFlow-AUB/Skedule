@@ -1,4 +1,4 @@
-import { createAuthClient, requireSupabaseClient } from '../db/supabase.js';
+import { requireSupabaseClient, requireAuthClient } from '../db/supabase.js';
 import { AppError } from '../utils/app-error.js';
 
 export type RegisterInput = {
@@ -51,8 +51,9 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
     throw new AppError(400, 'AUB_EMAIL_REQUIRED', 'Only AUB email addresses are allowed.');
   }
 
-  const { data, error } = await createAuthClient().auth.signUp({
-    email: input.email,
+  const authDb = requireAuthClient();
+  const { data, error } = await authDb.auth.signUp({
+    email: email,
     password: input.password,
   });
 
@@ -74,10 +75,10 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
     throw new AppError(500, 'AUTH_SIGNUP_FAILED', 'Account was not created.');
   }
 
-  await ensureProfile(user.id, user.email ?? input.email);
+  await ensureProfile(user.id, user.email ?? email);
 
   const response: AuthResponse = {
-    user: { id: user.id, email: user.email ?? input.email },
+    user: { id: user.id, email: user.email ?? email },
   };
 
   if (data.session) {
@@ -88,12 +89,21 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
 }
 
 export async function login(input: LoginInput): Promise<AuthResponse> {
-  const { data, error } = await createAuthClient().auth.signInWithPassword({
+  const authDb = requireAuthClient();
+  const { data, error } = await authDb.auth.signInWithPassword({
     email: input.email,
     password: input.password,
   });
 
   if (error) {
+    if (error.code === 'email_not_confirmed') {
+      throw new AppError(
+        401,
+        'EMAIL_NOT_CONFIRMED',
+        'Please confirm your email address before signing in.',
+      );
+    }
+
     throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
   }
 
@@ -103,8 +113,6 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
     throw new AppError(500, 'AUTH_SESSION_MISSING', 'Login could not be completed.');
   }
 
-  await ensureProfile(user.id, user.email ?? input.email);
-
   return {
     user: { id: user.id, email: user.email ?? input.email },
     tokens: tokensFromSession(data.session),
@@ -112,14 +120,13 @@ export async function login(input: LoginInput): Promise<AuthResponse> {
 }
 
 export async function logout(userId: string): Promise<void> {
-  const db = requireSupabaseClient();
-  await db.auth.admin.signOut(userId, 'global');
+  const authDb = requireAuthClient();
+  await authDb.auth.admin.signOut(userId, 'global');
 }
 
 export async function refresh(refreshToken: string): Promise<AuthTokens> {
-  const { data, error } = await createAuthClient().auth.refreshSession({
-    refresh_token: refreshToken,
-  });
+  const authDb = requireAuthClient();
+  const { data, error } = await authDb.auth.refreshSession({ refresh_token: refreshToken });
 
   if (error || !data.session) {
     throw new AppError(401, 'INVALID_TOKEN', 'Authentication token is invalid or expired.');
@@ -129,7 +136,8 @@ export async function refresh(refreshToken: string): Promise<AuthTokens> {
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {
-  const { error } = await createAuthClient().auth.resetPasswordForEmail(email);
+  const authDb = requireAuthClient();
+  const { error } = await authDb.auth.resetPasswordForEmail(email);
 
   if (error) {
     throw error;
@@ -145,7 +153,8 @@ export async function resetPassword(
     throw new AppError(400, 'PASSWORD_CONFIRMATION_MISMATCH', 'Passwords do not match.');
   }
 
-  const { data, error } = await createAuthClient().auth.verifyOtp({
+  const authDb = requireAuthClient();
+  const { data, error } = await authDb.auth.verifyOtp({
     type: 'recovery',
     token_hash: tokenHash,
   });
@@ -158,8 +167,7 @@ export async function resetPassword(
     );
   }
 
-  const db = requireSupabaseClient();
-  const { error: updateError } = await db.auth.admin.updateUserById(data.user.id, {
+  const { error: updateError } = await authDb.auth.admin.updateUserById(data.user.id, {
     password,
   });
 
@@ -169,8 +177,8 @@ export async function resetPassword(
 }
 
 export async function getUser(userId: string): Promise<AuthUser> {
-  const db = requireSupabaseClient();
-  const { data, error } = await db.auth.admin.getUserById(userId);
+  const authDb = requireAuthClient();
+  const { data, error } = await authDb.auth.admin.getUserById(userId);
 
   if (error || !data.user) {
     throw new AppError(401, 'INVALID_TOKEN', 'Authentication token is invalid or expired.');

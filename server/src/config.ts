@@ -25,6 +25,13 @@ const config = {
     anonKey: readOptionalValue(process.env.SUPABASE_ANON_KEY),
     serviceRoleKey: readOptionalValue(process.env.SUPABASE_SERVICE_ROLE_KEY),
   },
+  aub: {
+    baseUrl:
+      process.env.AUB_REGISTRATION_URL ?? 'https://sturegss.aub.edu.lb/StudentRegistrationSsb',
+    termCode: process.env.AUB_SYNC_TERM_CODE ?? '202710',
+    syncIntervalMs: Number(process.env.AUB_SYNC_INTERVAL_MS ?? 600_000),
+    syncOnStartup: (process.env.AUB_SYNC_ON_STARTUP ?? 'true') === 'true',
+  },
 } as const;
 
 export default config;

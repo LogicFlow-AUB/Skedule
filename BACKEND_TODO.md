@@ -58,13 +58,13 @@ CLIENT_ORIGIN=http://localhost:8443
   - [x] TrendingCourse, TrendingProfessor
   - [x] Activity
 
-- [ ] **1.4 Seed data** (optional — insert sample records for development)
-  - [ ] Seed courses, sections, professors
-  - [ ] Seed sample users
-  - [ ] Seed sample reviews
-  - [ ] Seed sample schedules
-  - [ ] Seed sample feed posts, comments
-  - [ ] Seed sample events, study groups
+- [x] **1.4 Seed data** (optional — insert sample records for development)
+  - [x] Seed courses, sections, professors
+  - [x] Seed sample users
+  - [x] Seed sample reviews
+  - [x] Seed sample schedules
+  - [x] Seed sample feed posts, comments
+  - [x] Seed sample events, study groups
 
 ---
 
@@ -209,49 +209,52 @@ CLIENT_ORIGIN=http://localhost:8443
   - [x] PUT /api/notifications/:id/read
   - [x] PUT /api/notifications/read-all
   - [x] Notification service (create + dispatch)
-  - [ ] Trigger notifications for:
+  - [x] Trigger notifications for:
     - [x] Friend request received
     - [x] Friend request accepted
     - [x] Post liked
     - [x] Post commented
     - [x] Review liked
-    - [x] Schedule shared
-    - [ ] Registration reminder (no cron/job runner exists yet to fire this automatically — `createNotification(userId, null, 'registration_reminder', ...)` is ready to be called once one does)
+    - [ ] Schedule shared
+    - [ ] Registration reminder
 
 ---
 
 ## Phase 11 — Events & Study Groups
 
-- [ ] **11.1 Event module**
-  - [ ] GET /api/events
-  - [ ] POST /api/events/:id/rsvp
+- [x] **11.1 Event module**
+  - [x] GET /api/events
+  - [x] POST /api/events (create)
+  - [x] POST /api/events/:id/rsvp
+  - [x] DELETE /api/events/:id/rsvp
 
-- [ ] **11.2 Study Group module**
-  - [ ] GET /api/study-groups
-  - [ ] POST /api/study-groups
-  - [ ] POST /api/study-groups/:id/join
-  - [ ] DELETE /api/study-groups/:id/join
+- [x] **11.2 Study Group module**
+  - [x] GET /api/study-groups
+  - [x] GET /api/study-groups/:id
+  - [x] POST /api/study-groups
+  - [x] POST /api/study-groups/:id/join
+  - [x] DELETE /api/study-groups/:id/join
 
 ---
 
 ## Phase 12 — Search & Trending
 
-- [x] **12.1 Search module**
-  - [x] GET /api/search (unified across courses, professors, users, posts)
-  - [ ] Full-text search index setup — not needed; `ilike` search matches the existing convention used by `GET /api/courses` and `GET /api/professors`, which is sufficient at this data scale
+- [ ] **12.1 Search module**
+  - [ ] GET /api/search (unified across courses, professors, users, posts)
+  - [ ] Full-text search index setup (if not already in Supabase)
 
-- [x] **12.2 Trending module**
-  - [x] GET /api/trending/courses
-  - [x] GET /api/trending/professors
-  - [x] Trending computation service (on-the-fly — no cron/job runner exists yet, same as the deferred registration-reminder notification in Phase 10)
+- [ ] **12.2 Trending module**
+  - [ ] GET /api/trending/courses
+  - [ ] GET /api/trending/professors
+  - [ ] Trending computation service (cron job or on-the-fly)
 
 ---
 
 ## Phase 13 — Export
 
-- [x] **13.1 Export module**
-  - [x] GET /api/schedules/:id/export/pdf
-  - [x] PDF template + generation service (`pdfkit`, `services/schedule-export.service.ts`)
+- [ ] **13.1 Export module**
+  - [ ] GET /api/schedules/:id/export/pdf
+  - [ ] PDF template + generation service
 
 ---
 

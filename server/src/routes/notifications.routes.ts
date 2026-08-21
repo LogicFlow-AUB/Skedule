@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import {
+  getPreferences,
   getUnreadCount,
   listNotifications,
   markAllAsRead,
@@ -12,6 +13,7 @@ import { validateParams, validateQuery } from '../middleware/validation.middlewa
 import { asyncHandler } from '../utils/async-handler.js';
 
 const notificationIdParams = z.object({ id: z.coerce.number().int().positive() }).strict();
+
 const notificationsQuery = z
   .object({
     page: z.coerce.number().int().positive().optional(),
@@ -23,12 +25,13 @@ const router = Router();
 
 router.get('/', requireAuth, validateQuery(notificationsQuery), asyncHandler(listNotifications));
 router.get('/unread-count', requireAuth, asyncHandler(getUnreadCount));
-router.put('/read-all', requireAuth, asyncHandler(markAllAsRead));
 router.put(
   '/:id/read',
   requireAuth,
   validateParams(notificationIdParams),
   asyncHandler(markAsRead),
 );
+router.put('/read-all', requireAuth, asyncHandler(markAllAsRead));
+router.get('/preferences', requireAuth, asyncHandler(getPreferences));
 
 export default router;

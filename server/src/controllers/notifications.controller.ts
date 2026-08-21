@@ -27,19 +27,21 @@ export const listNotifications: RequestHandler = async (req, res) => {
 
 export const getUnreadCount: RequestHandler = async (req, res) => {
   const count = await notificationsService.getUnreadCount(getUserId(req));
-
   res.status(200).json({ data: { count } });
 };
 
 export const markAsRead: RequestHandler = async (req, res) => {
   const { id } = getValidated<NotificationIdParams>(res, 'params');
   await notificationsService.markAsRead(getUserId(req), id);
-
   res.status(204).send();
 };
 
 export const markAllAsRead: RequestHandler = async (req, res) => {
   await notificationsService.markAllAsRead(getUserId(req));
-
   res.status(204).send();
+};
+
+export const getPreferences: RequestHandler = async (req, res) => {
+  const prefs = await notificationsService.getPreferences(getUserId(req));
+  res.status(200).json({ data: prefs });
 };

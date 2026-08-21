@@ -3,7 +3,10 @@ import type { Friendship } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { parseDays, parseMinutes } from './schedules.service.js';
 import { trackActivity } from './activity.service.js';
-import { createNotification } from './notifications.service.js';
+import {
+  notifyFriendRequestReceived,
+  notifyFriendRequestAccepted,
+} from './notifications.service.js';
 
 export type FriendRequestDirection = 'incoming' | 'outgoing';
 
@@ -268,13 +271,7 @@ export async function sendFriendRequest(userId: string, targetUserId: string) {
       await trackActivity(userId, 'friend_request_accepted', 'You are now friends.', {
         friendId: targetUserId,
       });
-      await createNotification(
-        targetUserId,
-        userId,
-        'friend_request_accepted',
-        'Your friend request was accepted.',
-        { friendshipId: accepted.id },
-      );
+      await notifyFriendRequestAccepted(targetUserId, userId);
 
       return { id: accepted.id, status: accepted.status, createdAt: accepted.created_at };
     }
@@ -300,13 +297,7 @@ export async function sendFriendRequest(userId: string, targetUserId: string) {
   await trackActivity(userId, 'friend_request_sent', 'You sent a friend request.', {
     friendId: targetUserId,
   });
-  await createNotification(
-    targetUserId,
-    userId,
-    'friend_request_received',
-    'You have a new friend request.',
-    { friendshipId: created.id },
-  );
+  await notifyFriendRequestReceived(targetUserId, userId);
 
   return { id: created.id, status: created.status, createdAt: created.created_at };
 }
@@ -341,13 +332,7 @@ export async function acceptFriendRequest(userId: string, requesterId: string) {
   await trackActivity(userId, 'friend_request_accepted', 'You are now friends.', {
     friendId: requesterId,
   });
-  await createNotification(
-    requesterId,
-    userId,
-    'friend_request_accepted',
-    'Your friend request was accepted.',
-    { friendshipId: request.id },
-  );
+  await notifyFriendRequestAccepted(requesterId, userId);
 
   const profilesByUserId = await getProfilesByUserId([requesterId]);
   const profile = profilesByUserId.get(requesterId);

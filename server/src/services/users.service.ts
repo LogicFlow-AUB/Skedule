@@ -1,7 +1,8 @@
-import { createAuthClient, requireSupabaseClient } from '../db/supabase.js';
+import { requireSupabaseClient, requireAuthClient } from '../db/supabase.js';
 import type { CourseReview, ProfessorReview, User } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
+import * as notificationsService from './notifications.service.js';
 
 export type ProfileUpdateInput = {
   firstName?: string;
@@ -222,19 +223,8 @@ export async function updateProfile(
   return toProfile(data);
 }
 
-export async function updateNotificationSettings(
-  _userId: string,
-  _input: NotificationSettingsInput,
-) {
-  return {
-    friendRequests: true,
-    friendAcceptances: true,
-    postLikes: true,
-    postComments: true,
-    reviewLikes: true,
-    scheduleShares: true,
-    registrationReminders: true,
-  };
+export async function updateNotificationSettings(userId: string, input: NotificationSettingsInput) {
+  return notificationsService.updatePreferences(userId, input);
 }
 
 export async function updatePrivacySettings(_userId: string, _input: PrivacySettingsInput) {
@@ -252,8 +242,9 @@ export async function changePassword(userId: string, input: PasswordChangeInput)
   }
 
   const user = await getUserOrThrow(userId);
+  const authDb = requireAuthClient();
 
-  const { error: verifyError } = await createAuthClient().auth.signInWithPassword({
+  const { error: verifyError } = await authDb.auth.signInWithPassword({
     email: user.email,
     password: input.currentPassword,
   });
@@ -262,8 +253,7 @@ export async function changePassword(userId: string, input: PasswordChangeInput)
     throw new AppError(401, 'INVALID_PASSWORD', 'Current password is incorrect.');
   }
 
-  const db = requireSupabaseClient();
-  const { error: updateError } = await db.auth.admin.updateUserById(userId, {
+  const { error: updateError } = await authDb.auth.admin.updateUserById(userId, {
     password: input.password,
   });
 
@@ -291,7 +281,8 @@ export async function deleteAccount(userId: string): Promise<void> {
     throw deleteError;
   }
 
-  const { error: authError } = await db.auth.admin.deleteUser(userId);
+  const authDb = requireAuthClient();
+  const { error: authError } = await authDb.auth.admin.deleteUser(userId);
   if (authError) {
     throw authError;
   }

@@ -174,9 +174,19 @@ export async function getProfessor(id: number) {
     count: (reviews ?? []).filter((review) => review.rating === rating).length,
   }));
 
+  const seenCourseIds = new Set<number>();
+  const uniqueCourses = (sections ?? []).filter((entry: Record<string, unknown>) => {
+    const course = entry.courses as { id: number } | null;
+    if (!course || seenCourseIds.has(course.id)) {
+      return false;
+    }
+    seenCourseIds.add(course.id);
+    return true;
+  });
+
   return {
     ...summary,
-    courses: sections ?? [],
+    courses: uniqueCourses,
     ratingBreakdown,
   };
 }
