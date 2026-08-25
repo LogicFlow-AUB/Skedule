@@ -1,5 +1,5 @@
 import { requireSupabaseClient } from '../db/supabase.js';
-import type { StudyGroup } from '../db/types.js';
+import type { StudyGroup, User } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
 

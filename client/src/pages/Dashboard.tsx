@@ -120,7 +120,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
               Build your perfect semester.
             </h1>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 6 }}>
-              Registration opens in <strong style={{ color: 'white' }}>12 days</strong>. Your schedule is ready to register.
+              Your schedule is ready to register.
             </p>
           </div>
           <div className="flex gap-3">
@@ -244,7 +244,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
                 </div>
                 <div className="flex-1">
                   <div style={{ fontSize: 14, fontWeight: 700, color: '#1E293B' }}>Saved Schedules</div>
-                  <div style={{ fontSize: 12, color: '#64748B' }}>3 schedules saved · Ready to compare & register</div>
+                  <div style={{ fontSize: 12, color: '#64748B' }}>View your saved schedules</div>
                 </div>
                 <ChevronRight size={16} color="#38BDF8" />
               </button>
@@ -255,10 +255,6 @@ export default function Dashboard({ setPage }: DashboardProps) {
           <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
             <div className="flex items-center justify-between mb-4">
               <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Upcoming</div>
-              <div className="flex items-center gap-1 rounded-full px-2.5 py-1" style={{ background: '#FEF2F2', border: '1px solid #FECACA' }}>
-                <div className="rounded-full" style={{ width: 6, height: 6, background: '#EF4444' }} />
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#EF4444' }}>Registration in 12d</span>
-              </div>
             </div>
             <div className="flex flex-col gap-2">
               {upcoming.map((u, i) => (

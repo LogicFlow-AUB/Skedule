@@ -7,8 +7,6 @@ import {
   UserCheck,
   Users,
   User,
-  Settings,
-  Bell,
   GraduationCap,
 } from 'lucide-react'
 import type { Page } from '../App'
@@ -18,12 +16,11 @@ const NAV_ITEMS: { id: Page; label: string; icon: React.ReactNode; section: stri
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={16} />, section: 'main' },
   { id: 'ai-scheduler', label: 'AI Scheduler', icon: <Sparkles size={16} />, section: 'main', badge: { text: 'AI', color: '#4338CA', bg: '#EEF2FF' } },
   { id: 'manual-builder', label: 'Manual Builder', icon: <CalendarDays size={16} />, section: 'main' },
-  { id: 'saved-schedules', label: 'Saved Schedules', icon: <BookmarkCheck size={16} />, section: 'main', badge: { text: '3', color: '#059669', bg: '#ECFDF5' } },
+  { id: 'saved-schedules', label: 'Saved Schedules', icon: <BookmarkCheck size={16} />, section: 'main' },
   { id: 'course-reviews', label: 'Course Reviews', icon: <Star size={16} />, section: 'review' },
   { id: 'professor-reviews', label: 'Professor Reviews', icon: <UserCheck size={16} />, section: 'review' },
-  { id: 'community', label: 'Community', icon: <Users size={16} />, section: 'social', badge: { text: '3', color: '#10B981', bg: '#ECFDF5' } },
+  { id: 'community', label: 'Community', icon: <Users size={16} />, section: 'social' },
   { id: 'profile', label: 'Profile & Settings', icon: <User size={16} />, section: 'account' },
-  { id: 'settings', label: 'Settings', icon: <Settings size={16} />, section: 'account' },
 ]
 
 const SECTIONS: { key: string; label: string }[] = [
@@ -41,7 +38,10 @@ interface SidebarProps {
 export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
   const { user } = useAuth()
   // Profile and Settings both resolve to the same page
-  const effectivePage = activePage === 'settings' ? 'profile' : activePage
+  const effectivePage =
+    activePage === 'settings' ? 'profile'
+    : activePage === 'friends' ? 'community'
+    : activePage
 
   const displayName = user?.email ? user.email.split('@')[0] ?? 'Student' : 'Student'
 
@@ -138,9 +138,6 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
             <div style={{ fontSize: 12, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
             <div style={{ fontSize: 11, color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email ?? ''}</div>
           </div>
-          <button className="shrink-0" style={{ color: '#94A3B8' }}>
-            <Bell size={14} />
-          </button>
         </div>
       </div>
     </aside>

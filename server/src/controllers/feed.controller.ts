@@ -16,9 +16,10 @@ function getUserId(req: Parameters<RequestHandler>[0]): string {
   return req.userId;
 }
 
-export const listFeed: RequestHandler = async (_req, res) => {
+export const listFeed: RequestHandler = async (req, res) => {
   const page = await feedService.listFeed(
     parseOffsetPagination(getValidated<FeedQuery>(res, 'query')),
+    req.userId,
   );
 
   res.status(200).json({ data: page.data, pagination: page.pagination });
@@ -33,9 +34,9 @@ export const createPost: RequestHandler = async (req, res) => {
   res.status(201).json({ data });
 };
 
-export const getPost: RequestHandler = async (_req, res) => {
+export const getPost: RequestHandler = async (req, res) => {
   const { id } = getValidated<PostIdParams>(res, 'params');
-  const data = await feedService.getPost(id);
+  const data = await feedService.getPost(id, req.userId);
 
   res.status(200).json({ data });
 };

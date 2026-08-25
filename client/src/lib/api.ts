@@ -311,6 +311,8 @@ export type Post = {
   author: PostAuthor | null
   likeCount: number
   commentCount: number
+  isLikedByCurrentUser: boolean
+  isSavedByCurrentUser: boolean
 }
 
 export type PostComment = {
@@ -340,6 +342,10 @@ export type FriendRequest = {
 export type FriendRequests = {
   incoming: FriendRequest[]
   outgoing: FriendRequest[]
+}
+
+export type StudentSearchResult = FriendProfile & {
+  relationship: 'self' | 'friends' | 'request_sent' | 'request_received' | 'none'
 }
 
 export type FreeTimeDay = {
@@ -434,11 +440,11 @@ export const api = {
         auth: false,
         body: { email, password },
       }),
-    register: (email: string, password: string, confirmPassword: string) =>
+    register: (email: string, password: string, confirmPassword: string, profile?: { firstName?: string; lastName?: string; major?: string; level?: string }) =>
       request<AuthResponse>('/auth/register', {
         method: 'POST',
         auth: false,
-        body: { email, password, confirmPassword },
+        body: { email, password, confirmPassword, ...profile },
       }),
     me: () => request<{ user: AuthUser }>('/auth/me'),
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
@@ -492,6 +498,8 @@ export const api = {
       request<void>(`/courses/${encodeURIComponent(code)}/save`, { method: 'POST' }),
     unsave: (code: string) =>
       request<void>(`/courses/${encodeURIComponent(code)}/save`, { method: 'DELETE' }),
+    saved: (page = 1, limit = 50) =>
+      request<Page<CourseSummary>>(`/courses/saved?page=${page}&limit=${limit}`),
   },
 
   professors: {
@@ -573,6 +581,8 @@ export const api = {
   friends: {
     list: () => request<{ data: FriendProfile[] }>('/friends'),
     suggested: (limit = 10) => request<{ data: FriendProfile[] }>(`/friends/suggested?limit=${limit}`),
+    search: (query: string, limit = 10) =>
+      request<{ data: StudentSearchResult[] }>(`/friends/search?query=${encodeURIComponent(query)}&limit=${limit}`),
     requests: () => request<{ data: FriendRequests }>('/friends/requests'),
     sendRequest: (userId: string) =>
       request<{ data: FriendRequest }>(`/friends/requests/${userId}`, { method: 'POST' }),
@@ -591,6 +601,14 @@ export const api = {
     markRead: (id: number) => request<void>(`/notifications/${id}/read`, { method: 'PUT' }),
     markAllRead: () => request<void>('/notifications/read-all', { method: 'PUT' }),
     preferences: () => request<{ data: NotificationPreferences }>('/notifications/preferences'),
+  },
+
+  assistant: {
+    chat: (message: string, history?: { role: 'user' | 'assistant'; content: string }[]) =>
+      request<{ data: { response: string } }>('/assistant/chat', {
+        method: 'POST',
+        body: { message, history },
+      }),
   },
 
   users: {

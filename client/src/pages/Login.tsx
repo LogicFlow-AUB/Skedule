@@ -11,6 +11,10 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [major, setMajor] = useState('')
+  const [level, setLevel] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [confirmEmailAddress, setConfirmEmailAddress] = useState<string | null>(null)
@@ -20,6 +24,10 @@ export default function Login() {
     setMode('login')
     setPassword('')
     setConfirmPassword('')
+    setFirstName('')
+    setLastName('')
+    setMajor('')
+    setLevel('')
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -36,7 +44,10 @@ export default function Login() {
       if (mode === 'login') {
         await login(email, password)
       } else {
-        const response = await register(email, password, confirmPassword)
+        const profile = (firstName.trim() || lastName.trim() || major.trim() || level.trim())
+          ? { firstName: firstName.trim() || undefined, lastName: lastName.trim() || undefined, major: major.trim() || undefined, level: level.trim() || undefined }
+          : undefined
+        const response = await register(email, password, confirmPassword, profile)
         if (!response.tokens) {
           setConfirmEmailAddress(email)
         }
@@ -133,6 +144,62 @@ export default function Login() {
                   style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: 14, color: '#0F172A' }}
                 />
               </div>
+            )}
+
+            {mode === 'register' && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>First Name</label>
+                    <input
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      placeholder="John"
+                      className="w-full mt-1 rounded-xl px-3.5 py-2.5 outline-none"
+                      style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: 14, color: '#0F172A' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>Last Name</label>
+                    <input
+                      type="text"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      placeholder="Doe"
+                      className="w-full mt-1 rounded-xl px-3.5 py-2.5 outline-none"
+                      style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: 14, color: '#0F172A' }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>Major</label>
+                  <input
+                    type="text"
+                    value={major}
+                    onChange={(e) => setMajor(e.target.value)}
+                    placeholder="Computer Science"
+                    className="w-full mt-1 rounded-xl px-3.5 py-2.5 outline-none"
+                    style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: 14, color: '#0F172A' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>Year / Level</label>
+                  <select
+                    value={level}
+                    onChange={(e) => setLevel(e.target.value)}
+                    className="w-full mt-1 rounded-xl px-3.5 py-2.5 outline-none"
+                    style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: 14, color: '#0F172A' }}
+                  >
+                    <option value="">Select level...</option>
+                    <option value="Freshman">Freshman</option>
+                    <option value="Sophomore">Sophomore</option>
+                    <option value="Junior">Junior</option>
+                    <option value="Senior">Senior</option>
+                    <option value="Graduate">Graduate</option>
+                  </select>
+                </div>
+              </>
             )}
 
             {error && (

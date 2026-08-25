@@ -1,20 +1,11 @@
 import { useEffect, useState } from 'react'
 import {
-  Star, BookOpen, Edit3, Heart, MessageSquare, Bookmark, Trophy, Target,
-  GraduationCap, Bell, Lock, Eye, Palette, Shield, ChevronRight, X, CheckCircle, Users,
+  Star, BookOpen, Edit3, Heart, MessageSquare, Bookmark,
+  Bell, Lock, Eye, Palette, Shield, X, CheckCircle, Users,
 } from 'lucide-react'
-import { api, type UserProfile, type UserStats, type UserReview, type ScheduleSummary, type NotificationPreferences } from '../lib/api'
-import { displayName, formatDate, timeAgo } from '../lib/format'
+import { api, type UserProfile, type UserStats, type UserReview, type FriendProfile, type FriendRequest, type CourseSummary, type NotificationPreferences } from '../lib/api'
+import { displayName, timeAgo } from '../lib/format'
 import { useAuth } from '../lib/auth'
-
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
-
-function formatDays(days: number[]): string {
-  if (days.length === 0) {
-    return '—'
-  }
-  return days.map((d) => DAYS[d] ?? `Day ${d}`).join(' · ')
-}
 
 function StatCard({ value, label, sub, color }: { value: string; label: string; sub?: string; color: string }) {
   return (
@@ -59,11 +50,14 @@ function NotifToggle({ label, sub, on, onToggle }: { label: string; sub: string;
 
 export default function Profile() {
   const { user, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'overview' | 'schedules' | 'courses' | 'reviews' | 'settings'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'friends' | 'reviews' | 'settings'>('overview')
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [stats, setStats] = useState<UserStats | null>(null)
-  const [schedules, setSchedules] = useState<ScheduleSummary[]>([])
   const [reviews, setReviews] = useState<UserReview[]>([])
+  const [friends, setFriends] = useState<FriendProfile[]>([])
+  const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([])
+  const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([])
+  const [savedCourses, setSavedCourses] = useState<CourseSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -94,11 +88,13 @@ export default function Profile() {
     async function load() {
       setLoading(true)
       try {
-        const [p, s, r, sched, np] = await Promise.all([
-          api.users.profile(userId),
-          api.users.stats(userId),
-          api.users.reviews(userId, 1, 50),
-          api.schedules.list(1, 50),
+        const [p, s, r, friendsRes, requestsRes, savedRes, np] = await Promise.all([
+          api.users.profile(userId!),
+          api.users.stats(userId!),
+          api.users.reviews(userId!, 1, 50),
+          api.friends.list(),
+          api.friends.requests(),
+          api.courses.saved(1, 50),
           api.notifications.preferences(),
         ])
         if (cancelled) {
@@ -107,7 +103,10 @@ export default function Profile() {
         setProfile(p.data)
         setStats(s.data)
         setReviews(r.data)
-        setSchedules(sched.data)
+        setFriends(friendsRes.data)
+        setIncomingRequests(requestsRes.data.incoming)
+        setOutgoingRequests(requestsRes.data.outgoing)
+        setSavedCourses(savedRes.data)
         setNotifPrefs(np.data)
       } catch (err) {
         if (!cancelled) {
@@ -126,6 +125,46 @@ export default function Profile() {
       cancelled = true
     }
   }, [userId])
+
+  const refreshFriendData = async () => {
+    if (!userId) return
+    const [friendsRes, requestsRes, statsRes] = await Promise.all([
+      api.friends.list(),
+      api.friends.requests(),
+      api.users.stats(userId),
+    ])
+    setFriends(friendsRes.data)
+    setIncomingRequests(requestsRes.data.incoming)
+    setOutgoingRequests(requestsRes.data.outgoing)
+    setStats(statsRes.data)
+  }
+
+  const acceptRequest = async (userId: string) => {
+    try {
+      await api.friends.acceptRequest(userId)
+      await refreshFriendData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not accept friend request.')
+    }
+  }
+
+  const rejectRequest = async (userId: string) => {
+    try {
+      await api.friends.rejectRequest(userId)
+      await refreshFriendData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not reject friend request.')
+    }
+  }
+
+  const cancelRequest = async (userId: string) => {
+    try {
+      await api.friends.remove(userId)
+      await refreshFriendData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not cancel friend request.')
+    }
+  }
 
   const startEdit = () => {
     if (!profile) {
@@ -207,7 +246,7 @@ export default function Profile() {
             </div>
             <div className="absolute -bottom-1 -right-1 rounded-full p-1.5"
               style={{ background: '#10B981', border: '2px solid white' }}>
-              <GraduationCap size={12} color="white" />
+              <CheckCircle size={12} color="white" />
             </div>
           </div>
 
@@ -259,8 +298,7 @@ export default function Profile() {
         <div className="flex gap-1">
           {[
             { id: 'overview', label: 'Overview' },
-            { id: 'schedules', label: 'Saved Schedules' },
-            { id: 'courses', label: 'Completed Courses' },
+            { id: 'friends', label: 'Friends' },
             { id: 'reviews', label: 'My Reviews' },
             { id: 'settings', label: '⚙ Settings' },
           ].map((t) => (
@@ -298,18 +336,28 @@ export default function Profile() {
             </div>
 
             <div className="grid grid-cols-2 gap-6">
-              {/* Achievements */}
+              {/* Saved Courses */}
               <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
                 <div className="flex items-center gap-2 mb-4">
-                  <Trophy size={16} color="#F59E0B" />
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Achievements</div>
+                  <Bookmark size={16} color="#4338CA" />
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Saved Courses</div>
                 </div>
-                {/* TODO(backend): /users/:id/achievements returns an empty stub for now. */}
-                <div className="rounded-xl p-4 text-center" style={{ background: '#F8FAFC', border: '1px dashed #E2E8F0' }}>
-                  <span style={{ fontSize: 24, marginBottom: 4, display: 'block' }}>🏆</span>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>No achievements unlocked yet</div>
-                  <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>Write reviews and save schedules to earn them.</div>
-                </div>
+                {savedCourses.length === 0 && (
+                  <div style={{ fontSize: 12, color: '#94A3B8' }}>No saved courses yet. Browse courses and click Save to add them here.</div>
+                )}
+                {savedCourses.slice(0, 5).map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 mb-3 last:mb-0">
+                    <div className="rounded-lg px-2 py-1 shrink-0" style={{ background: '#EEF2FF', color: '#4338CA', fontSize: 11, fontWeight: 700 }}>
+                      {c.code}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.title}</div>
+                      <div style={{ fontSize: 10, color: '#94A3B8' }}>
+                        {c.reviewCount} reviews · {c.averageRating !== null ? `${c.averageRating.toFixed(1)} ★` : 'No rating'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="flex flex-col gap-4">
@@ -323,14 +371,25 @@ export default function Profile() {
                   <div style={{ fontSize: 12, color: '#94A3B8' }}>No favorite professors yet.</div>
                 </div>
 
-                {/* Wishlist */}
+                {/* Recent reviews */}
                 <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
                   <div className="flex items-center gap-2 mb-4">
-                    <Target size={16} color="#4338CA" />
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Course Wishlist</div>
+                    <Star size={16} color="#F59E0B" />
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Recent Reviews</div>
                   </div>
-                  {/* TODO(backend): /users/:id/wishlist returns an empty stub for now. */}
-                  <div style={{ fontSize: 12, color: '#94A3B8' }}>Your wishlist is empty.</div>
+                  {reviews.length === 0 && <div style={{ fontSize: 12, color: '#94A3B8' }}>No reviews yet.</div>}
+                  {reviews.slice(0, 3).map((r) => (
+                    <div key={r.id} className="flex items-center gap-2 mb-2 last:mb-0">
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {Array.from({ length: 5 }).map((_, j) => (
+                          <Star key={j} size={10} fill={j < r.rating ? '#F59E0B' : 'none'} color={j < r.rating ? '#F59E0B' : '#CBD5E1'} />
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {r.type === 'course' ? r.course?.title ?? '—' : displayName(r.professor?.firstName, r.professor?.lastName) || '—'}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -356,33 +415,56 @@ export default function Profile() {
           </div>
         )}
 
-        {!loading && activeTab === 'schedules' && (
-          <div className="flex flex-col gap-4">
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Saved Schedules</div>
-            {schedules.length === 0 && <div style={{ fontSize: 13, color: '#94A3B8' }}>No saved schedules yet. Build one in the AI Scheduler.</div>}
-            {schedules.map((s) => (
-              <div key={s.id} className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0F172A' }}>{s.name ?? `Schedule #${s.id}`}</div>
-                    <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 1 }}>
-                      Saved {formatDate(s.createdAt)} · {formatDays(s.days)} · {s.totalCredits} credits · {s.courseCount} courses
-                    </div>
+        {!loading && activeTab === 'friends' && (
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>Friends ({friends.length})</div>
+            {friends.length === 0 && <div style={{ fontSize: 13, color: '#94A3B8' }}>No friends yet. Visit the Community to find classmates.</div>}
+            <div className="grid grid-cols-2 gap-3">
+              {friends.map((f) => (
+                <div key={f.id} className="flex items-center gap-3 rounded-2xl p-4"
+                  style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                  <div className="rounded-full flex items-center justify-center shrink-0"
+                    style={{ width: 40, height: 40, background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', fontSize: 14, fontWeight: 700, color: 'white' }}>
+                    {((f.firstName?.[0] ?? '') + (f.lastName?.[0] ?? '')).toUpperCase() || '?'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{displayName(f.firstName, f.lastName)}</div>
+                    <div style={{ fontSize: 11, color: '#94A3B8' }}>{[f.major, f.level].filter(Boolean).join(' · ') || 'AUB Student'}</div>
+                  </div>
+                  <div className="shrink-0">
+                    <div className="rounded-full" style={{ width: 8, height: 8, background: f.presenceStatus === 'online' ? '#10B981' : '#CBD5E1' }} />
                   </div>
                 </div>
+              ))}
+            </div>
+            <div className="mt-6">
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>Incoming Requests ({incomingRequests.length})</div>
+              {incomingRequests.length === 0 && <div style={{ fontSize: 13, color: '#94A3B8' }}>No pending requests.</div>}
+              <div className="grid grid-cols-2 gap-3">
+                {incomingRequests.map((request) => (
+                  <div key={request.id} className="rounded-2xl p-4" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{displayName(request.user.firstName, request.user.lastName)}</div>
+                    <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{[request.user.major, request.user.level].filter(Boolean).join(' · ') || 'AUB Student'}</div>
+                    <div className="flex gap-2 mt-3">
+                      <button onClick={() => void acceptRequest(request.user.id)} className="rounded-lg px-3 py-1.5" style={{ fontSize: 11, fontWeight: 700, background: '#4338CA', color: 'white' }}>Accept</button>
+                      <button onClick={() => void rejectRequest(request.user.id)} className="rounded-lg px-3 py-1.5" style={{ fontSize: 11, fontWeight: 700, background: '#FEF2F2', color: '#DC2626' }}>Reject</button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-
-        {!loading && activeTab === 'courses' && (
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>Completed Courses</div>
-            {/* TODO(backend): /users/:id/completed-courses returns an empty stub for now. */}
-            <div className="rounded-2xl p-8 text-center" style={{ background: '#FFFFFF', border: '1px dashed #E2E8F0' }}>
-              <GraduationCap size={32} color="#CBD5E1" />
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#94A3B8', marginTop: 8 }}>No completed courses tracked yet</div>
-              <div style={{ fontSize: 12, color: '#CBD5E1', marginTop: 4 }}>Completed-course history isn't available in the API yet.</div>
+            </div>
+            <div className="mt-6">
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>Sent Requests ({outgoingRequests.length})</div>
+              {outgoingRequests.length === 0 && <div style={{ fontSize: 13, color: '#94A3B8' }}>No sent requests are pending.</div>}
+              <div className="grid grid-cols-2 gap-3">
+                {outgoingRequests.map((request) => (
+                  <div key={request.id} className="rounded-2xl p-4" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{displayName(request.user.firstName, request.user.lastName)}</div>
+                    <div style={{ fontSize: 11, color: '#D97706', marginTop: 2 }}>Pending</div>
+                    <button onClick={() => void cancelRequest(request.user.id)} className="rounded-lg px-3 py-1.5 mt-3" style={{ fontSize: 11, fontWeight: 700, background: '#FEF2F2', color: '#DC2626' }}>Cancel request</button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

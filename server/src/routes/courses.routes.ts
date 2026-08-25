@@ -11,6 +11,7 @@ import {
 import {
   createCourseReview,
   getCourseReviews,
+  listSavedCourses,
   saveCourse,
   unsaveCourse,
 } from '../controllers/reviews.controller.js';
@@ -61,6 +62,7 @@ const courseReviewBody = z
 
 const router = Router();
 
+router.get('/saved', requireAuth, validateQuery(reviewsQuery), asyncHandler(listSavedCourses));
 router.get('/', validateQuery(courseListQuery), asyncHandler(listCourses));
 router.post('/compare', validateBody(compareCoursesBody), asyncHandler(compareCourses));
 router.post(

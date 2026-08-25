@@ -36,7 +36,14 @@ function postAuthor(user: User | null) {
   };
 }
 
-function postResponse(post: Post, author: User | null, likeCount: number, commentCount: number) {
+function postResponse(
+  post: Post,
+  author: User | null,
+  likeCount: number,
+  commentCount: number,
+  isLikedByCurrentUser: boolean,
+  isSavedByCurrentUser: boolean,
+) {
   return {
     id: post.id,
     type: post.type,
@@ -47,6 +54,8 @@ function postResponse(post: Post, author: User | null, likeCount: number, commen
     author: postAuthor(author),
     likeCount,
     commentCount,
+    isLikedByCurrentUser,
+    isSavedByCurrentUser,
   };
 }
 
@@ -115,16 +124,71 @@ async function countRowsByPost(
   return counts;
 }
 
-async function getPostResponses(posts: Post[]) {
+async function getPostResponses(posts: Post[], userId?: string) {
   if (posts.length === 0) {
     return [];
   }
 
   const postIds = posts.map((post) => post.id);
-  const [authorsByUserId, likeCounts, commentCounts] = await Promise.all([
+  const promises: Promise<unknown>[] = [
     getAuthorsByUserId(posts.map((post) => post.user_id)),
     countRowsByPost('post_likes', postIds),
     countRowsByPost('post_comments', postIds),
+  ];
+
+  let userLikedPostIds: Set<number> = new Set();
+  let userSavedPostIds: Set<number> = new Set();
+
+  if (userId) {
+    promises.push(
+      (async () => {
+        const db = requireSupabaseClient();
+        const { data } = await db
+          .from('post_likes')
+          .select('post_id')
+          .eq('user_id', userId)
+          .in('post_id', postIds);
+        return (data ?? []) as { post_id: number }[];
+      })(),
+      (async () => {
+        const db = requireSupabaseClient();
+        const { data } = await db
+          .from('post_saves')
+          .select('post_id')
+          .eq('user_id', userId)
+          .in('post_id', postIds);
+        return (data ?? []) as { post_id: number }[];
+      })(),
+    );
+
+    const [authorsByUserId, likeCounts, commentCounts, likedRows, savedRows] =
+      await Promise.all(promises as [
+        Promise<Map<string, User>>,
+        Promise<Map<number, number>>,
+        Promise<Map<number, number>>,
+        Promise<{ post_id: number }[]>,
+        Promise<{ post_id: number }[]>,
+      ]);
+
+    userLikedPostIds = new Set(likedRows.map((r) => r.post_id));
+    userSavedPostIds = new Set(savedRows.map((r) => r.post_id));
+
+    return posts.map((post) =>
+      postResponse(
+        post,
+        authorsByUserId.get(post.user_id) ?? null,
+        likeCounts.get(post.id) ?? 0,
+        commentCounts.get(post.id) ?? 0,
+        userLikedPostIds.has(post.id),
+        userSavedPostIds.has(post.id),
+      ),
+    );
+  }
+
+  const [authorsByUserId, likeCounts, commentCounts] = await Promise.all(promises as [
+    Promise<Map<string, User>>,
+    Promise<Map<number, number>>,
+    Promise<Map<number, number>>,
   ]);
 
   return posts.map((post) =>
@@ -133,6 +197,8 @@ async function getPostResponses(posts: Post[]) {
       authorsByUserId.get(post.user_id) ?? null,
       likeCounts.get(post.id) ?? 0,
       commentCounts.get(post.id) ?? 0,
+      false,
+      false,
     ),
   );
 }
@@ -173,7 +239,7 @@ async function assertScheduleOwnership(userId: string, scheduleId: number): Prom
   }
 }
 
-export async function listFeed(pagination: OffsetPagination): Promise<OffsetPage<unknown>> {
+export async function listFeed(pagination: OffsetPagination, userId?: string): Promise<OffsetPage<unknown>> {
   const db = requireSupabaseClient();
   const { data, error, count } = await db
     .from('posts')
@@ -185,7 +251,7 @@ export async function listFeed(pagination: OffsetPagination): Promise<OffsetPage
     throw error;
   }
 
-  return createOffsetPage(await getPostResponses((data ?? []) as Post[]), count ?? 0, pagination);
+  return createOffsetPage(await getPostResponses((data ?? []) as Post[], userId), count ?? 0, pagination);
 }
 
 export async function createPost(userId: string, input: CreatePostInput) {
@@ -213,12 +279,12 @@ export async function createPost(userId: string, input: CreatePostInput) {
   const post = data as Post;
   await trackActivity(userId, 'post_created', 'You shared a new post.', { postId: post.id });
 
-  const [response] = await getPostResponses([post]);
+  const [response] = await getPostResponses([post], userId);
   return response;
 }
 
-export async function getPost(postId: number) {
-  const [response] = await getPostResponses([await getPostRowOrThrow(postId)]);
+export async function getPost(postId: number, userId?: string) {
+  const [response] = await getPostResponses([await getPostRowOrThrow(postId)], userId);
   return response;
 }
 

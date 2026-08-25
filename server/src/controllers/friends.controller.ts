@@ -6,6 +6,7 @@ import { AppError } from '../utils/app-error.js';
 
 type UserIdParams = { userId: string };
 type SuggestedQuery = { limit?: number };
+type StudentSearchQuery = { query: string; limit?: number };
 
 function getUserId(req: Parameters<RequestHandler>[0]): string {
   if (!req.userId) {
@@ -24,6 +25,13 @@ export const listFriends: RequestHandler = async (req, res) => {
 export const getSuggestedFriends: RequestHandler = async (req, res) => {
   const { limit } = getValidated<SuggestedQuery>(res, 'query');
   const data = await friendsService.getSuggestedFriends(getUserId(req), limit ?? 10);
+
+  res.status(200).json({ data });
+};
+
+export const searchStudents: RequestHandler = async (req, res) => {
+  const { query, limit } = getValidated<StudentSearchQuery>(res, 'query');
+  const data = await friendsService.searchStudents(getUserId(req), query, limit ?? 10);
 
   res.status(200).json({ data });
 };

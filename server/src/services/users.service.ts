@@ -131,7 +131,8 @@ export async function getStats(userId: string): Promise<UserStats> {
     db
       .from('friendships')
       .select('*', { count: 'exact', head: true })
-      .or(`user_id.eq.${userId},friend_id.eq.${userId}`),
+      .or(`user_id.eq.${userId},friend_id.eq.${userId}`)
+      .eq('status', 'accepted'),
     db.from('schedules').select('*', { count: 'exact', head: true }).eq('user_id', userId),
   ]);
 

@@ -190,6 +190,100 @@ export async function unsaveCourse(userId: string, courseCode: string): Promise<
   }
 }
 
+export async function listSavedCourses(
+  userId: string,
+  pagination: OffsetPagination,
+): Promise<
+  OffsetPage<{
+    id: number;
+    code: string;
+    title: string;
+    department: string | null;
+    credits: string;
+    averageRating: number | null;
+    reviewCount: number;
+  }>
+> {
+  const db = requireSupabaseClient();
+  const { data, error, count } = await db
+    .from('course_saves')
+    .select('course_id, courses(id, subject, course_number, title, department, credits)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(pagination.offset, pagination.offset + pagination.limit - 1);
+
+  if (error) {
+    throw error;
+  }
+
+  const courseIds = (data ?? []).map((row: { course_id: number }) => row.course_id);
+  const reviewCounts = new Map<number, number>();
+  const avgRatings = new Map<number, number | null>();
+
+  if (courseIds.length > 0) {
+    const [countsResult, ratingsResult] = await Promise.all([
+      db.from('course_reviews').select('course_id').in('course_id', courseIds),
+      db.from('course_reviews').select('course_id, rating').in('course_id', courseIds),
+    ]);
+
+    for (const row of (countsResult.data ?? []) as { course_id: number }[]) {
+      reviewCounts.set(row.course_id, (reviewCounts.get(row.course_id) ?? 0) + 1);
+    }
+
+    const ratingSums = new Map<number, { sum: number; count: number }>();
+    for (const row of (ratingsResult.data ?? []) as { course_id: number; rating: number }[]) {
+      const entry = ratingSums.get(row.course_id) ?? { sum: 0, count: 0 };
+      entry.sum += row.rating;
+      entry.count += 1;
+      ratingSums.set(row.course_id, entry);
+    }
+    for (const [courseId, entry] of ratingSums) {
+      avgRatings.set(
+        courseId,
+        entry.count > 0 ? Math.round((entry.sum / entry.count) * 10) / 10 : null,
+      );
+    }
+  }
+
+  const courses = (data ?? [])
+    .map(
+      (row: {
+        course_id: number;
+        courses: {
+          id: number;
+          subject: string;
+          course_number: string;
+          title: string;
+          department: string | null;
+          credits: string;
+        }[];
+      }) => {
+        const c = row.courses?.[0];
+        if (!c) return null;
+        return {
+          id: c.id,
+          code: `${c.subject} ${c.course_number}`,
+          title: c.title,
+          department: c.department,
+          credits: c.credits,
+          averageRating: avgRatings.get(c.id) ?? null,
+          reviewCount: reviewCounts.get(c.id) ?? 0,
+        };
+      },
+    )
+    .filter(Boolean) as {
+    id: number;
+    code: string;
+    title: string;
+    department: string | null;
+    credits: string;
+    averageRating: number | null;
+    reviewCount: number;
+  }[];
+
+  return createOffsetPage(courses, count ?? 0, pagination);
+}
+
 export async function createProfessorReview(
   userId: string,
   professorId: number,

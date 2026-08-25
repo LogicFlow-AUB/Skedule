@@ -556,6 +556,11 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
   const [compareModal, setCompareModal] = useState<{ codeA: string; codeB: string } | null>(null)
 
   useEffect(() => {
+    setTab(activeTab === 'professor-reviews' ? 'professors' : 'courses')
+    setSelectedProfId(null)
+  }, [activeTab])
+
+  useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)

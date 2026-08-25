@@ -23,6 +23,10 @@ const registerBody = z
     email,
     password,
     confirmPassword: password,
+    firstName: z.string().trim().min(1).max(100).optional(),
+    lastName: z.string().trim().min(1).max(100).optional(),
+    major: z.string().trim().min(1).max(100).optional(),
+    level: z.string().trim().min(1).max(50).optional(),
   })
   .strict();
 

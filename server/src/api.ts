@@ -10,6 +10,8 @@ import friendsRoutes from './routes/friends.routes.js';
 import notificationsRoutes from './routes/notifications.routes.js';
 import professorsRoutes from './routes/professors.routes.js';
 import schedulesRoutes from './routes/schedules.routes.js';
+import assistantRoutes from './routes/assistant.routes.js';
+import ragRoutes from './routes/rag.routes.js';
 import studyGroupsRoutes from './routes/study-groups.routes.js';
 import usersRoutes from './routes/users.routes.js';
 import type { ApiHealthResponse } from './types.js';
@@ -38,5 +40,7 @@ api.use('/friends', friendsRoutes);
 api.use('/notifications', notificationsRoutes);
 api.use('/events', eventsRoutes);
 api.use('/study-groups', studyGroupsRoutes);
+api.use('/rag', ragRoutes);
+api.use('/assistant', assistantRoutes);
 
 export default api;

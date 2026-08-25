@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   Plus, X, Trash2, Sparkles, RotateCcw, Zap, GitCompare,
-  Eye, ArrowLeftRight, Send, Bot, User, Info, AlertCircle,
+  Eye, ArrowLeftRight, Send, Bot, User, AlertCircle,
   BookOpen, Clock, MapPin, Star, TrendingUp, Bookmark,
   GripVertical, Search, CalendarDays, CheckCircle,
 } from 'lucide-react'
@@ -32,99 +32,6 @@ interface Course {
   credits: number
   sectionId: number | null
 }
-
-const SCHEDULE_1: Course[] = [
-  {
-    id: 'eece330',
-    code: 'EECE 330',
-    name: 'Digital Systems',
-    section: '01',
-    professor: 'Dr. Hassan',
-    room: 'BE-301',
-    days: [0, 2],
-    startHour: 10,
-    startMin: 0,
-    durationMin: 75,
-    color: '#4338CA',
-    colorLight: '#EEF2FF',
-    credits: 3,
-    sectionId: null,
-  },
-  {
-    id: 'math201',
-    code: 'MATH 201',
-    name: 'Calculus III',
-    section: '03',
-    professor: 'Dr. Khalil',
-    room: 'SCC-210',
-    days: [1, 3],
-    startHour: 9,
-    startMin: 0,
-    durationMin: 75,
-    color: '#059669',
-    colorLight: '#ECFDF5',
-    credits: 3,
-    sectionId: null,
-  },
-  {
-    id: 'phys211',
-    code: 'PHYS 211',
-    name: 'Physics II',
-    section: '02',
-    professor: 'Dr. Nassif',
-    room: 'SCC-315',
-    days: [0, 2, 4],
-    startHour: 13,
-    startMin: 0,
-    durationMin: 60,
-    color: '#0284C7',
-    colorLight: '#F0F9FF',
-    credits: 3,
-    sectionId: null,
-  },
-  {
-    id: 'eece351',
-    code: 'EECE 351',
-    name: 'Signals & Systems',
-    section: '01',
-    professor: 'Dr. Farhat',
-    room: 'BE-402',
-    days: [1, 3],
-    startHour: 11,
-    startMin: 30,
-    durationMin: 90,
-    color: '#7C3AED',
-    colorLight: '#F5F3FF',
-    credits: 3,
-    sectionId: null,
-  },
-  {
-    id: 'chem201',
-    code: 'CHEM 201',
-    name: 'General Chemistry',
-    section: '05',
-    professor: 'Dr. Ibrahim',
-    room: 'SCC-110',
-    days: [4],
-    startHour: 8,
-    startMin: 0,
-    durationMin: 60,
-    color: '#D97706',
-    colorLight: '#FFFBEB',
-    credits: 3,
-    sectionId: null,
-  },
-]
-
-const SCHEDULE_2: Course[] = [
-  { ...SCHEDULE_1[0], days: [1, 3], startHour: 11, section: '02', room: 'BE-205' },
-  { ...SCHEDULE_1[1], days: [0, 2], startHour: 14, section: '01', room: 'SCC-108' },
-  { ...SCHEDULE_1[2], days: [1, 3], startHour: 15, section: '04', room: 'SCC-220' },
-  { ...SCHEDULE_1[3], days: [0, 2], startHour: 9, section: '03', room: 'BE-301' },
-  { ...SCHEDULE_1[4], days: [4], startHour: 10, section: '02', room: 'SCC-112' },
-]
-
-const SCHEDULES = [SCHEDULE_1, SCHEDULE_2, SCHEDULE_1.slice(0, 4)]
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
 
@@ -158,21 +65,53 @@ function parseDays(days: string | null): number[] {
   if (!days) {
     return []
   }
-  return days
-    .split(',')
-    .map((d) => Number(d.trim()))
-    .filter((n) => !Number.isNaN(n))
+
+  const numericDays = days.match(/\b[1-5]\b/g)
+  if (numericDays?.length) {
+    return [...new Set(numericDays.map((day) => Number(day) - 1))].sort((a, b) => a - b)
+  }
+
+  const DAY_CODES: Record<string, number> = { M: 0, T: 1, W: 2, R: 3, F: 4 }
+  const DAY_NAMES: Record<string, number> = { MON: 0, TUE: 1, WED: 2, THU: 3, FRI: 4 }
+  const parsed = new Set<number>()
+
+  for (const token of days.trim().toUpperCase().split(/[^A-Z]+/)) {
+    if (!token) continue
+    const named = DAY_NAMES[token.slice(0, 3)]
+    if (token.length >= 3 && named !== undefined) {
+      parsed.add(named)
+      continue
+    }
+    for (const ch of token) {
+      const day = DAY_CODES[ch]
+      if (day !== undefined) parsed.add(day)
+    }
+  }
+
+  return [...parsed].sort((a, b) => a - b)
 }
 
 function parseTime(t: string | null): { hours: number; minutes: number } | null {
   if (!t) {
     return null
   }
-  const [h, m] = t.split(':').map(Number)
-  if (Number.isNaN(h)) {
+  const normalized = t.trim()
+  const twelveHour = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(normalized)
+  if (twelveHour) {
+    const hours = Number(twelveHour[1])
+    const minutes = Number(twelveHour[2])
+    if (hours < 1 || hours > 12 || minutes > 59) return null
+    return { hours: (hours % 12) + (twelveHour[3]?.toUpperCase() === 'PM' ? 12 : 0), minutes }
+  }
+
+  const compact = /^(\d{2})(\d{2})$/.exec(normalized)
+  const match = /^(\d{1,2}):(\d{2})/.exec(normalized)
+  const hours = Number(compact?.[1] ?? match?.[1])
+  const minutes = Number(compact?.[2] ?? match?.[2])
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || hours > 23 || minutes > 59) {
     return null
   }
-  return { hours: h, minutes: m ?? 0 }
+  return { hours, minutes }
 }
 
 function daysLabel(days: number[]): string {
@@ -198,7 +137,7 @@ function durationMinutes(start: string | null, end: string | null): number {
   if (!s || !e) {
     return 60
   }
-  return e.hours * 60 + e.minutes - (s.hours * 60 + s.minutes)
+  return Math.max(0, e.hours * 60 + e.minutes - (s.hours * 60 + s.minutes))
 }
 
 // ----- Course Detail Modal -----
@@ -817,23 +756,7 @@ interface Message {
   timestamp: string
 }
 
-const INITIAL_MESSAGES: Message[] = [
-  {
-    role: 'ai',
-    text: "Hi Alex! I've analyzed your preferences and generated 3 schedule options. Schedule 1 gives you the best work-life balance with Fridays partially free. What would you like to adjust?",
-    timestamp: '10:02 AM',
-  },
-  {
-    role: 'user',
-    text: 'I want no classes before 10 AM and I only want professors rated above 4.5.',
-    timestamp: '10:04 AM',
-  },
-  {
-    role: 'ai',
-    text: "Got it! I've updated Schedule 1 to start no earlier than 10 AM. Dr. Hassan (4.8★), Dr. Khalil (4.6★), and Dr. Nassif (4.9★) all qualify. CHEM 201 on Friday is the only exception — Dr. Ibrahim is rated 4.3★. Want me to find an alternative section?",
-    timestamp: '10:04 AM',
-  },
-]
+const INITIAL_MESSAGES: Message[] = []
 
 const EXAMPLE_PROMPTS = [
   "Give me Fridays off",
@@ -852,22 +775,33 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!input.trim()) return
     const userMsg: Message = { role: 'user', text: input, timestamp: 'now' }
     setMessages((p) => [...p, userMsg])
     setInput('')
     setLoading(true)
-    // TODO(frontend): no AI conversation endpoint yet — response is a UI placeholder.
-    setTimeout(() => {
+    try {
+      const history: { role: 'user' | 'assistant'; content: string }[] = messages.map((m) => ({
+        role: m.role === 'ai' ? ('assistant' as const) : ('user' as const),
+        content: m.text,
+      }))
+      const res = await api.assistant.chat(input, history)
       setMessages((p) => [...p, {
         role: 'ai',
-        text: "I've updated the schedule based on your preferences. Schedule 2 now satisfies most constraints. Would you like me to optimize further or compare the options?",
+        text: res.data.response,
         timestamp: 'now',
       }])
-      setLoading(false)
       onGenerate()
-    }, 1200)
+    } catch {
+      setMessages((p) => [...p, {
+        role: 'ai',
+        text: 'Sorry, I encountered an error. Please try again.',
+        timestamp: 'now',
+      }])
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -929,38 +863,6 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
           </div>
         )}
         <div ref={bottomRef} />
-      </div>
-
-      {/* Reasoning card */}
-      <div className="mx-3 mb-2 rounded-xl p-3" style={{ background: '#F0F9FF', border: '1px solid #BAE6FD' }}>
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <Info size={12} color="#0284C7" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#0284C7' }}>Reasoning</span>
-        </div>
-        <p style={{ fontSize: 11, color: '#0369A1', lineHeight: 1.6 }}>
-          I selected this schedule because it minimizes walking distance between buildings while keeping all your classes after 10 AM.
-        </p>
-      </div>
-
-      {/* Trade-offs card */}
-      <div className="mx-3 mb-2 rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-        <div className="flex items-center gap-1.5 mb-2">
-          <AlertCircle size={12} color="#D97706" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#92400E' }}>Trade-offs</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          {[
-            { ok: true, text: 'Fridays free' },
-            { ok: true, text: 'Highest rated professors' },
-            { ok: true, text: 'No classes before 10' },
-            { ok: false, text: 'EECE 351 morning section mandatory' },
-          ].map((t, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <span style={{ fontSize: 13, lineHeight: 1 }}>{t.ok ? '✓' : '✗'}</span>
-              <span style={{ fontSize: 11, color: t.ok ? '#059669' : '#DC2626', fontWeight: t.ok ? 500 : 600 }}>{t.text}</span>
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* Quick prompts */}
@@ -1086,9 +988,9 @@ function ManualBuilder({
       professor: displayName(sec.professors?.first_name, sec.professors?.last_name),
       room: sec.room ?? '',
       days: parseDays(sec.days),
-      startHour: start?.hours ?? 8,
+      startHour: start?.hours ?? START_HOUR,
       startMin: start?.minutes ?? 0,
-      durationMin: start && end ? durationMinutes(sec.start_time, sec.end_time) : 60,
+      durationMin: start && end ? durationMinutes(sec.start_time, sec.end_time) : 0,
       color,
       colorLight: color + '15',
       credits: src.credits,
@@ -1100,7 +1002,11 @@ function ManualBuilder({
     if (!picking) {
       return
     }
-    setCourses((p) => [...p, buildCourse(picking, sec)])
+    const selectedCourse = buildCourse(picking, sec)
+    if (selectedCourse.days.length === 0 || selectedCourse.durationMin <= 0) {
+      setNotice('This section was added, but its meeting time is not available for calendar placement.')
+    }
+    setCourses((p) => [...p, selectedCourse])
     setPicking(null)
   }
 
@@ -1267,23 +1173,27 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 
 export default function AIScheduler({ activeMode }: { activeMode: Page; setPage: (p: Page) => void }) {
   const [mode, setMode] = useState<'ai' | 'manual'>(activeMode === 'manual-builder' ? 'manual' : 'ai')
-  const [scheduleTab, setScheduleTab] = useState(0)
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [generating, setGenerating] = useState(false)
-  const [_currentScheduleIdx, setCurrentScheduleIdx] = useState(0)
   const [manualCourses, setManualCourses] = useState<Course[]>([])
   const [toast, setToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    setMode(activeMode === 'manual-builder' ? 'manual' : 'ai')
+    setSelectedCourse(null)
+    setGenerating(false)
+  }, [activeMode])
 
   // TODO(frontend): no schedule-generation endpoint yet (Phase 9 unchecked) — AI preview stays a UI placeholder.
   const handleGenerate = () => {
     setGenerating(true)
     setTimeout(() => {
-      setCurrentScheduleIdx((p) => (p + 1) % SCHEDULES.length)
       setGenerating(false)
+      setToast('AI schedule generation is not connected yet. Use Manual Builder to add courses.')
     }, 1500)
   }
 
-  const activeCourses = SCHEDULES[scheduleTab] ?? SCHEDULE_1
+  const activeCourses: Course[] = []
   const currentCredits = mode === 'manual'
     ? manualCourses.reduce((acc, c) => acc + c.credits, 0)
     : activeCourses.reduce((acc, c) => acc + c.credits, 0)
@@ -1333,33 +1243,10 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
           ))}
         </div>
 
-        {/* Schedule tabs (AI mode only) */}
+        {/* AI status (AI mode only) */}
         {mode === 'ai' && (
-          <div className="flex items-center gap-1">
-            {['Schedule 1', 'Schedule 2', 'Schedule 3'].map((t, i) => (
-              <button
-                key={t}
-                onClick={() => setScheduleTab(i)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  background: scheduleTab === i ? '#EEF2FF' : 'transparent',
-                  color: scheduleTab === i ? '#4338CA' : '#64748B',
-                  border: scheduleTab === i ? '1px solid #C7D2FE' : '1px solid transparent',
-                }}
-              >
-                {t}
-                {scheduleTab === i && <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#4338CA' }} />}
-              </button>
-            ))}
-            <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-              style={{ fontSize: 12, fontWeight: 600, color: '#64748B', border: '1px solid #E2E8F0' }}
-            >
-              <GitCompare size={12} />
-              Compare
-            </button>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg ml-1" style={{ fontSize: 12, fontWeight: 600, color: '#64748B', background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+            AI generation not connected yet — use Manual Builder
           </div>
         )}
 
@@ -1391,7 +1278,6 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
                   <Sparkles size={28} color="#4338CA" className="animate-pulse" />
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#4338CA' }}>Generating your perfect schedule...</div>
-                <div style={{ fontSize: 12, color: '#94A3B8' }}>Analyzing 847 section combinations</div>
               </div>
             </div>
           )}

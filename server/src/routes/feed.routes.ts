@@ -13,7 +13,7 @@ import {
   unlikePost,
   unsavePost,
 } from '../controllers/feed.controller.js';
-import { requireAuth } from '../middleware/auth.middleware.js';
+import { optionalAuth, requireAuth } from '../middleware/auth.middleware.js';
 import {
   validateBody,
   validateParams,
@@ -40,7 +40,7 @@ const commentBody = z.object({ content: z.string().trim().min(1).max(2000) }).st
 
 const router = Router();
 
-router.get('/', validateQuery(feedQuery), asyncHandler(listFeed));
+router.get('/', optionalAuth, validateQuery(feedQuery), asyncHandler(listFeed));
 router.post('/', requireAuth, validateBody(createPostBody), asyncHandler(createPost));
 router.post('/:id/like', requireAuth, validateParams(postIdParams), asyncHandler(likePost));
 router.delete('/:id/like', requireAuth, validateParams(postIdParams), asyncHandler(unlikePost));
@@ -48,6 +48,7 @@ router.post('/:id/save', requireAuth, validateParams(postIdParams), asyncHandler
 router.delete('/:id/save', requireAuth, validateParams(postIdParams), asyncHandler(unsavePost));
 router.get(
   '/:id/comments',
+  optionalAuth,
   validateParams(postIdParams),
   validateQuery(feedQuery),
   asyncHandler(getComments),
@@ -59,7 +60,7 @@ router.post(
   validateBody(commentBody),
   asyncHandler(createComment),
 );
-router.get('/:id', validateParams(postIdParams), asyncHandler(getPost));
+router.get('/:id', optionalAuth, validateParams(postIdParams), asyncHandler(getPost));
 router.delete('/:id', requireAuth, validateParams(postIdParams), asyncHandler(deletePost));
 
 export default router;

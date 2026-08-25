@@ -9,6 +9,7 @@ import {
 } from './notifications.service.js';
 
 export type FriendRequestDirection = 'incoming' | 'outgoing';
+export type StudentRelationship = 'self' | 'friends' | 'request_sent' | 'request_received' | 'none';
 
 type UserProfileRow = {
   id: string;
@@ -57,6 +58,10 @@ function friendProfile(user: UserProfileRow) {
     lastSeenAt: user.last_seen_at,
   };
 }
+
+export type StudentSearchResult = ReturnType<typeof friendProfile> & {
+  relationship: StudentRelationship;
+};
 
 async function getProfilesByUserId(userIds: string[]): Promise<Map<string, UserProfileRow>> {
   const ids = [...new Set(userIds)];
@@ -205,6 +210,61 @@ export async function getSuggestedFriends(userId: string, limit: number) {
   });
 
   return candidates.slice(0, limit).map(friendProfile);
+}
+
+export async function searchStudents(userId: string, query: string, limit: number) {
+  const db = requireSupabaseClient();
+  const search = query.replace(/[(),]/g, '');
+  const [{ data: users, error: usersError }, { data: relationships, error: relationshipsError }] =
+    await Promise.all([
+      db
+        .from('users')
+        .select(PROFILE_COLUMNS)
+        .or(
+          `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,major.ilike.%${search}%`,
+        )
+        .order('last_name')
+        .limit(limit),
+      db
+        .from('friendships')
+        .select(FRIENDSHIP_COLUMNS)
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`),
+    ]);
+
+  if (usersError) {
+    throw usersError;
+  }
+
+  if (relationshipsError) {
+    throw relationshipsError;
+  }
+
+  const relationshipByUserId = new Map<string, Friendship>();
+  for (const relationship of (relationships ?? []) as Friendship[]) {
+    const otherUserId =
+      relationship.user_id === userId ? relationship.friend_id : relationship.user_id;
+    relationshipByUserId.set(otherUserId, relationship);
+  }
+
+  return ((users ?? []) as UserProfileRow[]).map((student): StudentSearchResult => {
+    if (student.id === userId) {
+      return { ...friendProfile(student), relationship: 'self' };
+    }
+
+    const relationship = relationshipByUserId.get(student.id);
+    if (!relationship || relationship.status === 'rejected') {
+      return { ...friendProfile(student), relationship: 'none' };
+    }
+
+    if (relationship.status === 'accepted') {
+      return { ...friendProfile(student), relationship: 'friends' };
+    }
+
+    return {
+      ...friendProfile(student),
+      relationship: relationship.user_id === userId ? 'request_sent' : 'request_received',
+    };
+  });
 }
 
 export async function getFriendRequests(userId: string) {

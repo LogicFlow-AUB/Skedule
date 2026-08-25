@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, ChevronDown, Bell, MessageSquare, Sparkles, ChevronRight, LogOut } from 'lucide-react'
+import { Search, Bell, Sparkles, ChevronRight, LogOut } from 'lucide-react'
 import type { Page } from '../App'
 import { useAuth } from '../lib/auth'
 import { api, type Notification } from '../lib/api'
@@ -152,15 +152,6 @@ export default function TopBar({ activePage }: { activePage: Page }) {
       </div>
 
       <div className="flex items-center gap-1 ml-auto">
-        {/* Semester dropdown */}
-        <button
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors"
-          style={{ fontSize: 12, fontWeight: 600, color: '#4338CA', background: '#EEF2FF', border: '1px solid #C7D2FE' }}
-        >
-          Fall 2025
-          <ChevronDown size={12} />
-        </button>
-
         {/* AI shortcut */}
         <button
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors"
@@ -168,20 +159,6 @@ export default function TopBar({ activePage }: { activePage: Page }) {
         >
           <Sparkles size={12} />
           Ask AI
-        </button>
-
-        {/* Messages */}
-        <button
-          className="flex items-center justify-center rounded-lg transition-colors relative"
-          style={{ width: 34, height: 34, color: '#64748B' }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-        >
-          <MessageSquare size={16} />
-          <span
-            className="absolute top-1.5 right-1.5 rounded-full"
-            style={{ width: 6, height: 6, background: '#10B981' }}
-          />
         </button>
 
         {/* Notifications */}

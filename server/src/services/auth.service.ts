@@ -5,6 +5,10 @@ export type RegisterInput = {
   email: string;
   password: string;
   confirmPassword: string;
+  firstName?: string;
+  lastName?: string;
+  major?: string;
+  level?: string;
 };
 
 export type LoginInput = Pick<RegisterInput, 'email' | 'password'>;
@@ -31,9 +35,22 @@ function tokensFromSession(session: { access_token: string; refresh_token: strin
   };
 }
 
-async function ensureProfile(userId: string, email: string): Promise<void> {
+async function ensureProfile(
+  userId: string,
+  email: string,
+  profileFields?: { firstName?: string; lastName?: string; major?: string; level?: string },
+): Promise<void> {
+  const profileRecord: Record<string, string> = {};
+  if (profileFields?.firstName !== undefined) profileRecord.first_name = profileFields.firstName;
+  if (profileFields?.lastName !== undefined) profileRecord.last_name = profileFields.lastName;
+  if (profileFields?.major !== undefined) profileRecord.major = profileFields.major;
+  if (profileFields?.level !== undefined) profileRecord.level = profileFields.level;
+
   const db = requireSupabaseClient();
-  const { error } = await db.from('users').upsert({ id: userId, email }, { onConflict: 'id' });
+  const { error } = await db.from('users').upsert(
+    { id: userId, email, ...profileRecord },
+    { onConflict: 'id' },
+  );
 
   if (error) {
     throw error;
@@ -75,7 +92,13 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
     throw new AppError(500, 'AUTH_SIGNUP_FAILED', 'Account was not created.');
   }
 
-  await ensureProfile(user.id, user.email ?? email);
+  const profileFields: { firstName?: string; lastName?: string; major?: string; level?: string } = {};
+  if (input.firstName !== undefined) profileFields.firstName = input.firstName;
+  if (input.lastName !== undefined) profileFields.lastName = input.lastName;
+  if (input.major !== undefined) profileFields.major = input.major;
+  if (input.level !== undefined) profileFields.level = input.level;
+
+  await ensureProfile(user.id, user.email ?? email, profileFields);
 
   const response: AuthResponse = {
     user: { id: user.id, email: user.email ?? email },
