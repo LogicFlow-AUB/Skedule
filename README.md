@@ -23,7 +23,7 @@ The frontend is fully designed and implemented. Backend development is in progre
 ## Features
 
 ### Scheduling
-- **AI Schedule Generator** — Configure preferences (time windows, free days, max classes per day, break duration) and generate optimized schedules.
+- **Schedule Generator** — Configure preferences (time windows, free days, max classes per day, break duration) and generate optimal schedules.
 - **Manual Builder** — Browse available courses, add them to a weekly calendar, swap sections, and remove courses.
 - **Schedule Comparison** — Side-by-side comparison of two schedules with shared courses highlighted.
 - **Weekly Calendar View** — Visual timetable (Mon–Fri, 7 AM – 9 PM) with colored course blocks and hover actions.
