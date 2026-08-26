@@ -4,6 +4,30 @@ import { logger } from '../utils/logger.js';
 const BASE = config.aub.baseUrl;
 const PAGE_SIZE = 500;
 
+export type AubMeetingTime = {
+  beginTime: string | null;
+  endTime: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  monday: boolean;
+  tuesday: boolean;
+  wednesday: boolean;
+  thursday: boolean;
+  friday: boolean;
+  saturday: boolean;
+  sunday: boolean;
+  meetingScheduleType: string | null;
+  meetingType: string | null;
+  meetingTypeDescription: string | null;
+  room: string | null;
+  building: string | null;
+  buildingDescription: string | null;
+  campus: string | null;
+  hoursWeek: number | null;
+  creditHourSession: number | null;
+  weeklySchedulePatterns: string | null;
+};
+
 export type AubSection = {
   id: number;
   term: string;
@@ -20,15 +44,12 @@ export type AubSection = {
   enrollmentAvailability: string | null;
   maximumEnrollment: string | null;
   seatsAvailable: string | null;
+  isSectionLinked: boolean;
+  linkIdentifier: string | null;
   faculty: Array<{ bannerId: string; firstName: string; lastName: string; displayName: string }>;
   meetingsFaculty: Array<{
-    meetingTime: {
-      beginTime: string | null;
-      endTime: string | null;
-      weeklySchedulePatterns: string | null;
-      room: string | null;
-      buildingDescription: string | null;
-    };
+    category: string | null;
+    meetingTime: AubMeetingTime;
   }>;
   sectionAttributes: Array<{ description: string }>;
 };

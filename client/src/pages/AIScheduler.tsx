@@ -6,7 +6,7 @@ import {
   GripVertical, Search, CalendarDays, CheckCircle,
 } from 'lucide-react'
 import type { Page } from '../App'
-import { api, type CourseSummary, type CourseSection, type CourseReview, type GradeDistributionRow } from '../lib/api'
+import { api, type CourseSummary, type CourseSection, type CourseReview, type GradeDistributionRow, type SectionMeeting } from '../lib/api'
 import { displayName, timeAgo } from '../lib/format'
 
 const HOUR_HEIGHT = 60 // px per hour
@@ -141,6 +141,62 @@ function durationMinutes(start: string | null, end: string | null): number {
 }
 
 // ----- Course Detail Modal -----
+
+/** Convert a SectionMeeting's boolean day fields to number[] (0=Mon..4=Fri) */
+function meetingDaysToNumbers(mt: SectionMeeting): number[] {
+  const days: number[] = []
+  if (mt.monday) days.push(0)
+  if (mt.tuesday) days.push(1)
+  if (mt.wednesday) days.push(2)
+  if (mt.thursday) days.push(3)
+  if (mt.friday) days.push(4)
+  return days
+}
+
+/** Group sections by link_identifier (or use section id as unique key) */
+type SectionGroup = {
+  key: string
+  sections: CourseSection[]
+}
+
+function groupSectionsByLink(sections: CourseSection[]): SectionGroup[] {
+  const groups = new Map<string, CourseSection[]>()
+  for (const sec of sections) {
+    const key = sec.link_identifier ?? String(sec.id)
+    const existing = groups.get(key)
+    if (existing) {
+      existing.push(sec)
+    } else {
+      groups.set(key, [sec])
+    }
+  }
+  return [...groups.values()].map((g) => ({
+    key: g[0]?.link_identifier ?? String(g[0]?.id),
+    sections: g,
+  }))
+}
+
+/** Build a human-readable summary of a section group for the picker */
+function sectionGroupSummary(group: SectionGroup): string {
+  const parts: string[] = []
+  for (const sec of group.sections) {
+    const type = sec.schedule_type ?? sec.meeting_schedule_type ?? 'Class'
+    const meetings = sec.section_meetings ?? []
+    if (meetings.length > 0) {
+      for (const mt of meetings) {
+        const mtDays = daysLabel(meetingDaysToNumbers(mt))
+        const mtTime = `${timeLabel(mt.start_time)}–${timeLabel(mt.end_time)}`
+        parts.push(`${type}: ${mtDays} ${mtTime}`)
+      }
+    } else {
+      const mtDays = daysLabel(parseDays(sec.days))
+      const mtTime = `${timeLabel(sec.start_time)}–${timeLabel(sec.end_time)}`
+      parts.push(`${type}: ${mtDays} ${mtTime}`)
+    }
+  }
+  return parts.join(' + ')
+}
+
 function CourseModal({ course, onSwap, onClose }: { course: Course; onSwap?: (c: Course) => void; onClose: () => void }) {
   const [summary, setSummary] = useState<CourseSummary | null>(null)
   const [reviews, setReviews] = useState<CourseReview[]>([])
@@ -342,7 +398,7 @@ function SectionPickerModal({
   title: string
   code: string
   currentSection?: string
-  onPick: (sec: CourseSection) => void
+  onPick: (sections: CourseSection[]) => void
   onClose: () => void
 }) {
   const [sections, setSections] = useState<CourseSection[]>([])
@@ -375,12 +431,14 @@ function SectionPickerModal({
     }
   }, [code])
 
+  const groups = groupSectionsByLink(sections)
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: 480, maxHeight: '85vh', background: '#FFFFFF' }}>
+        style={{ width: 520, maxHeight: '85vh', background: '#FFFFFF' }}>
         <div className="px-5 py-4 flex items-center justify-between"
           style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
           <div>
@@ -401,33 +459,41 @@ function SectionPickerModal({
             </div>
           )}
           {loading && <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>Loading sections...</div>}
-          {!loading && sections.length === 0 && !error && (
+          {!loading && groups.length === 0 && !error && (
             <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No sections available this semester.</div>
           )}
-          {sections.map((sec) => {
-            const isCurrent = sec.section_number === currentSection
-            const start = parseTime(sec.start_time)
-            const end = parseTime(sec.end_time)
-            const startLabel = start ? `${timeLabel(sec.start_time)}` : '—'
-            const endLabel = end ? timeLabel(sec.end_time) : '—'
-            const seatsLeft = sec.seats_total !== null && sec.seats_remaining !== null ? sec.seats_remaining : null
+          {groups.map((group) => {
+            const primarySec = group.sections[0]!
+            const isCurrent = group.sections.some((s) => s.section_number === currentSection)
+            const seatsLeft = group.sections.reduce(
+              (min, s) => {
+                const r = s.seats_total !== null && s.seats_remaining !== null ? s.seats_remaining : null
+                return r !== null && r < min ? r : min
+              },
+              Infinity,
+            )
+            const seatsLabel = seatsLeft === Infinity ? 'Seats N/A' : `${seatsLeft} seats open`
+            const professor = displayName(primarySec.professors?.first_name, primarySec.professors?.last_name) || 'Unknown instructor'
+
             return (
               <button
-                key={sec.id}
-                onClick={() => onPick(sec)}
+                key={group.key}
+                onClick={() => onPick(group.sections)}
                 className="flex items-start gap-4 p-4 rounded-xl text-left transition-all"
                 style={{ background: '#F8FAFC', border: '1px solid #F1F5F9', cursor: isCurrent ? 'default' : 'pointer', opacity: isCurrent ? 0.75 : 1 }}
                 onMouseEnter={(e) => { if (!isCurrent) { e.currentTarget.style.border = '1px solid #4338CA50'; e.currentTarget.style.background = '#EEF2FF' } }}
                 onMouseLeave={(e) => { e.currentTarget.style.border = '1px solid #F1F5F9'; e.currentTarget.style.background = '#F8FAFC' }}
               >
                 <div className="rounded-lg px-2 py-1 shrink-0" style={{ background: '#4338CA20', color: '#4338CA', fontSize: 12, fontWeight: 800 }}>
-                  §{sec.section_number}
+                  §{primarySec.section_number}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{displayName(sec.professors?.first_name, sec.professors?.last_name) || 'Unknown instructor'}</div>
-                  <div style={{ fontSize: 11, color: '#64748B' }}>{daysLabel(parseDays(sec.days))} · {startLabel} – {endLabel} · {sec.room || 'TBA'}</div>
-                  <div style={{ fontSize: 11, color: seatsLeft !== null && seatsLeft > 0 ? '#059669' : '#94A3B8', marginTop: 2 }}>
-                    {seatsLeft !== null ? `${seatsLeft} seats open` : 'Seats N/A'}
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{professor}</div>
+                  <div style={{ fontSize: 11, color: '#64748B', lineHeight: 1.5 }}>
+                    {sectionGroupSummary(group)}
+                  </div>
+                  <div style={{ fontSize: 11, color: seatsLeft !== Infinity && seatsLeft > 0 ? '#059669' : '#94A3B8', marginTop: 2 }}>
+                    {seatsLabel}
                   </div>
                 </div>
                 <div className="ml-auto text-xs font-semibold" style={{ color: '#4338CA' }}>{isCurrent ? 'Current' : 'Select →'}</div>
@@ -976,8 +1042,55 @@ function ManualBuilder({
     setCourses((p) => p.filter((c) => c.id !== id))
   }
 
-  const buildCourse = (src: { code: string; title: string; credits: number }, sec: CourseSection): Course => {
-    const color = COURSE_COLORS[courses.length % COURSE_COLORS.length]
+  let colorIndex = courses.length
+
+  const buildCourseFromMeeting = (
+    src: { code: string; title: string; credits: number },
+    sec: CourseSection,
+    meeting: { days: number[]; startTime: string | null; endTime: string | null; room: string | null; building: string | null; meetingType: string | null },
+    label: string,
+  ): Course => {
+    const color = COURSE_COLORS[colorIndex % COURSE_COLORS.length]
+    colorIndex++
+    const start = parseTime(meeting.startTime)
+    const end = parseTime(meeting.endTime)
+    const roomStr = meeting.building && meeting.room ? `${meeting.building} ${meeting.room}` : (meeting.room ?? sec.room ?? '')
+    return {
+      id: `sec-${sec.id}-mt-${label}`,
+      code: src.code,
+      name: src.title,
+      section: `${sec.section_number} ${label}`.trim(),
+      professor: displayName(sec.professors?.first_name, sec.professors?.last_name),
+      room: roomStr,
+      days: meeting.days,
+      startHour: start?.hours ?? START_HOUR,
+      startMin: start?.minutes ?? 0,
+      durationMin: start && end ? durationMinutes(meeting.startTime, meeting.endTime) : 0,
+      color,
+      colorLight: color + '15',
+      credits: src.credits,
+      sectionId: sec.id,
+    }
+  }
+
+  const buildCourseFromSection = (
+    src: { code: string; title: string; credits: number },
+    sec: CourseSection,
+  ): Course => {
+    const meetings = sec.section_meetings ?? []
+    if (meetings.length > 0) {
+      const mt = meetings[0]!
+      return buildCourseFromMeeting(src, sec, {
+        days: meetingDaysToNumbers(mt),
+        startTime: mt.start_time,
+        endTime: mt.end_time,
+        room: mt.room,
+        building: mt.building,
+        meetingType: mt.meeting_type,
+      }, mt.meeting_type ?? '')
+    }
+    const color = COURSE_COLORS[colorIndex % COURSE_COLORS.length]
+    colorIndex++
     const start = parseTime(sec.start_time)
     const end = parseTime(sec.end_time)
     return {
@@ -998,34 +1111,71 @@ function ManualBuilder({
     }
   }
 
-  const handlePick = (sec: CourseSection) => {
-    if (!picking) {
-      return
+  const handlePick = (pickedSections: CourseSection[]) => {
+    if (!picking) return
+    const newCourses: Course[] = []
+    let hasPlacementIssue = false
+
+    for (const sec of pickedSections) {
+      const meetings = sec.section_meetings ?? []
+      if (meetings.length > 0) {
+        for (const mt of meetings) {
+          const c = buildCourseFromMeeting(picking, sec, {
+            days: meetingDaysToNumbers(mt),
+            startTime: mt.start_time,
+            endTime: mt.end_time,
+            room: mt.room,
+            building: mt.building,
+            meetingType: mt.meeting_type,
+          }, mt.meeting_type ?? '')
+          if (c.days.length === 0 || c.durationMin <= 0) hasPlacementIssue = true
+          newCourses.push(c)
+        }
+      } else {
+        const c = buildCourseFromSection(picking, sec)
+        if (c.days.length === 0 || c.durationMin <= 0) hasPlacementIssue = true
+        newCourses.push(c)
+      }
     }
-    const selectedCourse = buildCourse(picking, sec)
-    if (selectedCourse.days.length === 0 || selectedCourse.durationMin <= 0) {
-      setNotice('This section was added, but its meeting time is not available for calendar placement.')
+
+    if (hasPlacementIssue) {
+      setNotice('Some meetings were added but their meeting time is not available for calendar placement.')
     }
-    setCourses((p) => [...p, selectedCourse])
+    setCourses((p) => [...p, ...newCourses])
     setPicking(null)
   }
 
-  const handleSwap = (target: Course, sec: CourseSection) => {
-    const start = parseTime(sec.start_time)
-    const end = parseTime(sec.end_time)
-    setCourses((p) =>
-      p.map((c) => c.id === target.id ? {
-        ...c,
-        section: sec.section_number,
-        professor: displayName(sec.professors?.first_name, sec.professors?.last_name),
-        room: sec.room ?? '',
-        days: parseDays(sec.days),
-        startHour: start?.hours ?? c.startHour,
-        startMin: start?.minutes ?? c.startMin,
-        durationMin: start && end ? durationMinutes(sec.start_time, sec.end_time) : c.durationMin,
-        sectionId: sec.id,
-      } : c)
-    )
+  const handleSwap = (target: Course, swapSections: CourseSection[]) => {
+    const newCourses: Course[] = []
+    for (const sec of swapSections) {
+      const meetings = sec.section_meetings ?? []
+      if (meetings.length > 0) {
+        for (const mt of meetings) {
+          newCourses.push(buildCourseFromMeeting(
+            { code: target.code, title: target.name, credits: target.credits },
+            sec,
+            {
+              days: meetingDaysToNumbers(mt),
+              startTime: mt.start_time,
+              endTime: mt.end_time,
+              room: mt.room,
+              building: mt.building,
+              meetingType: mt.meeting_type,
+            },
+            mt.meeting_type ?? '',
+          ))
+        }
+      } else {
+        newCourses.push(buildCourseFromSection(
+          { code: target.code, title: target.name, credits: target.credits },
+          sec,
+        ))
+      }
+    }
+    setCourses((p) => {
+      const without = p.filter((c) => c.id !== target.id)
+      return [...without, ...newCourses]
+    })
     setChangeCourse(null)
   }
 

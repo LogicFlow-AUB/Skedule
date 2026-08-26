@@ -1,5 +1,5 @@
 import { requireSupabaseClient } from '../db/supabase.js';
-import type { Course, CourseReview, Professor, Section } from '../db/types.js';
+import type { Course, CourseReview, Professor, Section, SectionMeeting } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
 
@@ -246,6 +246,7 @@ export async function getCourse(code: string): Promise<CourseSummary> {
 
 export type CourseSection = Section & {
   professors: Pick<Professor, 'id' | 'first_name' | 'last_name'> | null;
+  section_meetings: SectionMeeting[];
 };
 
 export async function getSections(code: string): Promise<CourseSection[]> {
@@ -253,7 +254,7 @@ export async function getSections(code: string): Promise<CourseSection[]> {
   const db = requireSupabaseClient();
   const { data, error } = await db
     .from('sections')
-    .select('*, professors(id, first_name, last_name)')
+    .select('*, professors(id, first_name, last_name), section_meetings(*)')
     .eq('course_id', course.id)
     .order('section_number');
 

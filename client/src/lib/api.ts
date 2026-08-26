@@ -167,6 +167,22 @@ export type CourseSummary = {
   wouldRetakePercentage: number | null
 }
 
+export type SectionMeeting = {
+  id: number
+  monday: boolean
+  tuesday: boolean
+  wednesday: boolean
+  thursday: boolean
+  friday: boolean
+  saturday: boolean
+  sunday: boolean
+  start_time: string | null
+  end_time: string | null
+  building: string | null
+  room: string | null
+  meeting_type: string | null
+}
+
 export type CourseSection = {
   id: number
   course_id: number
@@ -177,7 +193,11 @@ export type CourseSection = {
   end_time: string | null
   seats_total: number | null
   seats_remaining: number | null
+  link_identifier: string | null
+  schedule_type: string | null
+  meeting_schedule_type: string | null
   professors?: { id: number; first_name: string; last_name: string } | null
+  section_meetings?: SectionMeeting[]
 }
 
 export type GradeDistributionRow = {
@@ -227,6 +247,19 @@ export type ProfessorReview = {
   author: { id: string; firstName: string; lastName: string } | null
 }
 
+export type ScheduleCourseMeeting = {
+  id: number
+  days: number[]
+  startTime: string | null
+  endTime: string | null
+  startMinutes: number | null
+  endMinutes: number | null
+  durationMinutes: number | null
+  building: string | null
+  room: string | null
+  meetingType: string | null
+}
+
 export type ScheduleCourse = {
   courseId: number | null
   code: string | null
@@ -244,6 +277,9 @@ export type ScheduleCourse = {
     durationMinutes: number | null
     seatsTotal: number | null
     seatsRemaining: number | null
+    linkIdentifier: string | null
+    scheduleType: string | null
+    meetings: ScheduleCourseMeeting[]
   }
   professor: { id: number; firstName: string; lastName: string } | null
 }

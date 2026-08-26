@@ -33,6 +33,20 @@ export type ScheduleCourse = {
     durationMinutes: number | null;
     seatsTotal: number | null;
     seatsRemaining: number | null;
+    linkIdentifier: string | null;
+    scheduleType: string | null;
+    meetings: Array<{
+      id: number;
+      days: number[];
+      startTime: string | null;
+      endTime: string | null;
+      startMinutes: number | null;
+      endMinutes: number | null;
+      durationMinutes: number | null;
+      building: string | null;
+      room: string | null;
+      meetingType: string | null;
+    }>;
   };
   professor: { id: number; firstName: string; lastName: string } | null;
 };
@@ -81,6 +95,22 @@ type SectionProfessorRow = {
   last_name: string;
 };
 
+type SectionMeetingRow = {
+  id: number;
+  monday: boolean;
+  tuesday: boolean;
+  wednesday: boolean;
+  thursday: boolean;
+  friday: boolean;
+  saturday: boolean;
+  sunday: boolean;
+  start_time: string | null;
+  end_time: string | null;
+  building: string | null;
+  room: string | null;
+  meeting_type: string | null;
+};
+
 type SectionRow = {
   id: number;
   course_id: number | null;
@@ -92,8 +122,11 @@ type SectionRow = {
   room: string | null;
   seats_total: number | null;
   seats_remaining: number | null;
+  link_identifier: string | null;
+  schedule_type: string | null;
   courses: SectionCourseRow | SectionCourseRow[] | null;
   professors: SectionProfessorRow | SectionProfessorRow[] | null;
+  section_meetings: SectionMeetingRow | SectionMeetingRow[] | null;
 };
 
 type ScheduleSectionRow = {
@@ -104,7 +137,7 @@ type ScheduleSectionRow = {
 
 const SCHEDULE_COLUMNS = 'id, user_id, name, notes, term_id, created_at, updated_at';
 const SECTION_COLUMNS =
-  'id, course_id, professor_id, section_number, days, start_time, end_time, room, seats_total, seats_remaining, courses(id, subject, course_number, title, credits), professors(id, first_name, last_name)';
+  'id, course_id, professor_id, section_number, days, start_time, end_time, room, seats_total, seats_remaining, link_identifier, schedule_type, courses(id, subject, course_number, title, credits), professors(id, first_name, last_name), section_meetings(id, monday, tuesday, wednesday, thursday, friday, saturday, sunday, start_time, end_time, building, room, meeting_type)';
 const SCHEDULE_SECTION_COLUMNS = `schedule_id, section_id, sections(${SECTION_COLUMNS})`;
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
@@ -182,11 +215,47 @@ function courseLabel(course: ScheduleCourse): string {
   return `${course.code ?? 'Unknown course'} (${course.section.sectionNumber})`;
 }
 
+function parseSectionMeetingDays(mt: SectionMeetingRow): number[] {
+  const days: number[] = [];
+  if (mt.monday) days.push(0);
+  if (mt.tuesday) days.push(1);
+  if (mt.wednesday) days.push(2);
+  if (mt.thursday) days.push(3);
+  if (mt.friday) days.push(4);
+  return days;
+}
+
 function scheduleCourseResponse(section: SectionRow): ScheduleCourse {
   const course = toOne(section.courses);
   const professor = toOne(section.professors);
   const startMinutes = parseMinutes(section.start_time);
   const endMinutes = parseMinutes(section.end_time);
+
+  const rawMeetings = section.section_meetings;
+  const meetingsList: SectionMeetingRow[] = Array.isArray(rawMeetings)
+    ? rawMeetings.filter((m): m is SectionMeetingRow => m !== null)
+    : rawMeetings
+      ? [rawMeetings]
+      : [];
+
+  const meetings = meetingsList.map((mt) => {
+    const mtDays = parseSectionMeetingDays(mt);
+    const mtStart = parseMinutes(mt.start_time);
+    const mtEnd = parseMinutes(mt.end_time);
+    return {
+      id: mt.id,
+      days: mtDays,
+      startTime: mt.start_time,
+      endTime: mt.end_time,
+      startMinutes: mtStart,
+      endMinutes: mtEnd,
+      durationMinutes:
+        mtStart === null || mtEnd === null ? null : mtEnd - mtStart,
+      building: mt.building,
+      room: mt.room,
+      meetingType: mt.meeting_type,
+    };
+  });
 
   return {
     courseId: course?.id ?? section.course_id,
@@ -206,6 +275,9 @@ function scheduleCourseResponse(section: SectionRow): ScheduleCourse {
         startMinutes === null || endMinutes === null ? null : endMinutes - startMinutes,
       seatsTotal: section.seats_total,
       seatsRemaining: section.seats_remaining,
+      linkIdentifier: section.link_identifier,
+      scheduleType: section.schedule_type,
+      meetings,
     },
     professor: professor
       ? { id: professor.id, firstName: professor.first_name, lastName: professor.last_name }
@@ -406,26 +478,6 @@ async function getSectionOrThrow(sectionId: number): Promise<SectionRow> {
   return section;
 }
 
-function assertOneSectionPerCourse(sections: SectionRow[]): void {
-  const courseIds = new Set<number>();
-
-  for (const section of sections) {
-    if (section.course_id === null) {
-      continue;
-    }
-
-    if (courseIds.has(section.course_id)) {
-      throw new AppError(
-        409,
-        'DUPLICATE_COURSE',
-        'A schedule cannot contain two sections of the same course.',
-      );
-    }
-
-    courseIds.add(section.course_id);
-  }
-}
-
 async function touchSchedule(scheduleId: number): Promise<Schedule> {
   const db = requireSupabaseClient();
   const { data, error } = await db
@@ -483,7 +535,7 @@ export async function createSchedule(
   input: CreateScheduleInput,
 ): Promise<ScheduleDetail> {
   const sectionIds = [...new Set(input.sectionIds ?? [])];
-  assertOneSectionPerCourse(await getSectionsOrThrow(sectionIds));
+  await getSectionsOrThrow(sectionIds);
 
   const db = requireSupabaseClient();
   const { data, error } = await db
@@ -583,22 +635,11 @@ export async function addScheduleCourse(
 ): Promise<ScheduleDetail> {
   await getScheduleOrThrow(userId, scheduleId);
 
-  const section = await getSectionOrThrow(sectionId);
+  await getSectionsOrThrow([sectionId]);
   const rows = await getScheduleSectionRows([scheduleId]);
 
   if (rows.some((row) => row.section_id === sectionId)) {
     throw new AppError(409, 'SECTION_ALREADY_IN_SCHEDULE', 'This section is already scheduled.');
-  }
-
-  if (
-    section.course_id !== null &&
-    rows.some((row) => toOne(row.sections)?.course_id === section.course_id)
-  ) {
-    throw new AppError(
-      409,
-      'COURSE_ALREADY_IN_SCHEDULE',
-      'This course is already in the schedule. Swap the section instead.',
-    );
   }
 
   const db = requireSupabaseClient();

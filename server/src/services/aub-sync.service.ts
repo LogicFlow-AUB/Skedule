@@ -2,6 +2,7 @@ import config from '../config.js';
 import { requireSupabaseClient } from '../db/supabase.js';
 import { logger } from '../utils/logger.js';
 import { fetchAllSections } from './aub-registration.service.js';
+import type { AubMeetingTime } from './aub-registration.service.js';
 
 let syncTimer: ReturnType<typeof setInterval> | undefined;
 let syncing = false;
@@ -15,16 +16,26 @@ function parseTime(time: string | null): string | null {
   return `${h}:${m}:00`;
 }
 
-function parseDays(patterns: string | null): string | null {
-  if (!patterns) return null;
+function buildDaysString(mt: AubMeetingTime | null): string | null {
+  if (!mt) return null;
   const days: string[] = [];
-  if (patterns.includes('M')) days.push('M');
-  if (patterns.includes('T')) days.push('T');
-  if (patterns.includes('W')) days.push('W');
-  if (patterns.includes('R')) days.push('R');
-  if (patterns.includes('F')) days.push('F');
-  if (patterns.includes('S')) days.push('S');
+  if (mt.monday) days.push('M');
+  if (mt.tuesday) days.push('T');
+  if (mt.wednesday) days.push('W');
+  if (mt.thursday) days.push('R');
+  if (mt.friday) days.push('F');
+  if (mt.saturday) days.push('S');
+  if (mt.sunday) days.push('U');
   return days.length > 0 ? days.join('') : null;
+}
+
+function parseAubDate(dateStr: string | null): string | null {
+  if (!dateStr) return null;
+  const parts = dateStr.split('/');
+  if (parts.length !== 3) return null;
+  const [mm, dd, yyyy] = parts;
+  if (!mm || !dd || !yyyy) return null;
+  return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
 }
 
 function toNum(v: string | null | undefined): number | null {
@@ -199,10 +210,11 @@ async function syncAubData(): Promise<void> {
       logger.info({ count: newAttrs.length }, 'AUB sync: created attributes');
     }
 
-    // ── build section rows + course_attributes ─────────────────────
+    // ── build section rows + meetings + course_attributes ────────────
     const allSectionData: Array<Record<string, unknown>> = [];
     const caToInsert: Array<{ course_id: number; attribute_id: number }> = [];
     const seenCRNs = new Set<string>();
+    const pendingMeetings: Array<Record<string, unknown>> = [];
 
     for (const aub of aubSections) {
       const course = courseMap.get(`${aub.subject}|${aub.courseNumber}`);
@@ -216,28 +228,78 @@ async function syncAubData(): Promise<void> {
         professorId = prof?.id ?? null;
       }
 
-      const meeting = aub.meetingsFaculty?.[0]?.meetingTime;
+      const firstMeeting = aub.meetingsFaculty?.[0]?.meetingTime ?? null;
+
+      // Build has_* booleans as union of ALL meetings for this section
+      const has = { m: false, t: false, w: false, r: false, f: false, s: false, u: false };
+      for (const mf of aub.meetingsFaculty ?? []) {
+        const mt = mf.meetingTime;
+        if (mt.monday) has.m = true;
+        if (mt.tuesday) has.t = true;
+        if (mt.wednesday) has.w = true;
+        if (mt.thursday) has.r = true;
+        if (mt.friday) has.f = true;
+        if (mt.saturday) has.s = true;
+        if (mt.sunday) has.u = true;
+      }
+
       allSectionData.push({
         course_id: course.id,
         term_id: term.id,
         professor_id: professorId,
         section_number: aub.sequenceNumber,
         crn: aub.courseReferenceNumber,
-        days: parseDays(meeting?.weeklySchedulePatterns ?? null),
-        start_time: parseTime(meeting?.beginTime ?? null),
-        end_time: parseTime(meeting?.endTime ?? null),
+        days: buildDaysString(firstMeeting),
+        start_time: parseTime(firstMeeting?.beginTime ?? null),
+        end_time: parseTime(firstMeeting?.endTime ?? null),
         schedule_type: aub.scheduleTypeDescription,
         campus: aub.campusDescription,
         seats_total: toNum(aub.maximumEnrollment),
         seats_remaining: toNum(aub.seatsAvailable),
         status: null,
         room:
-          meeting?.buildingDescription && meeting?.room
-            ? `${meeting.buildingDescription} ${meeting.room}`
-            : (meeting?.buildingDescription ?? meeting?.room ?? null),
+          firstMeeting?.buildingDescription && firstMeeting?.room
+            ? `${firstMeeting.buildingDescription} ${firstMeeting.room}`
+            : (firstMeeting?.buildingDescription ?? firstMeeting?.room ?? null),
+        link_identifier: aub.linkIdentifier ?? null,
+        meeting_schedule_type: firstMeeting?.meetingScheduleType ?? null,
+        start_date: parseAubDate(firstMeeting?.startDate ?? null),
+        end_date: parseAubDate(firstMeeting?.endDate ?? null),
+        has_monday: has.m,
+        has_tuesday: has.t,
+        has_wednesday: has.w,
+        has_thursday: has.r,
+        has_friday: has.f,
+        has_saturday: has.s,
+        has_sunday: has.u,
       });
 
       seenCRNs.add(aub.courseReferenceNumber);
+
+      // Stage meetings for this section (keyed by CRN, resolved after upsert)
+      for (const mf of aub.meetingsFaculty ?? []) {
+        const mt = mf.meetingTime;
+        if (!mt) continue;
+        pendingMeetings.push({
+          _crn: aub.courseReferenceNumber,
+          term_id: term.id,
+          monday: mt.monday ?? false,
+          tuesday: mt.tuesday ?? false,
+          wednesday: mt.wednesday ?? false,
+          thursday: mt.thursday ?? false,
+          friday: mt.friday ?? false,
+          saturday: mt.saturday ?? false,
+          sunday: mt.sunday ?? false,
+          start_time: parseTime(mt.beginTime ?? null),
+          end_time: parseTime(mt.endTime ?? null),
+          building: mt.buildingDescription ?? null,
+          room: mt.room ?? null,
+          meeting_type: mt.meetingType ?? null,
+          hours_week: mt.hoursWeek ?? null,
+          start_date: parseAubDate(mt.startDate ?? null),
+          end_date: parseAubDate(mt.endDate ?? null),
+        });
+      }
 
       for (const aubAttr of aub.sectionAttributes ?? []) {
         const attr = attrMap.get(aubAttr.description);
@@ -264,6 +326,54 @@ async function syncAubData(): Promise<void> {
         );
       } else {
         synced += batch.length;
+      }
+    }
+
+    // Resolve CRN -> section_id and upsert section_meetings
+    if (pendingMeetings.length > 0) {
+      const { data: sectionRows, error: lookupErr } = await db
+        .from('sections')
+        .select('id, crn')
+        .eq('term_id', term.id)
+        .limit(10000);
+      if (!lookupErr && sectionRows) {
+        const crnToId = new Map<string, number>();
+        for (const row of sectionRows as Array<{ id: number; crn: string }>) {
+          crnToId.set(row.crn, row.id);
+        }
+
+        // Delete existing meetings for this term, then re-insert
+        const { error: delErr } = await db
+          .from('section_meetings')
+          .delete()
+          .eq('term_id', term.id);
+        if (delErr) {
+          logger.error({ error: delErr }, 'AUB sync: section_meetings delete failed');
+        }
+
+        const meetingRows = pendingMeetings
+          .map((m) => {
+            const sectionId = crnToId.get(m._crn as string);
+            if (!sectionId) return null;
+            const { _crn, ...rest } = m;
+            return { section_id: sectionId, ...rest };
+          })
+          .filter((r) => r !== null) as Array<Record<string, unknown>>;
+
+        let meetingsInserted = 0;
+        for (let i = 0; i < meetingRows.length; i += 500) {
+          const batch = meetingRows.slice(i, i + 500);
+          const { error } = await db.from('section_meetings').insert(batch);
+          if (error) {
+            logger.error(
+              { error, batchStart: i, batchSize: batch.length },
+              'AUB sync: section_meetings insert failed',
+            );
+          } else {
+            meetingsInserted += batch.length;
+          }
+        }
+        logger.info({ count: meetingsInserted }, 'AUB sync: section_meetings inserted');
       }
     }
 

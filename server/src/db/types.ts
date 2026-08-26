@@ -65,6 +65,39 @@ export type Section = {
   seats_remaining: number | null;
   status: string | null;
   room: string | null;
+  link_identifier: string | null;
+  meeting_schedule_type: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  has_monday: boolean;
+  has_tuesday: boolean;
+  has_wednesday: boolean;
+  has_thursday: boolean;
+  has_friday: boolean;
+  has_saturday: boolean;
+  has_sunday: boolean;
+};
+
+export type SectionMeeting = {
+  id: number;
+  section_id: number;
+  term_id: number;
+  monday: boolean;
+  tuesday: boolean;
+  wednesday: boolean;
+  thursday: boolean;
+  friday: boolean;
+  saturday: boolean;
+  sunday: boolean;
+  start_time: string | null;
+  end_time: string | null;
+  building: string | null;
+  room: string | null;
+  meeting_type: string | null;
+  hours_week: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
 };
 
 export type Schedule = {
