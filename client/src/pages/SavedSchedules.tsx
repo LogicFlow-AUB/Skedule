@@ -113,7 +113,7 @@ function ScheduleViewModal({ detail, onClose }: { detail: ScheduleDetail; onClos
       style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="relative rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: 800, maxHeight: '88vh', background: '#FFFFFF' }}>
+        style={{ width: 800, maxWidth: 'calc(100vw - 32px)', maxHeight: '88vh', background: '#FFFFFF' }}>
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
           <div>
             <h2 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A' }}>{detail.name ?? `Schedule #${detail.id}`}</h2>
@@ -200,7 +200,7 @@ function CompareModal({ summaries, details, onClose }: { summaries: ScheduleSumm
       style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: 920, maxHeight: '88vh', background: '#FFFFFF' }}>
+        style={{ width: 920, maxWidth: 'calc(100vw - 32px)', maxHeight: '88vh', background: '#FFFFFF' }}>
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: '#0F172A' }}>Compare Schedules</div>
           <button onClick={onClose} className="rounded-lg p-1.5" style={{ color: '#64748B' }}
@@ -212,7 +212,7 @@ function CompareModal({ summaries, details, onClose }: { summaries: ScheduleSumm
 
         <div className="overflow-y-auto flex-1 p-6">
           {/* Selectors */}
-          <div className="grid grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {[
               { id: leftId, set: setLeftId },
               { id: rightId, set: setRightId },
@@ -228,7 +228,7 @@ function CompareModal({ summaries, details, onClose }: { summaries: ScheduleSumm
           </div>
 
           {/* Side-by-side comparison */}
-          <div className="grid grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {[
               { sched: leftSummary, courses: leftCourses, otherCodes: rightCodes },
               { sched: rightSummary, courses: rightCourses, otherCodes: leftCodes },
@@ -281,7 +281,10 @@ function CompareModal({ summaries, details, onClose }: { summaries: ScheduleSumm
 
 // Toast
 function Toast({ message, onDone }: { message: string; onDone: () => void }) {
-  setTimeout(onDone, 2500)
+  useEffect(() => {
+    const timer = setTimeout(onDone, 2500)
+    return () => clearTimeout(timer)
+  }, [onDone])
   return (
     <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-3 shadow-xl"
       style={{ background: '#1E293B', color: 'white', fontSize: 13, fontWeight: 600, animation: 'none' }}>
@@ -359,7 +362,7 @@ export default function SavedSchedules() {
     <div className="h-full overflow-y-auto" style={{ background: '#F8FAFC' }}>
       {/* Header */}
       <div className="px-8 py-6" style={{ background: '#FFFFFF', borderBottom: '1px solid #F1F5F9' }}>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F172A' }}>Saved Schedules</h1>
             <p style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>{loading ? 'Loading...' : `${summaries.length} schedules saved`}</p>
@@ -368,9 +371,9 @@ export default function SavedSchedules() {
             onClick={() => setShowCompare(true)}
             disabled={summaries.length < 2}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold transition-all"
-            style={{ fontSize: 13, background: summaries.length >= 2 ? '#4338CA' : '#E2E8F0', color: summaries.length >= 2 ? 'white' : '#94A3B8' }}
-            onMouseEnter={(e) => { if (summaries.length >= 2) e.currentTarget.style.background = '#3730A3' }}
-            onMouseLeave={(e) => { if (summaries.length >= 2) e.currentTarget.style.background = '#4338CA' }}
+            style={{ fontSize: 13, background: summaries.length >= 2 ? 'var(--color-primary, #4338CA)' : '#E2E8F0', color: summaries.length >= 2 ? 'white' : '#94A3B8', cursor: summaries.length >= 2 ? 'pointer' : 'not-allowed' }}
+            onMouseEnter={(e) => { if (summaries.length >= 2) e.currentTarget.style.background = 'var(--color-primary-dark, #3730A3)' }}
+            onMouseLeave={(e) => { if (summaries.length >= 2) e.currentTarget.style.background = 'var(--color-primary, #4338CA)' }}
           >
             <GitCompare size={15} />
             Compare All
@@ -391,9 +394,9 @@ export default function SavedSchedules() {
           return (
             <div key={s.id} className="rounded-2xl overflow-hidden"
               style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
-              <div className="flex gap-6 p-5">
+              <div className="flex flex-col xl:flex-row gap-6 p-5">
                 {/* Mini calendar preview */}
-                <div style={{ width: 340, flexShrink: 0 }}>
+                <div style={{ width: '100%', maxWidth: 340, flexShrink: 0 }}>
                   {courses.length > 0 ? <MiniCalendar courses={courses} /> : (
                     <div className="flex items-center justify-center rounded-xl" style={{ height: 160, background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
                       <div style={{ fontSize: 12, color: '#94A3B8' }}>Loading preview...</div>
@@ -403,10 +406,10 @@ export default function SavedSchedules() {
 
                 {/* Info + actions */}
                 <div className="flex-1 flex flex-col">
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
                       <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0F172A' }}>{s.name ?? `Schedule #${s.id}`}</h3>
-                      <div className="flex items-center gap-3 mt-1">
+                      <div className="flex flex-wrap items-center gap-3 mt-1">
                         <span className="flex items-center gap-1" style={{ fontSize: 12, color: '#64748B' }}>
                           <BookOpen size={12} />{s.totalCredits} credits
                         </span>
@@ -442,13 +445,13 @@ export default function SavedSchedules() {
                   </div>
 
                   {/* Action buttons */}
-                  <div className="flex gap-2 mt-auto">
+                  <div className="flex flex-wrap gap-2 mt-auto">
                     <button
                       onClick={() => { const d = details[s.id]; if (d) setViewDetail(d) }}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all"
-                      style={{ fontSize: 12, background: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#E0E7FF' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = '#EEF2FF' }}
+                      style={{ fontSize: 12, background: 'var(--color-primary-light, #EEF2FF)', color: 'var(--color-primary, #4338CA)', border: '1px solid var(--color-primary-border, #C7D2FE)' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-primary-border, #E0E7FF)' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-primary-light, #EEF2FF)' }}
                     >
                       <Eye size={13} />
                       View Schedule

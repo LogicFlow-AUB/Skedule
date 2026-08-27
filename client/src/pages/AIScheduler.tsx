@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import {
-  Plus, X, Trash2, Sparkles, RotateCcw, Zap, GitCompare,
+  Plus, X, Trash2, Sparkles, RotateCcw, Zap, Pencil,
   Eye, ArrowLeftRight, Send, Bot, User, AlertCircle,
   BookOpen, Clock, MapPin, Star, TrendingUp, Bookmark,
   GripVertical, Search, CalendarDays, CheckCircle,
@@ -39,6 +39,19 @@ function formatHour(h: number) {
   if (h === 12) return '12 PM'
   if (h > 12) return `${h - 12} PM`
   return `${h} AM`
+}
+
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([\da-f]+);/gi, (_, code: string) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&apos;|&quot;|&lt;|&gt;|&amp;/g, (entity) => ({
+      '&apos;': "'",
+      '&quot;': '"',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&amp;': '&',
+    })[entity] ?? entity)
 }
 
 function courseTop(c: Course) {
@@ -566,14 +579,9 @@ function CalendarColumn({
           >
             <div className="p-1.5 h-full flex flex-col">
               <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.9)', lineHeight: 1.2 }}>{course.code}</div>
-              {height > 40 && (
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.3, marginTop: 1 }}>
-                  {course.name}
-                </div>
-              )}
-              {height > 55 && (
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginTop: 'auto' }}>
-                  {course.room}
+              {height > 40 && course.room && (
+                <div className="overflow-hidden text-ellipsis" style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.3, marginTop: 2 }}>
+                  {decodeHtmlEntities(course.room)}
                 </div>
               )}
             </div>
@@ -649,170 +657,175 @@ function WeeklyCalendar({ courses, onCourseClick, onRemove, onChange }: { course
 }
 
 // ----- Preferences Panel -----
-function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
-  const [requiredCourses, setRequiredCourses] = useState(['EECE 330', 'MATH 201', 'PHYS 211', 'EECE 351'])
-  const [newCourse, setNewCourse] = useState('')
-  const [priority, setPriority] = useState('Balanced workload')
-  const [startTime, setStartTime] = useState('9:00 AM')
-  const [endTime, setEndTime] = useState('6:00 PM')
-  const [maxClasses, setMaxClasses] = useState('3')
-  const [freeDays, setFreeDays] = useState<string[]>(['Friday'])
-  const [minBreak, setMinBreak] = useState('30 min')
+type ReqCourse = { code: string; title: string; credits: string; professorRatings: Record<string, number | null> }
+interface PriorityWeights { minimizeDays: number; compactDays: number; professorPreference: number }
+interface PreferencesPayload {
+  semester: string
+  requiredCourses: ReqCourse[]
+  requiredAttributes: string[]
+  electiveCourses: ReqCourse[]
+  constraints: { earliestStart: string; latestEnd: string; allowedStudyDays: string[]; maxClassesPerDay: string; minimumBreak: string; avoidBuildings: string[] }
+  weights: PriorityWeights
+}
 
-  const toggleDay = (d: string) => {
-    setFreeDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])
-  }
+const DEFAULT_WEIGHTS: PriorityWeights = { minimizeDays: 34, compactDays: 33, professorPreference: 33 }
+const ATTRIBUTES = ['Writing', 'Humanities', 'Natural Science', 'Social Science', 'Quantitative Thought', 'Quantitative Reasoning', 'Engineering', 'Arts']
+const BUILDINGS = ['Bechtel', 'Bliss', 'College Hall', 'Hostler', 'Nicely', 'OSB']
+const panelCardStyle = { background: '#F8FAFC', border: '1px solid #F1F5F9' }
+const fieldStyle = { fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }
+
+function SearchableCourseSelect({ exclude, onSelect, placeholder = 'Search course code or title...' }: { exclude: string[]; onSelect: (course: CourseSummary) => void; placeholder?: string }) {
+  const [query, setQuery] = useState('')
+  const [options, setOptions] = useState<CourseSummary[]>([])
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setLoading(true)
+    const timer = setTimeout(() => {
+      api.courses.list({ search: query.trim() || undefined, limit: 20 })
+        .then((res) => { if (!cancelled) setOptions(res.data.filter((c) => !exclude.includes(c.code))) })
+        .catch(() => { if (!cancelled) setOptions([]) })
+        .finally(() => { if (!cancelled) setLoading(false) })
+    }, 200)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [query, open, exclude.join('|')])
 
   return (
-    <div
-      className="h-full overflow-y-auto flex flex-col gap-3 p-4"
-      style={{ width: 264, background: '#FFFFFF', borderRight: '1px solid #F1F5F9' }}
-    >
-      <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A' }}>Student Preferences</div>
-
-      {/* Required courses */}
-      <div className="rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Required Courses
-        </div>
-        <div className="flex flex-col gap-1.5 mb-2">
-          {requiredCourses.map((c) => (
-            <div key={c} className="flex items-center justify-between rounded-lg px-2.5 py-1.5"
-              style={{ background: '#EEF2FF', border: '1px solid #C7D2FE' }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#4338CA' }}>{c}</span>
-              <button onClick={() => setRequiredCourses((p) => p.filter((x) => x !== c))}
-                style={{ color: '#818CF8' }}>
-                <X size={12} />
-              </button>
-            </div>
+    <div className="relative">
+      <div className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={fieldStyle}>
+        <Search size={12} color="#94A3B8" />
+        <input value={query} onFocus={() => setOpen(true)} onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+          placeholder={placeholder} className="flex-1 min-w-0 outline-none bg-transparent" style={{ fontSize: 11 }} />
+      </div>
+      {open && (
+        <div className="absolute left-0 right-0 top-full mt-1 rounded-lg overflow-y-auto shadow-xl z-30" style={{ maxHeight: 190, background: '#FFFFFF', border: '1px solid #E2E8F0' }}>
+          {loading && <div className="p-3 text-center" style={{ fontSize: 10, color: '#94A3B8' }}>Searching real courses...</div>}
+          {!loading && options.length === 0 && <div className="p-3 text-center" style={{ fontSize: 10, color: '#94A3B8' }}>No matching courses</div>}
+          {!loading && options.map((course) => (
+            <button key={course.id} className="w-full text-left px-3 py-2 hover:bg-slate-50" onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { onSelect(course); setQuery(''); setOpen(false) }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-primary, #4338CA)' }}>{course.code} <span style={{ color: '#94A3B8', fontWeight: 500 }}>· {course.credits} cr</span></div>
+              <div className="truncate" style={{ fontSize: 10, color: '#64748B' }}>{course.title}</div>
+            </button>
           ))}
         </div>
-        <div className="flex gap-1.5">
-          <input
-            value={newCourse}
-            onChange={(e) => setNewCourse(e.target.value)}
-            placeholder="Add course..."
-            className="flex-1 rounded-lg px-2.5 py-1.5 outline-none"
-            style={{ fontSize: 12, border: '1px solid #E2E8F0', background: '#FFFFFF' }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && newCourse.trim()) {
-                setRequiredCourses((p) => [...p, newCourse.trim()])
-                setNewCourse('')
-              }
-            }}
-          />
-          <button
-            onClick={() => { if (newCourse.trim()) { setRequiredCourses((p) => [...p, newCourse.trim()]); setNewCourse('') } }}
-            className="rounded-lg px-2 py-1.5"
-            style={{ background: '#4338CA', color: 'white' }}
-          >
-            <Plus size={12} />
-          </button>
-        </div>
-      </div>
-
-      {/* Time prefs */}
-      <div className="rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Class Times
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { label: 'Earliest Start', val: startTime, set: setStartTime, options: ['7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM'] },
-            { label: 'Latest End', val: endTime, set: setEndTime, options: ['3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM'] },
-          ].map((f) => (
-            <div key={f.label}>
-              <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>{f.label}</div>
-              <select
-                value={f.val}
-                onChange={(e) => f.set(e.target.value)}
-                className="w-full rounded-lg px-2 py-1.5 outline-none"
-                style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}
-              >
-                {f.options.map((o) => <option key={o}>{o}</option>)}
-              </select>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Schedule options */}
-      <div className="rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Preferences
-        </div>
-        <div className="flex flex-col gap-2">
-          <div>
-            <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>Max Classes/Day</div>
-            <select value={maxClasses} onChange={(e) => setMaxClasses(e.target.value)}
-              className="w-full rounded-lg px-2 py-1.5 outline-none"
-              style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}>
-              {['1', '2', '3', '4', '5'].map((o) => <option key={o}>{o}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>Min Break Between Classes</div>
-            <select value={minBreak} onChange={(e) => setMinBreak(e.target.value)}
-              className="w-full rounded-lg px-2 py-1.5 outline-none"
-              style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}>
-              {['No minimum', '15 min', '30 min', '45 min', '1 hour'].map((o) => <option key={o}>{o}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>Schedule Priority</div>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)}
-              className="w-full rounded-lg px-2 py-1.5 outline-none"
-              style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}>
-              {['Shortest days', 'Longest weekends', 'Balanced workload', 'Highest rated professors', 'Lowest workload', 'No morning classes'].map((o) => <option key={o}>{o}</option>)}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Free days */}
-      <div className="rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Preferred Free Days
-        </div>
-        <div className="flex gap-1.5 flex-wrap">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((d) => {
-            const sel = freeDays.includes(d)
-            return (
-              <button
-                key={d}
-                onClick={() => toggleDay(d)}
-                className="rounded-full px-2.5 py-1 text-xs font-semibold transition-all"
-                style={{
-                  background: sel ? '#4338CA' : '#F1F5F9',
-                  color: sel ? 'white' : '#64748B',
-                  border: sel ? '1px solid #4338CA' : '1px solid #E2E8F0',
-                }}
-              >
-                {d}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Buttons */}
-      <button
-        onClick={onGenerate}
-        className="w-full py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all"
-        style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)', color: 'white', fontSize: 13 }}
-      >
-        <Sparkles size={14} />
-        Generate Schedule
-      </button>
-      <button
-        className="w-full py-2 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all"
-        style={{ background: '#F1F5F9', color: '#64748B', fontSize: 13 }}
-      >
-        <RotateCcw size={13} />
-        Reset Preferences
-      </button>
+      )}
     </div>
   )
+}
+
+function CoursePreferenceCard({ course, onChange, onRemove }: { course: ReqCourse; onChange: (course: ReqCourse) => void; onRemove: () => void }) {
+  const [professors, setProfessors] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true); setFailed(false)
+    api.courses.sections(course.code)
+      .then((res) => {
+        if (cancelled) return
+        const names = [...new Set(res.data.map((section) => displayName(section.professors?.first_name, section.professors?.last_name)).filter(Boolean))]
+        setProfessors(names)
+      })
+      .catch(() => { if (!cancelled) { setProfessors([]); setFailed(true) } })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [course.code])
+
+  const setRating = (professor: string, rating: number | null) => onChange({ ...course, professorRatings: { ...course.professorRatings, [professor]: rating } })
+  return (
+    <div className="rounded-xl p-2.5" style={{ background: 'var(--color-primary-light, #EEF2FF)', border: '1px solid var(--color-primary-border, #C7D2FE)' }}>
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0"><div style={{ fontSize: 12, fontWeight: 800, color: 'var(--color-primary, #4338CA)' }}>{course.code}</div><div className="truncate" style={{ fontSize: 10, color: '#64748B' }}>{course.title}</div></div>
+        <span style={{ fontSize: 10, color: '#64748B' }}>{course.credits} cr</span>
+        <button onClick={onRemove} title={`Remove ${course.code}`} style={{ color: '#818CF8' }}><X size={13} /></button>
+      </div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B', marginTop: 9, marginBottom: 4 }}>Professor preferences</div>
+      {loading && <div style={{ fontSize: 10, color: '#94A3B8' }}>Loading professors...</div>}
+      {!loading && professors.length === 0 && <div style={{ fontSize: 10, color: failed ? '#B45309' : '#94A3B8' }}>Professor data will appear when available.</div>}
+      {!loading && professors.map((professor) => {
+        const rating = course.professorRatings[professor] ?? null
+        return <div key={professor} className="flex items-center gap-1 py-0.5">
+          <span className="flex-1 truncate" style={{ fontSize: 10, color: '#374151' }}>{professor}</span>
+          {[1, 2, 3, 4, 5].map((value) => <button key={value} title={`${value} star${value === 1 ? '' : 's'}`} onClick={() => setRating(professor, value)}><Star size={12} fill={rating !== null && value <= rating ? '#F59E0B' : 'transparent'} color={rating !== null && value <= rating ? '#F59E0B' : '#CBD5E1'} /></button>)}
+          {rating !== null && <button onClick={() => setRating(professor, null)} style={{ fontSize: 9, color: '#64748B', marginLeft: 2 }}>Clear</button>}
+        </div>
+      })}
+    </div>
+  )
+}
+
+function PreferencesPanel({ onGenerate, onChanged, onCreditsChange }: { onGenerate: (payload: PreferencesPayload) => void; onChanged: () => void; onCreditsChange: (credits: number) => void }) {
+  const [semester, setSemester] = useState('Fall 2025')
+  const [requiredCourses, setRequiredCourses] = useState<ReqCourse[]>([])
+  const [electiveCourses, setElectiveCourses] = useState<ReqCourse[]>([])
+  const [requiredAttributes, setRequiredAttributes] = useState<string[]>([])
+  const [earliestStart, setEarliestStart] = useState('9:00 AM')
+  const [latestEnd, setLatestEnd] = useState('6:00 PM')
+  const [allowedStudyDays, setAllowedStudyDays] = useState(['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
+  const [maxClassesPerDay, setMaxClassesPerDay] = useState('3')
+  const [minimumBreak, setMinimumBreak] = useState('30 min')
+  const [avoidBuildings, setAvoidBuildings] = useState<string[]>([])
+  const [weights, setWeights] = useState<PriorityWeights>(DEFAULT_WEIGHTS)
+
+  useEffect(() => {
+    onCreditsChange([...requiredCourses, ...electiveCourses].reduce((total, course) => total + (Number.parseFloat(course.credits) || 0), 0))
+  }, [requiredCourses, electiveCourses, onCreditsChange])
+
+  const notify = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, value: React.SetStateAction<T>) => { setter(value); onChanged() }
+  const addCourse = (course: CourseSummary, elective: boolean) => {
+    const item: ReqCourse = { code: course.code, title: course.title, credits: course.credits, professorRatings: {} }
+    notify(elective ? setElectiveCourses : setRequiredCourses, (prev) => [...prev, item])
+  }
+  const updateWeight = (key: keyof PriorityWeights, value: number) => {
+    const others = (Object.keys(weights) as (keyof PriorityWeights)[]).filter((item) => item !== key)
+    const remaining = 100 - value
+    const oldRemaining = weights[others[0]] + weights[others[1]]
+    const first = oldRemaining === 0 ? Math.floor(remaining / 2) : Math.round(remaining * weights[others[0]] / oldRemaining)
+    setWeights({ ...weights, [key]: value, [others[0]]: first, [others[1]]: remaining - first })
+    onChanged()
+  }
+  const reset = () => {
+    setSemester('Fall 2025'); setRequiredCourses([]); setElectiveCourses([]); setRequiredAttributes([])
+    setEarliestStart('9:00 AM'); setLatestEnd('6:00 PM'); setAllowedStudyDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri'])
+    setMaxClassesPerDay('3'); setMinimumBreak('30 min'); setAvoidBuildings([]); setWeights(DEFAULT_WEIGHTS); onChanged()
+  }
+  const generate = () => onGenerate({ semester, requiredCourses, requiredAttributes, electiveCourses, constraints: { earliestStart, latestEnd, allowedStudyDays, maxClassesPerDay, minimumBreak, avoidBuildings }, weights })
+  const sectionTitle = (number: number, title: string) => <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{number} — {title}</div>
+  const toggle = (value: string, values: string[], setter: React.Dispatch<React.SetStateAction<string[]>>) => notify(setter, values.includes(value) ? values.filter((item) => item !== value) : [...values, value])
+
+  return <div className="h-full overflow-y-auto flex flex-col gap-3 p-4 shrink-0" style={{ width: 300, background: '#FFFFFF', borderRight: '1px solid #F1F5F9' }}>
+    <div style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>Schedule Preferences</div>
+    <div className="rounded-xl p-3" style={panelCardStyle}>{sectionTitle(1, 'Semester')}<select value={semester} onChange={(e) => notify(setSemester, e.target.value)} className="w-full rounded-lg px-2.5 py-2 outline-none" style={fieldStyle}>{['Fall 2025', 'Spring 2026', 'Fall 2026', 'Spring 2027'].map((term) => <option key={term}>{term}</option>)}</select></div>
+    <div className="rounded-xl p-3 flex flex-col gap-2" style={panelCardStyle}>{sectionTitle(2, 'Required Courses')}
+      {requiredCourses.map((course, index) => <CoursePreferenceCard key={course.code} course={course} onChange={(next) => notify(setRequiredCourses, requiredCourses.map((item, i) => i === index ? next : item))} onRemove={() => notify(setRequiredCourses, requiredCourses.filter((_, i) => i !== index))} />)}
+      <SearchableCourseSelect exclude={[...requiredCourses, ...electiveCourses].map((c) => c.code)} onSelect={(course) => addCourse(course, false)} />
+    </div>
+    <div className="rounded-xl p-3 flex flex-col gap-2" style={panelCardStyle}>{sectionTitle(3, 'Electives')}
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B' }}>Required attributes</div>
+      <div className="flex flex-wrap gap-1">{ATTRIBUTES.map((attribute) => { const selected = requiredAttributes.includes(attribute); return <button key={attribute} onClick={() => toggle(attribute, requiredAttributes, setRequiredAttributes)} className="rounded-full px-2 py-1" style={{ fontSize: 9, fontWeight: 700, background: selected ? 'var(--color-primary, #4338CA)' : '#FFFFFF', color: selected ? '#FFFFFF' : '#64748B', border: `1px solid ${selected ? 'var(--color-primary, #4338CA)' : '#E2E8F0'}` }}>{attribute}</button> })}</div>
+      {electiveCourses.map((course, index) => <CoursePreferenceCard key={course.code} course={course} onChange={(next) => notify(setElectiveCourses, electiveCourses.map((item, i) => i === index ? next : item))} onRemove={() => notify(setElectiveCourses, electiveCourses.filter((_, i) => i !== index))} />)}
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B', marginTop: 3 }}>Add Specific Elective</div><SearchableCourseSelect exclude={[...requiredCourses, ...electiveCourses].map((c) => c.code)} onSelect={(course) => addCourse(course, true)} />
+    </div>
+    <div className="rounded-xl p-3" style={panelCardStyle}>{sectionTitle(4, 'Schedule Constraints')}
+      <div className="grid grid-cols-2 gap-2">{[
+        ['Earliest start', earliestStart, setEarliestStart, ['7:00 AM','8:00 AM','9:00 AM','10:00 AM','11:00 AM']], ['Latest end', latestEnd, setLatestEnd, ['3:00 PM','4:00 PM','5:00 PM','6:00 PM','7:00 PM','8:00 PM']],
+        ['Max classes/day', maxClassesPerDay, setMaxClassesPerDay, ['1','2','3','4','5']], ['Min break', minimumBreak, setMinimumBreak, ['No minimum','15 min','30 min','45 min','1 hour']],
+      ].map(([label, value, setter, options]) => <label key={label as string}><span style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8' }}>{label as string}</span><select value={value as string} onChange={(e) => notify(setter as React.Dispatch<React.SetStateAction<string>>, e.target.value)} className="w-full rounded-lg px-2 py-1.5 outline-none" style={fieldStyle}>{(options as string[]).map((option) => <option key={option}>{option}</option>)}</select></label>)}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B', marginTop: 9, marginBottom: 4 }}>Allowed study days</div><div className="flex flex-wrap gap-1">{DAYS.map((day) => { const selected = allowedStudyDays.includes(day); return <button key={day} onClick={() => toggle(day, allowedStudyDays, setAllowedStudyDays)} className="rounded-full px-2.5 py-1" style={{ fontSize: 10, fontWeight: 700, background: selected ? 'var(--color-primary, #4338CA)' : '#FFFFFF', color: selected ? '#FFFFFF' : '#64748B', border: `1px solid ${selected ? 'var(--color-primary, #4338CA)' : '#E2E8F0'}` }}>{day}</button> })}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: '#64748B', marginTop: 9, marginBottom: 4 }}>Buildings to avoid</div><div className="flex flex-wrap gap-1">{BUILDINGS.map((building) => { const selected = avoidBuildings.includes(building); return <button key={building} onClick={() => toggle(building, avoidBuildings, setAvoidBuildings)} className="rounded-full px-2 py-1" style={{ fontSize: 9, fontWeight: 700, background: selected ? '#FEE2E2' : '#FFFFFF', color: selected ? '#B91C1C' : '#64748B', border: `1px solid ${selected ? '#FCA5A5' : '#E2E8F0'}` }}>{building}</button> })}</div>
+    </div>
+    <div className="rounded-xl p-3" style={panelCardStyle}>{sectionTitle(5, 'Your Priorities')}
+      {([['minimizeDays','Minimize days on campus'],['compactDays','Shorter, compact days'],['professorPreference','Professor preference']] as [keyof PriorityWeights,string][]).map(([key,label]) => <div key={key} className="mb-2"><div className="flex justify-between" style={{ fontSize: 10, fontWeight: 700, color: '#64748B' }}><span>{label}</span><span>{weights[key]}%</span></div><input type="range" min="0" max="100" value={weights[key]} onChange={(e) => updateWeight(key, Number(e.target.value))} className="w-full" style={{ accentColor: 'var(--color-primary, #4338CA)' }} /></div>)}
+      <div className="grid grid-cols-3 gap-1">{Object.values(weights).map((value, index) => <div key={index} className="rounded-lg py-1.5 text-center" style={{ background: 'var(--color-primary-light, #EEF2FF)', fontSize: 10, fontWeight: 800, color: 'var(--color-primary, #4338CA)' }}>{value}%</div>)}</div>
+    </div>
+    <button onClick={generate} className="w-full py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2" style={{ background: 'var(--color-primary-grad, linear-gradient(135deg, #4338CA, #6366F1))', color: '#FFFFFF', fontSize: 13 }}><Sparkles size={14} />Generate Schedule</button>
+    <button onClick={reset} className="w-full py-2 rounded-xl font-semibold flex items-center justify-center gap-2" style={{ background: '#F1F5F9', color: '#64748B', fontSize: 13 }}><RotateCcw size={13} />Reset Preferences</button>
+  </div>
 }
 
 // ----- AI Assistant Panel -----
@@ -835,6 +848,8 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [aiName, setAiName] = useState('AI Assistant')
+  const [editingName, setEditingName] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -877,13 +892,16 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
     >
       {/* Header */}
       <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid #F1F5F9' }}>
-        <div className="rounded-lg p-1.5" style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}>
+        <div className="rounded-lg p-1.5" style={{ background: 'var(--color-primary-grad, linear-gradient(135deg, #4338CA, #6366F1))' }}>
           <Sparkles size={13} color="white" />
         </div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>AI Assistant</div>
-          <div style={{ fontSize: 10, color: '#10B981', fontWeight: 600 }}>● Online</div>
-        </div>
+        {editingName ? (
+          <input autoFocus value={aiName} onChange={(e) => setAiName(e.target.value)}
+            onBlur={() => { setAiName((name) => name.trim() || 'AI Assistant'); setEditingName(false) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+            className="flex-1 rounded-md px-2 py-1 outline-none" style={{ fontSize: 13, fontWeight: 700, border: '1px solid var(--color-primary-border, #C7D2FE)' }} />
+        ) : <div className="flex-1" style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{aiName}</div>}
+        <button onClick={() => setEditingName(true)} title="Edit assistant name" style={{ color: '#94A3B8' }}><Pencil size={12} /></button>
       </div>
 
       {/* Messages */}
@@ -931,6 +949,17 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
         <div ref={bottomRef} />
       </div>
 
+      <div className="px-3 pb-2 flex flex-col gap-2">
+        <div className="rounded-xl p-3" style={{ background: '#EFF6FF', border: '1px solid #BFDBFE' }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#1D4ED8', marginBottom: 3 }}>Reasoning</div>
+          <div style={{ fontSize: 10, lineHeight: 1.5, color: '#475569' }}>Schedule reasoning will appear here when generation results are available.</div>
+        </div>
+        <div className="rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#334155', marginBottom: 3 }}>Trade-offs</div>
+          <div style={{ fontSize: 10, lineHeight: 1.5, color: '#64748B' }}>No generated schedule is available to evaluate yet.</div>
+        </div>
+      </div>
+
       {/* Quick prompts */}
       <div className="px-3 mb-2">
         <div className="flex flex-wrap gap-1">
@@ -954,7 +983,6 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
         {[
           { icon: <RotateCcw size={11} />, label: 'Regenerate', fn: onGenerate },
           { icon: <Zap size={11} />, label: 'Optimize', fn: onGenerate },
-          { icon: <GitCompare size={11} />, label: 'Compare', fn: () => {} },
         ].map((b) => (
           <button
             key={b.label}
@@ -1192,7 +1220,7 @@ function ManualBuilder({
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search courses..."
+              placeholder="Search by name, CRN, professor, attribute"
               className="flex-1 outline-none bg-transparent"
               style={{ fontSize: 12, color: '#374151' }}
             />
@@ -1248,15 +1276,6 @@ function ManualBuilder({
               {notice}
             </div>
           )}
-          {/* TODO(frontend): automatic conflict fixing not wired — no backend endpoint for unsaved builders. */}
-          <button
-            onClick={() => setNotice('Automatic conflict fixing isn\'t wired yet. Review your calendar or adjust sections manually.')}
-            className="w-full py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2"
-            style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)', color: 'white', fontSize: 13 }}
-          >
-            <Sparkles size={14} />
-            AI Fix Conflicts
-          </button>
         </div>
       </div>
 
@@ -1311,7 +1330,10 @@ function ManualBuilder({
 
 // ----- Main AIScheduler -----
 function Toast({ message, onDone }: { message: string; onDone: () => void }) {
-  setTimeout(onDone, 3000)
+  useEffect(() => {
+    const timer = setTimeout(onDone, 3000)
+    return () => clearTimeout(timer)
+  }, [message, onDone])
   return (
     <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-3 shadow-xl"
       style={{ background: '#1E293B', color: 'white', fontSize: 13, fontWeight: 600, animation: 'none' }}>
@@ -1321,12 +1343,14 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   )
 }
 
-export default function AIScheduler({ activeMode }: { activeMode: Page; setPage: (p: Page) => void }) {
+export default function AIScheduler({ activeMode, setPage }: { activeMode: Page; setPage: (p: Page) => void }) {
   const [mode, setMode] = useState<'ai' | 'manual'>(activeMode === 'manual-builder' ? 'manual' : 'ai')
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [generating, setGenerating] = useState(false)
   const [manualCourses, setManualCourses] = useState<Course[]>([])
   const [toast, setToast] = useState<string | null>(null)
+  const [activeSchedule, setActiveSchedule] = useState(0)
+  const [aiCredits, setAiCredits] = useState(0)
 
   useEffect(() => {
     setMode(activeMode === 'manual-builder' ? 'manual' : 'ai')
@@ -1335,18 +1359,20 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
   }, [activeMode])
 
   // TODO(frontend): no schedule-generation endpoint yet (Phase 9 unchecked) — AI preview stays a UI placeholder.
-  const handleGenerate = () => {
+  const handleGenerate = (payload?: PreferencesPayload) => {
+    // TODO(frontend): send this payload to schedule generation once a compatible endpoint exists.
+    if (payload) console.info('Schedule preferences', payload)
     setGenerating(true)
     setTimeout(() => {
       setGenerating(false)
-      setToast('AI schedule generation is not connected yet. Use Manual Builder to add courses.')
+      setToast('Preferences collected. Schedule generation is not connected yet.')
     }, 1500)
   }
 
   const activeCourses: Course[] = []
   const currentCredits = mode === 'manual'
     ? manualCourses.reduce((acc, c) => acc + c.credits, 0)
-    : activeCourses.reduce((acc, c) => acc + c.credits, 0)
+    : aiCredits
 
   async function handleSave() {
     if (mode === 'ai') {
@@ -1378,13 +1404,13 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
           {[{ id: 'ai', label: 'AI Builder', icon: <Sparkles size={12} /> }, { id: 'manual', label: 'Manual Builder', icon: <CalendarDays size={12} /> }].map((m) => (
             <button
               key={m.id}
-              onClick={() => setMode(m.id as 'ai' | 'manual')}
+              onClick={() => setPage(m.id === 'ai' ? 'ai-scheduler' : 'manual-builder')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all"
               style={{
                 fontSize: 12,
                 fontWeight: 600,
                 background: mode === m.id ? '#FFFFFF' : 'transparent',
-                color: mode === m.id ? '#4338CA' : '#64748B',
+                color: mode === m.id ? 'var(--color-primary, #4338CA)' : '#64748B',
                 boxShadow: mode === m.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
               }}
             >
@@ -1393,19 +1419,21 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
           ))}
         </div>
 
-        {/* AI status (AI mode only) */}
+        {/* Result tabs are frontend-ready; no schedules are fabricated. */}
         {mode === 'ai' && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg ml-1" style={{ fontSize: 12, fontWeight: 600, color: '#64748B', background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
-            AI generation not connected yet — use Manual Builder
+          <div className="flex items-center gap-1 rounded-lg p-0.5 ml-1" style={{ background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
+            {[0, 1, 2].map((index) => <button key={index} onClick={() => setActiveSchedule(index)} className="rounded-md px-3 py-1.5" style={{ fontSize: 11, fontWeight: 700, background: activeSchedule === index ? '#FFFFFF' : 'transparent', color: activeSchedule === index ? 'var(--color-primary, #4338CA)' : '#64748B', boxShadow: activeSchedule === index ? '0 1px 3px rgba(0,0,0,0.08)' : 'none' }}>Schedule {index + 1}</button>)}
           </div>
         )}
 
         <div className="ml-auto flex items-center gap-2">
-          {/* Credits count */}
-          <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-            <TrendingUp size={12} color="#16A34A" />
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#15803D' }}>{currentCredits} Credits</span>
-          </div>
+          {/* Credits count (AI Builder only) */}
+          {mode === 'ai' && (
+            <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+              <TrendingUp size={12} color="#16A34A" />
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#15803D' }}>{currentCredits} Credits</span>
+            </div>
+          )}
           <button
             onClick={() => void handleSave()}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
@@ -1431,7 +1459,7 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
               </div>
             </div>
           )}
-          <PreferencesPanel onGenerate={handleGenerate} />
+          <PreferencesPanel onGenerate={handleGenerate} onChanged={() => setToast('Preferences updated')} onCreditsChange={setAiCredits} />
           <div className="flex-1 overflow-hidden">
             <WeeklyCalendar courses={activeCourses} onCourseClick={setSelectedCourse} />
           </div>

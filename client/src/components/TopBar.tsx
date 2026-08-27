@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Bell, Sparkles, ChevronRight, LogOut } from 'lucide-react'
+import { Bell, ChevronRight, LogOut } from 'lucide-react'
 import type { Page } from '../App'
 import { useAuth } from '../lib/auth'
 import { api, type Notification } from '../lib/api'
@@ -19,7 +19,6 @@ const PAGE_TITLES: Record<Page, string> = {
 
 export default function TopBar({ activePage }: { activePage: Page }) {
   const { user, logout } = useAuth()
-  const [search, setSearch] = useState('')
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -120,47 +119,7 @@ export default function TopBar({ activePage }: { activePage: Page }) {
         <span style={{ fontSize: 13, color: '#1E293B', fontWeight: 600 }}>{PAGE_TITLES[activePage]}</span>
       </div>
 
-      {/* Search */}
-      <div className="flex-1 max-w-md relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#94A3B8' }} />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search courses, professors, students..."
-          className="w-full pl-9 pr-4 py-1.5 rounded-lg outline-none transition-all"
-          style={{
-            fontSize: 13,
-            background: '#F8FAFC',
-            border: '1px solid #E2E8F0',
-            color: '#1E293B',
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.border = '1px solid #818CF8'
-            e.currentTarget.style.background = '#FFFFFF'
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.border = '1px solid #E2E8F0'
-            e.currentTarget.style.background = '#F8FAFC'
-          }}
-        />
-        <kbd
-          className="absolute right-3 top-1/2 -translate-y-1/2 rounded"
-          style={{ fontSize: 10, color: '#94A3B8', background: '#F1F5F9', padding: '1px 5px', fontFamily: 'inherit' }}
-        >
-          ⌘K
-        </kbd>
-      </div>
-
       <div className="flex items-center gap-1 ml-auto">
-        {/* AI shortcut */}
-        <button
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors"
-          style={{ fontSize: 12, fontWeight: 600, color: '#FFFFFF', background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}
-        >
-          <Sparkles size={12} />
-          Ask AI
-        </button>
-
         {/* Notifications */}
         <div className="relative">
           <button
