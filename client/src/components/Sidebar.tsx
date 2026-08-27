@@ -6,6 +6,7 @@ import {
   Star,
   UserCheck,
   Users,
+  Clock3,
   User,
   GraduationCap,
 } from 'lucide-react'
@@ -20,6 +21,7 @@ const NAV_ITEMS: { id: Page; label: string; icon: React.ReactNode; section: stri
   { id: 'course-reviews', label: 'Course Reviews', icon: <Star size={16} />, section: 'review' },
   { id: 'professor-reviews', label: 'Professor Reviews', icon: <UserCheck size={16} />, section: 'review' },
   { id: 'community', label: 'Community', icon: <Users size={16} />, section: 'social' },
+  { id: 'common-free-time', label: 'Common Free Time', icon: <Clock3 size={16} />, section: 'social' },
   { id: 'profile', label: 'Profile & Settings', icon: <User size={16} />, section: 'account' },
 ]
 

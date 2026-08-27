@@ -12,6 +12,7 @@ const PAGE_TITLES: Record<Page, string> = {
   'course-reviews': 'Course Reviews',
   'professor-reviews': 'Professor Reviews',
   community: 'Community',
+  'common-free-time': 'Common Free Time',
   friends: 'Community',
   profile: 'Profile & Settings',
   settings: 'Profile & Settings',

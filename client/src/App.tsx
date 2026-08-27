@@ -7,6 +7,7 @@ import AIScheduler from './pages/AIScheduler'
 import SavedSchedules from './pages/SavedSchedules'
 import Reviews from './pages/Reviews'
 import Community from './pages/Community'
+import CommonFreeTime from './pages/CommonFreeTime'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
 import { AuthProvider, useAuth } from './lib/auth'
@@ -19,6 +20,7 @@ export type Page =
   | 'course-reviews'
   | 'professor-reviews'
   | 'community'
+  | 'common-free-time'
   | 'friends'       // kept for backwards-compat, resolves to community
   | 'profile'
   | 'settings'      // merged into profile
@@ -88,6 +90,8 @@ function AppGate() {
       case 'community':
       case 'friends':
         return <Community />
+      case 'common-free-time':
+        return <CommonFreeTime />
       case 'profile':
       case 'settings':
         return <Profile />
