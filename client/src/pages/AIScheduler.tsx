@@ -836,6 +836,11 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [sessionId] = useState(() =>
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `session-${Date.now()}`,
+  )
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -848,11 +853,7 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
     setInput('')
     setLoading(true)
     try {
-      const history: { role: 'user' | 'assistant'; content: string }[] = messages.map((m) => ({
-        role: m.role === 'ai' ? ('assistant' as const) : ('user' as const),
-        content: m.text,
-      }))
-      const res = await api.assistant.chat(input, history)
+      const res = await api.assistant.chat(input, sessionId)
       setMessages((p) => [...p, {
         role: 'ai',
         text: res.data.response,

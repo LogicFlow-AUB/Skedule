@@ -32,20 +32,12 @@ const config = {
     syncIntervalMs: Number(process.env.AUB_SYNC_INTERVAL_MS ?? 600_000),
     syncOnStartup: (process.env.AUB_SYNC_ON_STARTUP ?? 'true') === 'true',
   },
-  qdrant: {
-    url: readOptionalValue(process.env.QDRANT_URL) ?? 'http://localhost:6333',
-  },
-  rag: {
-    embeddingModel: readOptionalValue(process.env.RAG_EMBEDDING_MODEL) ?? 'Xenova/all-MiniLM-L6-v2',
-    collectionName: readOptionalValue(process.env.RAG_COLLECTION_NAME) ?? 'knowledge_base',
-    vectorSize: Number(process.env.RAG_VECTOR_SIZE ?? 384),
-  },
-  hf: {
-    apiToken: readOptionalValue(process.env.HF_API_TOKEN),
-    model: readOptionalValue(process.env.HF_MODEL) ?? 'openai-community/gpt2',
-  },
   gemini: {
     apiKey: readOptionalValue(process.env.GEMINI_API_KEY),
+    model: readOptionalValue(process.env.GEMINI_MODEL) ?? 'gemini-3.6-flash',
+  },
+  scheduleOptimizer: {
+    url: readOptionalValue(process.env.SCHEDULE_OPTIMIZER_URL),
   },
 } as const;
 

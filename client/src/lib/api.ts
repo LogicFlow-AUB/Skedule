@@ -640,10 +640,10 @@ export const api = {
   },
 
   assistant: {
-    chat: (message: string, history?: { role: 'user' | 'assistant'; content: string }[]) =>
+    chat: (message: string, sessionId?: string) =>
       request<{ data: { response: string } }>('/assistant/chat', {
         method: 'POST',
-        body: { message, history },
+        body: { message, ...(sessionId ? { sessionId } : {}) },
       }),
   },
 

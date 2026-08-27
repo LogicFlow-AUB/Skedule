@@ -355,7 +355,8 @@ async function syncAubData(): Promise<void> {
           .map((m) => {
             const sectionId = crnToId.get(m._crn as string);
             if (!sectionId) return null;
-            const { _crn, ...rest } = m;
+            const rest = { ...m };
+            delete rest._crn;
             return { section_id: sectionId, ...rest };
           })
           .filter((r) => r !== null) as Array<Record<string, unknown>>;

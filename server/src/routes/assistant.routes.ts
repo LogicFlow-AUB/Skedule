@@ -9,17 +9,7 @@ import { asyncHandler } from '../utils/async-handler.js';
 const chatBody = z
   .object({
     message: z.string().trim().min(1).max(2000),
-    history: z
-      .array(
-        z
-          .object({
-            role: z.enum(['user', 'assistant']),
-            content: z.string().max(5000),
-          })
-          .strict(),
-      )
-      .max(20)
-      .optional(),
+    sessionId: z.string().trim().min(1).max(200).optional(),
   })
   .strict();
 

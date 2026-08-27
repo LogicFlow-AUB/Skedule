@@ -44,16 +44,23 @@ function round(value: number): number {
 }
 
 function splitCourseCode(code: string) {
-  const parts = code.trim().toUpperCase().split(/\s+/);
+  const normalized = code.trim().toUpperCase().replace(/\s+/g, ' ').trim();
+  const parts = normalized.split(' ');
 
-  if (parts.length < 2) {
-    throw new AppError(404, 'COURSE_NOT_FOUND', 'Course not found.');
+  if (parts.length >= 2) {
+    return {
+      subject: parts.slice(0, -1).join(' '),
+      courseNumber: parts.at(-1) ?? '',
+    };
   }
 
-  return {
-    subject: parts.slice(0, -1).join(' '),
-    courseNumber: parts.at(-1) ?? '',
-  };
+  // Handle unspaced codes such as "MATH201" or "CMPS214L".
+  const unspaced = /^([A-Z]{2,6})(\d{1,4}[A-Z]?)$/.exec(normalized);
+  if (unspaced?.[1] && unspaced?.[2]) {
+    return { subject: unspaced[1], courseNumber: unspaced[2] };
+  }
+
+  throw new AppError(404, 'COURSE_NOT_FOUND', 'Course not found.');
 }
 
 async function getCourseSummaries(courses: Course[]): Promise<CourseSummary[]> {

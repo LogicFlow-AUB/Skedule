@@ -5,14 +5,15 @@ import { handleMessage } from '../services/assistant.service.js';
 
 type ChatBody = {
   message: string;
-  history?: { role: 'user' | 'assistant'; content: string }[];
+  sessionId?: string;
 };
 
 export const chat: RequestHandler = async (req, res) => {
-  const { message } = getValidated<ChatBody>(res, 'body');
+  const { message, sessionId } = getValidated<ChatBody>(res, 'body');
   const userId = req.userId!;
+  const resolvedSessionId = sessionId || userId;
 
-  const result = await handleMessage(message, userId);
+  const result = await handleMessage(message, userId, resolvedSessionId);
 
   res.status(200).json({ data: result });
 };
