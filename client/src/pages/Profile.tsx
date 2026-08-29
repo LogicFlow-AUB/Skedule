@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
   Star, Edit3, GitCompare,
-  Bell, Lock, Eye, Palette, Shield, X, CheckCircle, MessagesSquare, Trash2, Heart,
+  Lock, Eye, Shield, X, CheckCircle, MessagesSquare, Trash2, Heart,
 } from 'lucide-react'
-import { api, type UserProfile, type UserStats, type UserReview, type FriendProfile, type FriendRequest, type NotificationPreferences, type ScheduleSummary, type ScheduleDetail, type MyComment, type Post } from '../lib/api'
+import { api, type UserProfile, type UserStats, type UserReview, type FriendProfile, type FriendRequest, type ScheduleSummary, type ScheduleDetail, type MyComment, type Post } from '../lib/api'
 import { displayName, formatDate, timeAgo } from '../lib/format'
 import { useAuth } from '../lib/auth'
 
@@ -33,26 +33,6 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
 
 const MAJORS = ['Computer Science', 'Computer & Communications Engineering', 'Electrical & Computer Engineering', 'Civil Engineering', 'Mechanical Engineering', 'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Business Administration', 'Psychology', 'English', 'History']
 const MINORS = ['None', 'Mathematics', 'Computer Science', 'Data Science', 'Economics', 'Business', 'Psychology', 'English', 'History']
-
-function NotifToggle({ label, sub, on, onToggle }: { label: string; sub: string; on: boolean; onToggle: (next: boolean) => void }) {
-  const [enabled, setEnabled] = useState(on)
-  return (
-    <div className="flex items-center justify-between py-3" style={{ borderBottom: '1px solid #F8FAFC' }}>
-      <div>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{label}</div>
-        <div style={{ fontSize: 11, color: '#94A3B8' }}>{sub}</div>
-      </div>
-      <button
-        onClick={() => { const next = !enabled; setEnabled(next); onToggle(next) }}
-        className="rounded-full transition-all shrink-0"
-        style={{ width: 40, height: 22, background: enabled ? '#4338CA' : '#E2E8F0', position: 'relative' }}
-      >
-        <div className="absolute top-1 rounded-full transition-all"
-          style={{ width: 14, height: 14, background: 'white', left: enabled ? 23 : 3, boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
-      </button>
-    </div>
-  )
-}
 
 export default function Profile() {
   const { user, logout } = useAuth()
@@ -85,7 +65,6 @@ export default function Profile() {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({ firstName: '', lastName: '', major: '', minor: 'None', level: '' })
   const [minor, setMinor] = useState('None')
-  const [accent, setAccent] = useState(() => window.localStorage.getItem('profileAccent') ?? 'Light')
   const [savingProfile, setSavingProfile] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [pw, setPw] = useState({ current: '', password: '', confirm: '' })
@@ -93,28 +72,12 @@ export default function Profile() {
   const [savingPw, setSavingPw] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences | null>(null)
 
   const userId = user?.id
   const localPart = user?.email?.split('@')[0] ?? 'ST'
   const nameInitials = profile
     ? ((profile.firstName?.[0] ?? '') + (profile.lastName?.[0] ?? '')).toUpperCase() || '?'
     : (localPart.slice(0, 2) || 'ST').toUpperCase()
-
-  useEffect(() => {
-    const savedAccents: Record<string, [string, string, string, string]> = {
-      Pink: ['#EC4899', '#FDF2F8', '#F9A8D4', '#DB2777'],
-      Blue: ['#0284C7', '#F0F9FF', '#BAE6FD', '#0369A1'],
-      Red: ['#DC2626', '#FEF2F2', '#FECACA', '#B91C1C'],
-    }
-    const colors = savedAccents[accent]
-    if (!colors) return
-    const root = document.documentElement
-    root.style.setProperty('--color-primary', colors[0])
-    root.style.setProperty('--color-primary-light', colors[1])
-    root.style.setProperty('--color-primary-border', colors[2])
-    root.style.setProperty('--color-primary-grad', colors[3])
-  }, [accent])
 
   useEffect(() => {
     if (!userId) {
@@ -125,14 +88,13 @@ export default function Profile() {
     async function load() {
       setLoading(true)
       try {
-        const [p, s, r, friendsRes, requestsRes, schedulesRes, np, myCommentsRes, myPostsRes] = await Promise.all([
+        const [p, s, r, friendsRes, requestsRes, schedulesRes, myCommentsRes, myPostsRes] = await Promise.all([
           api.users.profile(userId!),
           api.users.stats(userId!),
           api.users.reviews(userId!, 1, 50),
           api.friends.list(),
           api.friends.requests(),
           api.schedules.list(1, 50),
-          api.notifications.preferences(),
           api.feed.myComments(1, 50),
           api.feed.myPosts(1, 50),
         ])
@@ -150,7 +112,6 @@ export default function Profile() {
         setSchedules(schedulesRes.data)
         const loadedDetails = await Promise.all(schedulesRes.data.map((schedule) => api.schedules.get(schedule.id)))
         if (!cancelled) setScheduleDetails(Object.fromEntries(loadedDetails.map((response) => [response.data.id, response.data])))
-        setNotifPrefs(np.data)
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Could not load profile.')
@@ -303,34 +264,6 @@ export default function Profile() {
   const setPreferredSchedule = (id: number) => {
     setPreferredScheduleId(id)
     window.localStorage.setItem('preferredScheduleId', String(id))
-  }
-
-  const applyAppearance = async (name: string) => {
-    const accents: Record<string, { primary: string; light: string; border: string; grad: string }> = {
-      Pink: { primary: '#EC4899', light: '#FDF2F8', border: '#F9A8D4', grad: '#DB2777' },
-      Blue: { primary: '#0284C7', light: '#F0F9FF', border: '#BAE6FD', grad: '#0369A1' },
-      Red: { primary: '#DC2626', light: '#FEF2F2', border: '#FECACA', grad: '#B91C1C' },
-    }
-    setAccent(name)
-    window.localStorage.setItem('profileAccent', name)
-    if (name === 'Light' || name === 'Dark') {
-      const root = document.documentElement
-      root.style.removeProperty('--color-primary')
-      root.style.removeProperty('--color-primary-light')
-      root.style.removeProperty('--color-primary-border')
-      root.style.removeProperty('--color-primary-grad')
-      await api.users.updateTheme(name.toLowerCase() as 'light' | 'dark')
-    } else {
-      const colors = accents[name]
-      if (colors) {
-        const root = document.documentElement
-        root.style.setProperty('--color-primary', colors.primary)
-        root.style.setProperty('--color-primary-light', colors.light)
-        root.style.setProperty('--color-primary-border', colors.border)
-        root.style.setProperty('--color-primary-grad', colors.grad)
-      }
-    }
-    setToast(`Theme set to ${name}.`)
   }
 
   return (
@@ -665,45 +598,11 @@ export default function Profile() {
         {/* ---- SETTINGS TAB ---- */}
         {!loading && activeTab === 'settings' && (
           <div className="max-w-2xl flex flex-col gap-6">
-            {/* Notification preferences */}
-            <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-              <div className="flex items-center gap-2 mb-4">
-                <Bell size={16} color="#4338CA" />
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Notifications</div>
-              </div>
-              <NotifToggle key={notifPrefs ? 'loaded' : 'loading'} label="Friend schedule shared" sub="When a friend shares their schedule with you" on={notifPrefs?.scheduleShares ?? false} onToggle={(v) => void api.users.updateNotifications({ scheduleShares: v })} />
-              <NotifToggle key={notifPrefs ? 'loaded' : 'loading'} label="New professor reviews" sub="Reviews posted for professors you follow" on={notifPrefs?.reviewLikes ?? false} onToggle={(v) => void api.users.updateNotifications({ reviewLikes: v })} />
-            </div>
-
-            {/* Privacy */}
-            <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-              <div className="flex items-center gap-2 mb-4">
-                <Eye size={16} color="#4338CA" />
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Privacy</div>
-              </div>
-              <div className="flex items-center justify-between py-3" style={{ borderBottom: '1px solid #F8FAFC' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>Profile visibility</div>
-                  <div style={{ fontSize: 11, color: '#94A3B8' }}>Who can see your full profile</div>
-                </div>
-                <select
-                  defaultValue="friends"
-                  onChange={(e) => void api.users.updatePrivacy({ profileVisibility: e.target.value as 'public' | 'friends' | 'private' })}
-                  className="rounded-lg px-3 py-1.5 outline-none"
-                  style={{ fontSize: 12, fontWeight: 600, background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' }}
-                >
-                  <option value="public">Public</option>
-                  <option value="friends">Friends only</option>
-                  <option value="private">Private</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Account */}
+            {/* Account & Privacy */}
             <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
               <div className="flex items-center gap-2 mb-4">
                 <Shield size={16} color="#4338CA" />
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Account & Security</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Account & Privacy</div>
               </div>
               <div className="flex items-center justify-between py-3" style={{ borderBottom: '1px solid #F8FAFC' }}>
                 <div className="flex items-center gap-2">
@@ -714,7 +613,7 @@ export default function Profile() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between py-3">
+              <div className="flex items-center justify-between py-3" style={{ borderBottom: '1px solid #F8FAFC' }}>
                 <div className="flex items-center gap-2">
                   <span style={{ color: '#94A3B8' }}><Lock size={14} /></span>
                   <div>
@@ -747,32 +646,22 @@ export default function Profile() {
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Appearance */}
-            <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-              <div className="flex items-center gap-2 mb-4">
-                <Palette size={16} color="#4338CA" />
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Appearance</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B', marginBottom: 8 }}>Color Theme</div>
-                <div className="flex gap-2">
-                  {[
-                    { name: 'Light', value: 'light', color: '#F8FAFC', ring: '#CBD5E1' },
-                    { name: 'Dark', value: 'dark', color: '#0F172A', ring: '#0F172A' },
-                    { name: 'Pink', value: 'pink', color: '#EC4899', ring: '#F9A8D4' },
-                    { name: 'Blue', value: 'blue', color: '#0284C7', ring: '#BAE6FD' },
-                    { name: 'Red', value: 'red', color: '#DC2626', ring: '#FECACA' },
-                  ].map((t) => (
-                    <button key={t.value}
-                      onClick={() => void applyAppearance(t.name)}
-                      className="flex flex-col items-center gap-1.5">
-                      <div className="rounded-xl" style={{ width: 40, height: 36, background: t.color, border: `3px solid ${accent === t.name ? 'var(--color-primary, #4338CA)' : t.ring}`, boxShadow: accent === t.name ? '0 0 0 2px var(--color-primary-light, #EEF2FF)' : '0 1px 3px rgba(0,0,0,0.1)' }} />
-                      <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>{t.name}</span>
-                    </button>
-                  ))}
+              <div className="flex items-center justify-between py-3">
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>Profile visibility</div>
+                  <div style={{ fontSize: 11, color: '#94A3B8' }}>Who can see your full profile</div>
                 </div>
+                <select
+                  defaultValue="friends"
+                  onChange={(e) => void api.users.updatePrivacy({ profileVisibility: e.target.value as 'public' | 'friends' | 'private' })}
+                  className="rounded-lg px-3 py-1.5 outline-none"
+                  style={{ fontSize: 12, fontWeight: 600, background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' }}
+                >
+                  <option value="public">Public</option>
+                  <option value="friends">Friends only</option>
+                  <option value="private">Private</option>
+                </select>
               </div>
             </div>
 
