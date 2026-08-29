@@ -77,11 +77,12 @@ export const unsavePost: RequestHandler = async (req, res) => {
   res.status(204).send();
 };
 
-export const getComments: RequestHandler = async (_req, res) => {
+export const getComments: RequestHandler = async (req, res) => {
   const { id } = getValidated<PostIdParams>(res, 'params');
   const page = await feedService.getComments(
     id,
     parseOffsetPagination(getValidated<FeedQuery>(res, 'query')),
+    req.userId,
   );
 
   res.status(200).json({ data: page.data, pagination: page.pagination });

@@ -52,6 +52,7 @@ export class FakeQuery {
   private singleMode = false;
   private lastInserted: Row[] = [];
   private deleteMode = false;
+  private updateValues: Row | null = null;
 
   /** The most recent `select(...)` argument received. */
   lastSelect: string | null = null;
@@ -164,6 +165,12 @@ export class FakeQuery {
     return this;
   }
 
+  update(values: Row): FakeQuery {
+    this.updateValues = values;
+    this.singleMode = true;
+    return this;
+  }
+
   delete(): FakeQuery {
     this.deleteMode = true;
     return this;
@@ -179,6 +186,14 @@ export class FakeQuery {
   }
 
   private compute(): { data: Row[] | Row | null; error: null; count: number } {
+    if (this.updateValues) {
+      const matching = this.table.filter((row) => this.predicates.every((p) => p(row)));
+      for (const row of matching) {
+        Object.assign(row, { ...this.updateValues });
+      }
+      return { data: matching[0] ?? null, error: null, count: matching.length };
+    }
+
     if (this.deleteMode) {
       const matching = this.table.filter((row) => this.predicates.every((p) => p(row)));
       for (const row of matching) {

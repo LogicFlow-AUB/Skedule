@@ -15,7 +15,7 @@ import {
   saveCourse,
   unsaveCourse,
 } from '../controllers/reviews.controller.js';
-import { requireAuth } from '../middleware/auth.middleware.js';
+import { optionalAuth, requireAuth } from '../middleware/auth.middleware.js';
 import {
   validateBody,
   validateParams,
@@ -79,6 +79,7 @@ router.post(
 );
 router.get(
   '/:code/reviews',
+  optionalAuth,
   validateParams(courseCodeParams),
   validateQuery(reviewsQuery),
   asyncHandler(getCourseReviews),

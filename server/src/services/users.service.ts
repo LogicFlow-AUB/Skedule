@@ -28,6 +28,29 @@ export type PrivacySettingsInput = Partial<{
   showOnlineStatus: boolean;
 }>;
 
+type ApiVisibility = 'public' | 'friends' | 'private';
+type StoredVisibility = 'public' | 'friends_only' | 'private';
+
+function toApiVisibility(value: StoredVisibility | null | undefined): ApiVisibility {
+  if (value === 'private') {
+    return 'private';
+  }
+  if (value === 'friends_only') {
+    return 'friends';
+  }
+  return 'public';
+}
+
+function toStoredVisibility(value: ApiVisibility): StoredVisibility {
+  if (value === 'private') {
+    return 'private';
+  }
+  if (value === 'friends') {
+    return 'friends_only';
+  }
+  return 'public';
+}
+
 export type PasswordChangeInput = {
   currentPassword: string;
   password: string;
@@ -49,6 +72,7 @@ export type UserProfile = {
   email: string;
   major: string | null;
   level: string | null;
+  profileVisibility: 'public' | 'friends' | 'private';
 };
 
 export type UserStats = {
@@ -100,6 +124,7 @@ function toProfile(user: User): UserProfile {
     email: user.email,
     major: user.major,
     level: user.level,
+    profileVisibility: toApiVisibility(user.profile_visibility),
   };
 }
 
@@ -228,9 +253,48 @@ export async function updateNotificationSettings(userId: string, input: Notifica
   return notificationsService.updatePreferences(userId, input);
 }
 
-export async function updatePrivacySettings(_userId: string, _input: PrivacySettingsInput) {
+export async function updatePrivacySettings(
+  userId: string,
+  input: PrivacySettingsInput,
+): Promise<PrivacySettingsInput> {
+  const db = requireSupabaseClient();
+
+  if (input.profileVisibility === undefined) {
+    const { data, error } = await db
+      .from('users')
+      .select('profile_visibility')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    const visibility = (data as { profile_visibility?: StoredVisibility | null } | null)?.profile_visibility;
+    return {
+      profileVisibility: toApiVisibility(visibility),
+      showCompletedCourses: true,
+      showSchedule: true,
+      showOnlineStatus: true,
+    };
+  }
+
+  const storedVisibility = toStoredVisibility(input.profileVisibility);
+
+  const { data, error } = await db
+    .from('users')
+    .update({ profile_visibility: storedVisibility })
+    .eq('id', userId)
+    .select('profile_visibility')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  const stored = (data as { profile_visibility?: StoredVisibility | null } | null)?.profile_visibility;
   return {
-    profileVisibility: 'public' as const,
+    profileVisibility: toApiVisibility(stored),
     showCompletedCourses: true,
     showSchedule: true,
     showOnlineStatus: true,

@@ -5,6 +5,7 @@ export type User = {
   email: string;
   major: string | null;
   level: string | null;
+  profile_visibility: 'public' | 'friends_only' | 'private' | null;
 };
 
 export type CourseReview = {

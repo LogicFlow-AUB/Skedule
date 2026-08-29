@@ -3,6 +3,7 @@ import type { Post, PostComment, User } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { trackActivity } from './activity.service.js';
 import { notifyPostLiked, notifyPostCommented } from './notifications.service.js';
+import { getRevealedAuthorIds } from './profile-visibility.service.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
 
 export type PostType = 'schedule' | 'review' | 'question' | 'tip';
@@ -19,13 +20,23 @@ export type CreateCommentInput = {
   parentCommentId?: number;
 };
 
-const USER_COLUMNS = 'id, first_name, last_name, email, major, level';
+const USER_COLUMNS = 'id, first_name, last_name, email, major, level, profile_visibility';
 const POST_COLUMNS = 'id, user_id, type, content, tags, schedule_id, created_at';
 const COMMENT_COLUMNS = 'id, post_id, user_id, content, parent_comment_id, created_at';
 
-function postAuthor(user: User | null) {
+function postAuthor(user: User | null, revealed: boolean) {
   if (!user) {
     return null;
+  }
+
+  if (!revealed) {
+    return {
+      id: user.id,
+      firstName: null,
+      lastName: null,
+      major: null,
+      level: null,
+    };
   }
 
   return {
@@ -44,6 +55,7 @@ function postResponse(
   commentCount: number,
   isLikedByCurrentUser: boolean,
   isSavedByCurrentUser: boolean,
+  revealed: boolean,
 ) {
   return {
     id: post.id,
@@ -52,7 +64,7 @@ function postResponse(
     tags: post.tags,
     scheduleId: post.schedule_id,
     createdAt: post.created_at,
-    author: postAuthor(author),
+    author: postAuthor(author, revealed),
     likeCount,
     commentCount,
     isLikedByCurrentUser,
@@ -76,14 +88,14 @@ function toOne<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null;
 }
 
-function commentResponse(comment: PostCommentRow) {
+function commentResponse(comment: PostCommentRow, revealed: boolean) {
   return {
     id: comment.id,
     postId: comment.post_id,
     content: comment.content,
     parentCommentId: comment.parent_comment_id,
     createdAt: comment.created_at,
-    author: postAuthor(toOne(comment.users)),
+    author: postAuthor(toOne(comment.users), revealed),
   };
 }
 
@@ -177,6 +189,8 @@ async function getPostResponses(posts: Post[], userId?: string) {
     userLikedPostIds = new Set(likedRows.map((r) => r.post_id));
     userSavedPostIds = new Set(savedRows.map((r) => r.post_id));
 
+    const revealedIds = await getRevealedAuthorIds(authorsByUserId ? [...authorsByUserId.values()] : [], userId);
+
     return posts.map((post) =>
       postResponse(
         post,
@@ -185,6 +199,7 @@ async function getPostResponses(posts: Post[], userId?: string) {
         commentCounts.get(post.id) ?? 0,
         userLikedPostIds.has(post.id),
         userSavedPostIds.has(post.id),
+        revealedIds.has(post.user_id),
       ),
     );
   }
@@ -195,6 +210,8 @@ async function getPostResponses(posts: Post[], userId?: string) {
     Promise<Map<number, number>>,
   ]);
 
+  const revealedIds = await getRevealedAuthorIds(authorsByUserId ? [...authorsByUserId.values()] : [], userId);
+
   return posts.map((post) =>
     postResponse(
       post,
@@ -203,6 +220,7 @@ async function getPostResponses(posts: Post[], userId?: string) {
       commentCounts.get(post.id) ?? 0,
       false,
       false,
+      revealedIds.has(post.user_id),
     ),
   );
 }
@@ -389,6 +407,7 @@ export async function unsavePost(userId: string, postId: number): Promise<void> 
 export async function getComments(
   postId: number,
   pagination: OffsetPagination,
+  viewerId?: string,
 ): Promise<OffsetPage<ReturnType<typeof commentResponse>>> {
   await getPostRowOrThrow(postId);
 
@@ -404,8 +423,20 @@ export async function getComments(
     throw error;
   }
 
+  const rows = (data ?? []) as PostCommentRow[];
+  const revealedIds = await getRevealedAuthorIds(
+    rows
+      .map((comment) => toOne(comment.users))
+      .filter((author): author is User => author !== null)
+      .map((author) => ({ id: author.id, profile_visibility: author.profile_visibility })),
+    viewerId,
+  );
+
   return createOffsetPage(
-    (data ?? []).map((comment) => commentResponse(comment as PostCommentRow)),
+    rows.map((comment) => {
+      const author = toOne(comment.users);
+      return commentResponse(comment, author ? revealedIds.has(author.id) : true);
+    }),
     count ?? 0,
     pagination,
   );
@@ -485,7 +516,7 @@ export async function createComment(userId: string, postId: number, input: Creat
     await notifyPostCommented(post.user_id, userId, postId);
   }
 
-  return commentResponse(comment);
+  return commentResponse(comment, true);
 }
 
 export async function deleteComment(userId: string, commentId: number): Promise<void> {

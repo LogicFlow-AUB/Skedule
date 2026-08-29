@@ -424,6 +424,7 @@ export type UserProfile = {
   email: string
   major: string | null
   level: string | null
+  profileVisibility?: 'public' | 'friends' | 'private'
 }
 
 export type UserStats = {
