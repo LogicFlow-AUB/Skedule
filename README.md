@@ -1,4 +1,4 @@
-# Smart Schedule Builder
+# Skedule
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
@@ -8,7 +8,7 @@
 
 ## Overview
 
-Smart Schedule Builder is a web application that helps university students plan their semester course schedules. The application provides an AI-powered schedule generator, a manual drag-and-drop builder, course and professor reviews, a social community feed, and schedule comparison tools — all designed to simplify the registration process.
+Skedule is a web application that helps university students plan their semester course schedules. The application provides an AI-powered schedule generator, a manual drag-and-drop builder, course and professor reviews, a social community feed, and schedule comparison tools — all designed to simplify the registration process.
 
 The frontend is fully designed and implemented. Backend development is in progress, with a detailed implementation plan defined from the frontend surface.
 

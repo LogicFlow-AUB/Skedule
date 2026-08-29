@@ -8,6 +8,7 @@ type CourseCodeParams = { code: string };
 type CourseListQuery = {
   search?: string;
   attribute?: string;
+  term_id?: number;
   sort: coursesService.CourseListInput['sort'];
   order: coursesService.CourseListInput['order'];
   page?: number;
@@ -21,6 +22,7 @@ export const listCourses: RequestHandler = async (_req, res) => {
   const page = await coursesService.listCourses({
     ...(query.search ? { search: query.search } : {}),
     ...(query.attribute ? { attribute: query.attribute } : {}),
+    ...(query.term_id != null ? { termId: query.term_id } : {}),
     sort: query.sort,
     order: query.order,
     pagination: parseOffsetPagination(query),

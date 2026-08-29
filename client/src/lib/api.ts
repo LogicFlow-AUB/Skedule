@@ -167,6 +167,8 @@ export type CourseSummary = {
   averageDifficulty: number | null
   averageWorkload: number | null
   wouldRetakePercentage: number | null
+  /** Professors teaching this course in the requested term (present when termId is supplied). */
+  professors?: { id: number; first_name: string; last_name: string }[]
 }
 
 export type SectionMeeting = {
@@ -624,12 +626,6 @@ export const api = {
       if (!body || !Array.isArray(body.data)) throw new ApiError(502, 'MALFORMED_RESPONSE', 'Term list returned a malformed response.')
       return body.data
     },
-    optimizerCourses: async (termId: number, search: string) => {
-      const params = new URLSearchParams({ term_id: String(termId), search })
-      const body = await request<{ data: CourseOption[] }>(`/schedule/courses?${params.toString()}`)
-      if (!body || !Array.isArray(body.data)) throw new ApiError(502, 'MALFORMED_RESPONSE', 'Course search returned a malformed response.')
-      return body.data
-    },
     optimize: async (input: OptimizeScheduleRequest) => {
       const body = await request<{ data?: OptimizeScheduleResult }>('/schedule/optimize', { method: 'POST', body: input })
       if (!body?.data || typeof body.data.status !== 'string') throw new ApiError(502, 'MALFORMED_RESPONSE', 'Optimizer returned a malformed response.')
@@ -685,6 +681,24 @@ export const api = {
       request<{ data: ScheduleDetail }>(`/schedules/${id}/favorite`, { method: 'DELETE' }),
     loadAsDraft: (id: number) =>
       request<{ data: ScheduleDetail }>(`/schedules/${id}/load`, { method: 'POST' }),
+    pdf: async (id: number): Promise<Blob> => {
+      const token = getAccessToken()
+      const response = await fetch(`${API_BASE}/schedules/${id}/pdf`, {
+        method: 'GET',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      })
+      if (!response.ok) {
+        let message = `Request failed with status ${response.status}.`
+        try {
+          const payload = (await response.json()) as { error?: { message?: string } }
+          message = payload.error?.message ?? message
+        } catch {
+          // response body was not JSON
+        }
+        throw new ApiError(response.status, 'UNKNOWN_ERROR', message)
+      }
+      return response.blob()
+    },
   },
 
   feed: {

@@ -70,7 +70,7 @@ export default function Login() {
           <div className="rounded-xl p-2.5" style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)', boxShadow: '0 4px 16px rgba(67,56,202,0.35)' }}>
             <CalendarDays size={22} color="white" />
           </div>
-          <span style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>LogicFlow</span>
+          <span style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>Skedule</span>
         </div>
 
         <div className="rounded-2xl p-8" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 8px 32px rgba(15,23,42,0.08)' }}>

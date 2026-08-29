@@ -347,7 +347,7 @@ export default function Profile() {
               <StatCard value={String(stats?.courseReviewCount ?? 0)} label="Courses Rated" sub="Course reviews" color="#0EA5E9" />
               <StatCard value={String(stats?.professorReviewCount ?? 0)} label="Professors Rated" sub="Professor reviews" color="#7C3AED" />
               <StatCard value={String(stats?.scheduleCount ?? 0)} label="Schedules Saved" sub="Generated plans" color="#059669" />
-              <StatCard value={String(stats?.friendCount ?? 0)} label="Friends" sub="On LogicFlow" color="#F59E0B" />
+              <StatCard value={String(stats?.friendCount ?? 0)} label="Friends" sub="On Skedule" color="#F59E0B" />
             </div>
             <div className="rounded-2xl p-5" style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
               <div className="flex items-center gap-2 mb-4"><Star size={16} color="#F59E0B" /><div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A' }}>Recent Reviews</div></div>

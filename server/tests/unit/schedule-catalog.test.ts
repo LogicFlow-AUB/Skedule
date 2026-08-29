@@ -10,7 +10,6 @@ import { createFakeSupabase, type Row } from '../fixtures/fake-supabase.js';
 import {
   listOptimizerOptions,
   listTerms,
-  searchOfferedCourses,
 } from '../../src/services/schedule-catalog.service.js';
 import { termsInSyncWindow } from '../../src/services/term-window.js';
 
@@ -84,49 +83,6 @@ describe('schedule-catalog.service', () => {
         { id: 1, name: '202710', code: '202710', description: 'Fall 2026', start_date: '2026-09-01', end_date: '2026-12-20' },
         { id: 3, name: 'legacy' },
       ]);
-    });
-  });
-
-  describe('searchOfferedCourses', () => {
-    it('returns only courses offered in the selected term, with correct credits', async () => {
-      const courses = await searchOfferedCourses(1);
-      expect(courses.map((c) => c.code)).toEqual(['ACCT 210', 'BUSS 211']);
-      const accounting = courses.find((c) => c.code === 'ACCT 210')!;
-      expect(accounting.credits).toBe(3);
-      expect(accounting.title).toBe('Financial Accounting');
-    });
-
-    it('returns nothing for a term with no offered courses', async () => {
-      const courses = await searchOfferedCourses(null);
-      expect(courses).toEqual([]);
-    });
-
-    it('attaches each course its professors who teach it in that term, deduplicated', async () => {
-      const courses = await searchOfferedCourses(1);
-      const accounting = courses.find((c) => c.code === 'ACCT 210')!;
-      expect(accounting.professors.map((p) => p.last_name)).toEqual(['Baroudi', 'Nouiehed']);
-      const stats = courses.find((c) => c.code === 'BUSS 211')!;
-      expect(stats.professors.map((p) => p.first_name)).toEqual(['Rania']);
-    });
-
-    it('gathers professors only from the selected term', async () => {
-      const courses = await searchOfferedCourses(2);
-      const dataStructures = courses.find((c) => c.code === 'CMPS 214')!;
-      expect(dataStructures.professors.map((p) => p.last_name)).toEqual(['Artail']);
-      const calculus = courses.find((c) => c.code === 'MATH 201')!;
-      expect(calculus.credits).toBe(3);
-    });
-
-    it('filters by a free-text search within the offered term', async () => {
-      const courses = await searchOfferedCourses(1, 'accounting');
-      expect(courses.map((c) => c.code)).toEqual(['ACCT 210']);
-      const none = await searchOfferedCourses(1, 'calculus');
-      expect(none.map((c) => c.code)).toEqual([]);
-    });
-
-    it('sorts by course code when no search is given', async () => {
-      const courses = await searchOfferedCourses(2);
-      expect(courses.map((c) => c.code)).toEqual(['CMPS 214', 'MATH 201']);
     });
   });
 

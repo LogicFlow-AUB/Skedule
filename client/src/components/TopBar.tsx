@@ -115,7 +115,7 @@ export default function TopBar({ activePage }: { activePage: Page }) {
     >
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 mr-2">
-        <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>Smart Schedule</span>
+        <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>Skedule</span>
         <ChevronRight size={12} color="#CBD5E1" />
         <span style={{ fontSize: 13, color: '#1E293B', fontWeight: 600 }}>{PAGE_TITLES[activePage]}</span>
       </div>

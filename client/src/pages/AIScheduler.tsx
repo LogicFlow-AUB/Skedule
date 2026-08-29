@@ -68,14 +68,16 @@ function courseEndTime(c: Course) {
   const totalMin = c.startHour * 60 + c.startMin + c.durationMin
   const endH = Math.floor(totalMin / 60)
   const endM = totalMin % 60
-  const label = endH > 12 ? `${endH - 12}:${endM.toString().padStart(2, '0')} PM` : `${endH}:${endM.toString().padStart(2, '0')} AM`
-  return label
+  const h12 = endH % 12 === 0 ? 12 : endH % 12
+  const period = endH >= 12 ? 'PM' : 'AM'
+  return `${h12}:${endM.toString().padStart(2, '0')} ${period}`
 }
 function courseStartTime(c: Course) {
   const h = c.startHour
   const m = c.startMin
-  const label = h > 12 ? `${h - 12}:${m.toString().padStart(2, '0')} PM` : `${h}:${m.toString().padStart(2, '0')} AM`
-  return label
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  const period = h >= 12 ? 'PM' : 'AM'
+  return `${h12}:${m.toString().padStart(2, '0')} ${period}`
 }
 
 function parseDays(days: string | null): number[] {
@@ -795,13 +797,24 @@ const DEFAULT_OPTIMIZER_FORM: OptimizerFormState = {
   exactCredits: 15, minCredits: 12, maxCredits: 18, weights: { days: 34, gaps: 33, professor: 33 }, professorPreferences: {}, excludedSectionIds: [],
 }
 
+function courseSummaryToOption(summary: CourseSummary): CourseOption {
+  const credits = Number(summary.credits)
+  return {
+    id: summary.id,
+    code: summary.code,
+    title: summary.title,
+    credits: Number.isFinite(credits) ? credits : 0,
+    professors: summary.professors ?? [],
+  }
+}
+
 function OptimizerSearch({ termId, excludedIds, onPick }: { termId: number | null; excludedIds: number[]; onPick: (course: CourseOption) => void }) {
   const [query, setQuery] = useState(''); const [courses, setCourses] = useState<CourseOption[]>([]); const [open, setOpen] = useState(false); const [loading, setLoading] = useState(false)
   const latest = useRef(0)
   useEffect(() => {
-    if (!open || termId == null) { setCourses([]); return }
+    if (!open) { setCourses([]); return }
     const id = ++latest.current; let cancelled = false; setLoading(true)
-    const timer = setTimeout(() => { api.schedules.optimizerCourses(termId, query.trim()).then((data) => { if (!cancelled && id === latest.current) setCourses(data.filter((course) => !excludedIds.includes(course.id))) }).catch(() => { if (!cancelled && id === latest.current) setCourses([]) }).finally(() => { if (!cancelled && id === latest.current) setLoading(false) }) }, 250)
+    const timer = setTimeout(() => { api.courses.list({ search: query.trim() || undefined, termId: termId ?? undefined, limit: 100 }).then((res) => { if (!cancelled && id === latest.current) setCourses(res.data.map(courseSummaryToOption).filter((course) => !excludedIds.includes(course.id))) }).catch(() => { if (!cancelled && id === latest.current) setCourses([]) }).finally(() => { if (!cancelled && id === latest.current) setLoading(false) }) }, 250)
     return () => { cancelled = true; clearTimeout(timer) }
   }, [query, open, termId, excludedIds.join('|')])
   return <div className="relative"><div className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={fieldStyle}><Search size={12} color="#94A3B8" /><input disabled={termId == null} value={query} onFocus={() => setOpen(true)} onChange={(e) => { setQuery(e.target.value); setOpen(true) }} placeholder={termId == null ? 'Select a term first' : 'Search offered courses...'} className="flex-1 min-w-0 outline-none bg-transparent" /></div>{open && termId != null && <div className="absolute left-0 right-0 top-full mt-1 rounded-lg overflow-y-auto shadow-xl z-30" style={{ maxHeight: 190, background: '#FFFFFF', border: '1px solid #E2E8F0' }}>{loading ? <div className="p-3 text-center text-xs">Searching...</div> : courses.length === 0 ? <div className="p-3 text-center text-xs">No matching courses</div> : courses.map((course) => <button key={course.id} className="w-full text-left px-3 py-2 hover:bg-slate-50" onClick={() => { onPick(course); setQuery(''); setOpen(false) }}><div style={{ fontSize: 11, fontWeight: 800 }}>{course.code}</div><div className="truncate" style={{ fontSize: 10, color: '#64748B' }}>{course.title} — {course.credits} credits</div></button>)}</div>}</div>
@@ -1155,7 +1168,7 @@ function ManualBuilder({
     setSearchLoading(true)
     const timer = setTimeout(() => {
       api.courses
-        .list({ search: searchTerm.trim() || undefined, limit: 20 })
+        .list({ search: searchTerm.trim() || undefined, limit: 100 })
         .then((res) => {
           if (!cancelled) {
             setAvailable(res.data)

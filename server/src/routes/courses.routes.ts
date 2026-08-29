@@ -34,6 +34,7 @@ const courseListQuery = z
   .object({
     search: z.string().trim().min(1).max(100).optional(),
     attribute: z.string().trim().min(1).max(100).optional(),
+    term_id: z.coerce.number().int().positive().optional(),
     sort: z.enum(['name', 'rating', 'difficulty', 'workload', 'popularity']).default('name'),
     order: z.enum(['asc', 'desc']).default('asc'),
     page: z.coerce.number().int().positive().optional(),

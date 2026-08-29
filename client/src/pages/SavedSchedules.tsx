@@ -396,9 +396,23 @@ export default function SavedSchedules({ setPage }: { setPage?: (p: Page) => voi
     }
   }
 
-  // TODO(frontend): real PDF export not wired yet.
-  const handlePDF = (name: string) => {
+  const handlePDF = async (id: number, name: string) => {
     setToast(`Downloading "${name}" as PDF...`)
+    try {
+      const blob = await api.schedules.pdf(id)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${name}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      setToast(`Downloaded "${name}.pdf"`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not download the PDF.')
+      setToast(null)
+    }
   }
 
   return (
@@ -523,7 +537,7 @@ export default function SavedSchedules({ setPage }: { setPage?: (p: Page) => voi
                       Compare
                     </button>
                     <button
-                      onClick={() => handlePDF(s.name ?? `Schedule #${s.id}`)}
+                      onClick={() => void handlePDF(s.id, s.name ?? `Schedule #${s.id}`)}
                       className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all"
                       style={{ fontSize: 12, background: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' }}
                       onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#374151' }}

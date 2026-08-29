@@ -55,7 +55,7 @@ export default function CommonFreeTime() {
 
   return <div className="h-full overflow-auto" style={{ background: '#F8FAFC' }}>
     <header className="px-8 py-5" style={{ background: '#FFFFFF', borderBottom: '1px solid #F1F5F9' }}>
-      <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 5 }}>Smart Schedule <span style={{ margin: '0 5px' }}>›</span> Common Free Time</div>
+      <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 5 }}>Skedule <span style={{ margin: '0 5px' }}>›</span> Common Free Time</div>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0F172A' }}>Common Free Time</h1>
       <p style={{ fontSize: 13, color: '#64748B', marginTop: 3 }}>Find overlapping free time with your friends.</p>
     </header>

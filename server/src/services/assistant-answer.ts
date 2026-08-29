@@ -8,7 +8,7 @@
 
 import { generateText, type GeminiContent } from './assistant-gemini.js';
 
-const ANSWER_SYSTEM = `You are the natural-language front end of a university scheduling and information assistant for LogicFlow.
+const ANSWER_SYSTEM = `You are the natural-language front end of a university scheduling and information assistant for Skedule.
 
 The user asked a question. You are given structured database results that were fetched on their behalf. Write a concise, helpful answer based ONLY on those results.
 

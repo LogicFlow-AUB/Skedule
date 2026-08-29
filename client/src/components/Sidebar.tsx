@@ -61,7 +61,7 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
           <Sparkles size={16} color="white" />
         </div>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>Smart Schedule</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>Skedule</div>
           <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500, letterSpacing: '0.02em' }}>BUILDER</div>
         </div>
       </div>

@@ -28,7 +28,7 @@ const config = {
   aub: {
     baseUrl:
       process.env.AUB_REGISTRATION_URL ?? 'https://sturegss.aub.edu.lb/StudentRegistrationSsb',
-    syncIntervalMs: Number(process.env.AUB_SYNC_INTERVAL_MS ?? 600_000),
+    syncIntervalMs: Number(process.env.AUB_SYNC_INTERVAL_MS ?? 1_200_000),
     syncOnStartup: (process.env.AUB_SYNC_ON_STARTUP ?? 'true') === 'true',
   },
   gemini: {
