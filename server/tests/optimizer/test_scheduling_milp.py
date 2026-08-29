@@ -1,6 +1,10 @@
 """Unit tests for the public scheduling optimizer contract."""
 
+import os
+import sys
 import unittest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "optimizer"))
 
 from scheduling_milp import ModelInputError, solve_backend_request, solve_schedule
 

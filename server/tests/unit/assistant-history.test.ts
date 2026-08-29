@@ -6,7 +6,7 @@ import {
   getSessionHistory,
   historyToGeminiContents,
   MAX_HISTORY_MESSAGES,
-} from '../src/services/assistant.service.js';
+} from '../../src/services/assistant.service.js';
 
 describe('session chat history', () => {
   beforeEach(() => {

@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createFakeSupabase, FakeQuery } from './helpers/fake-supabase.js';
-import { executeAssistantQuery } from '../src/services/assistant-database.js';
-import type { Row } from './helpers/fake-supabase.js';
+import { createFakeSupabase, FakeQuery } from '../fixtures/fake-supabase.js';
+import { executeAssistantQuery } from '../../src/services/assistant-database.js';
+import type { Row } from '../fixtures/fake-supabase.js';
 
 const { fakeClient } = vi.hoisted(() => {
   return { fakeClient: { value: null as unknown } };
 });
 
-vi.mock('../src/db/supabase.js', () => ({
+vi.mock('../../src/db/supabase.js', () => ({
   requireSupabaseClient: () => fakeClient.value,
 }));
 

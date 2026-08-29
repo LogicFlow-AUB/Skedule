@@ -7,7 +7,7 @@ const { routerOutput, failRouter } = vi.hoisted(() => {
   };
 });
 
-vi.mock('../src/services/assistant-gemini.js', () => ({
+vi.mock('../../src/services/assistant-gemini.js', () => ({
   generateJson: async () => {
     if (failRouter.value) throw new Error('router unavailable');
     return routerOutput.value;
@@ -15,7 +15,7 @@ vi.mock('../src/services/assistant-gemini.js', () => ({
   generateText: async () => 'text',
 }));
 
-import { fallbackRoute, isRoute, routeMessage, VALID_ROUTES } from '../src/services/assistant-router.js';
+import { fallbackRoute, isRoute, routeMessage, VALID_ROUTES } from '../../src/services/assistant-router.js';
 
 beforeEach(() => {
   routerOutput.value = { route: 'assistant' };

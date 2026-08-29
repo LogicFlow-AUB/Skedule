@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { AppError } from '../src/utils/app-error.js';
+import { AppError } from '../../src/utils/app-error.js';
 import {
   DEFAULT_QUERY_LIMIT,
   MAX_QUERY_LIMIT,
@@ -8,7 +8,7 @@ import {
   QUERY_OPERATORS,
   parseGeneratedQuery,
   validateAssistantQuery,
-} from '../src/services/assistant-query.js';
+} from '../../src/services/assistant-query.js';
 
 const USER = '5bdce3e1-b0e4-49e6-b4ca-7432bf8937c4';
 const OTHER_USER = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';

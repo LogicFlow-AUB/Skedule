@@ -14,7 +14,7 @@ vi.mock('@google/genai', () => ({
   },
 }));
 
-import { generateJson } from '../src/services/assistant-gemini.js';
+import { generateJson } from '../../src/services/assistant-gemini.js';
 
 function capture<T>(promise: Promise<T>): Promise<unknown> {
   // Attach the handler immediately so the rejection is never flagged as
