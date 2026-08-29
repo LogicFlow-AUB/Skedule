@@ -28,6 +28,11 @@ export type AubMeetingTime = {
   weeklySchedulePatterns: string | null;
 };
 
+export type AubTerm = {
+  code: string;
+  description: string | null;
+};
+
 export type AubSection = {
   id: number;
   term: string;
@@ -38,7 +43,9 @@ export type AubSection = {
   courseNumber: string;
   sequenceNumber: string;
   courseTitle: string;
-  creditHours: string | null;
+  creditHours: string | number | null;
+  creditHourHigh: string | number | null;
+  creditHourLow: string | number | null;
   campusDescription: string | null;
   scheduleTypeDescription: string | null;
   enrollmentAvailability: string | null;
@@ -233,4 +240,41 @@ export async function fetchAllSections(termCode: string): Promise<AubSection[]> 
 
   logger.info({ fetched: allSections.length, totalCount }, 'AUB sync: fetch complete');
   return allSections;
+}
+
+/**
+ * Fetches the list of registration terms AUB currently exposes via the class
+ * search `getTerms` endpoint. Each term is identified by its external numeric
+ * `code` (e.g. '202710') and a human-readable `description` (e.g.
+ * "Fall 2026-2027 (View Only)"). The returned list drives the term selector and
+ * the per-term sync loop; no term is hardcoded here.
+ */
+export async function getTerms(): Promise<AubTerm[]> {
+  logger.info('AUB sync: fetching available terms');
+  const session = await initializeSession();
+
+  const params = new URLSearchParams({
+    searchTerm: '',
+    offset: '1',
+    max: '15',
+    _: String(Date.now()),
+  });
+
+  const { response } = await fetchWithCookies(
+    `${BASE}/ssb/classSearch/getTerms?${params}`,
+    session.cookies,
+  );
+
+  const json = (await response.json()) as unknown;
+  if (!Array.isArray(json)) {
+    logger.warn({ payloadType: typeof json }, 'AUB sync: getTerms returned a non-array payload');
+    return [];
+  }
+
+  const terms = (json as Array<{ code: string; description?: string | null }>)
+    .filter((term) => term && typeof term.code === 'string' && term.code.trim() !== '')
+    .map((term) => ({ code: term.code.trim(), description: term.description ?? null }));
+
+  logger.info({ count: terms.length }, 'AUB sync: terms fetched');
+  return terms;
 }

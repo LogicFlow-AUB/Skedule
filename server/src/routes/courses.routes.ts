@@ -50,6 +50,11 @@ const reviewsQuery = z
     limit: z.coerce.number().int().positive().max(100).optional(),
   })
   .strict();
+const sectionsQuery = z
+  .object({
+    term_id: z.coerce.number().int().positive().nullable().optional(),
+  })
+  .strict();
 const courseReviewBody = z
   .object({
     rating: z.number().int().min(1).max(5),
@@ -85,7 +90,7 @@ router.delete(
   validateParams(courseCodeParams),
   asyncHandler(unsaveCourse),
 );
-router.get('/:code/sections', validateParams(courseCodeParams), asyncHandler(getSections));
+router.get('/:code/sections', validateParams(courseCodeParams), validateQuery(sectionsQuery), asyncHandler(getSections));
 router.get(
   '/:code/grade-distribution',
   validateParams(courseCodeParams),

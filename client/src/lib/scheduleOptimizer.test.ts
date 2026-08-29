@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildOptimizeRequest, onlineOptimizerSections, optimizerMeetingOccurrences, validateOptimizerResult, type OptimizerFormState, type SelectedSection } from './scheduleOptimizer.ts'
+import { buildOptimizeRequest, buildOptimizerPrompt, onlineOptimizerSections, optimizerMeetingOccurrences, validateOptimizerResult, type OptimizerFormState, type SelectedSection } from './scheduleOptimizer.ts'
 
 const course = (id: number, credits = 3) => ({ id, code: `C ${id}`, title: 'Course', credits, professors: [{ id: 45, first_name: 'A', last_name: 'B' }] })
 const form = (overrides: Partial<OptimizerFormState> = {}): OptimizerFormState => ({ termId: 3, requiredCourses: [course(101)], acceptableElectives: [course(207)], selectedAttributeIds: [12], creditMode: 'exact', exactCredits: 15, minCredits: 12, maxCredits: 18, weights: { days: 35, gaps: 40, professor: 25 }, professorPreferences: { '45': 5 }, excludedSectionIds: [], ...overrides })
@@ -13,6 +13,17 @@ test('exact requests use numeric IDs, numeric backend credits, professor IDs, an
 test('range requests retain both credit bounds', () => {
   const request = buildOptimizeRequest(form({ creditMode: 'range', minCredits: 14, maxCredits: 17 }))
   assert.equal(request.min_credits, 14); assert.equal(request.max_credits, 17)
+})
+
+test('optimizer prompt encodes exact selections with numeric ids for the assistant route', () => {
+  const prompt = buildOptimizerPrompt(buildOptimizeRequest(form()))
+  assert.match(prompt, /term id 3/)
+  assert.match(prompt, /Required course ids: 101/)
+  assert.match(prompt, /elective course ids: 207/)
+  assert.match(prompt, /attribute ids: 12/)
+  assert.match(prompt, /exactly 15/)
+  assert.match(prompt, /days 35, gaps 40, professor 25/)
+  assert.match(prompt, /professor id 45: preference 5/)
 })
 
 test('validation rejects overlapping courses and invalid weights', () => {

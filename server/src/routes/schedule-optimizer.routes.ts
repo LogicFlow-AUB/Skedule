@@ -2,8 +2,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 
 import { optimize } from '../controllers/schedule-optimizer.controller.js';
+import {
+  listOptions,
+  listScheduleTerms,
+  searchCourses,
+} from '../controllers/schedule-catalog.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
-import { validateBody } from '../middleware/validation.middleware.js';
+import { validateBody, validateQuery } from '../middleware/validation.middleware.js';
 import { asyncHandler } from '../utils/async-handler.js';
 
 const positiveInt = z.number().int().positive();
@@ -55,6 +60,21 @@ const optimizeBody = z
 
 const router = Router();
 
+router.get('/optimizer-options', requireAuth, asyncHandler(listOptions));
+router.get('/terms', requireAuth, asyncHandler(listScheduleTerms));
+router.get(
+  '/courses',
+  requireAuth,
+  validateQuery(
+    z
+      .object({
+        term_id: z.coerce.number().int().positive().optional(),
+        search: z.string().trim().max(100).optional(),
+      })
+      .strict(),
+  ),
+  asyncHandler(searchCourses),
+);
 router.post('/optimize', requireAuth, validateBody(optimizeBody), asyncHandler(optimize));
 
 export default router;

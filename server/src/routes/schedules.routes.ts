@@ -6,11 +6,17 @@ import {
   compareSchedules,
   createSchedule,
   deleteSchedule,
+  getDraft,
   getSchedule,
   getScheduleConflicts,
   listSchedules,
+  loadScheduleAsDraft,
   removeScheduleCourse,
+  saveDraft,
+  saveSchedule,
+  setFavorite,
   swapScheduleSection,
+  unsetFavorite,
   updateSchedule,
 } from '../controllers/schedules.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
@@ -31,6 +37,11 @@ const schedulesQuery = z
     limit: z.coerce.number().int().positive().max(100).optional(),
   })
   .strict();
+const draftQuery = z
+  .object({
+    term_id: z.coerce.number().int().positive().nullable().optional(),
+  })
+  .strict();
 const createScheduleBody = z
   .object({
     name: z.string().trim().min(1).max(200),
@@ -39,6 +50,14 @@ const createScheduleBody = z
     sectionIds: z.array(sectionId).max(20).optional(),
   })
   .strict();
+const saveDraftBody = z
+  .object({
+    name: z.string().trim().min(1).max(200).optional(),
+    notes: z.string().trim().max(1000).nullable().optional(),
+    sectionIds: z.array(sectionId).max(20).optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, 'Request body must not be empty.');
 const updateScheduleBody = z
   .object({
     name: z.string().trim().min(1).max(200).optional(),
@@ -59,6 +78,8 @@ const router = Router();
 
 router.get('/', requireAuth, validateQuery(schedulesQuery), asyncHandler(listSchedules));
 router.post('/', requireAuth, validateBody(createScheduleBody), asyncHandler(createSchedule));
+router.get('/draft', requireAuth, validateQuery(draftQuery), asyncHandler(getDraft));
+router.put('/draft', requireAuth, validateQuery(draftQuery), validateBody(saveDraftBody), asyncHandler(saveDraft));
 router.post(
   '/compare',
   requireAuth,
@@ -91,6 +112,10 @@ router.get(
   validateParams(scheduleIdParams),
   asyncHandler(getScheduleConflicts),
 );
+router.post('/:id/save', requireAuth, validateParams(scheduleIdParams), asyncHandler(saveSchedule));
+router.post('/:id/favorite', requireAuth, validateParams(scheduleIdParams), asyncHandler(setFavorite));
+router.delete('/:id/favorite', requireAuth, validateParams(scheduleIdParams), asyncHandler(unsetFavorite));
+router.post('/:id/load', requireAuth, validateParams(scheduleIdParams), asyncHandler(loadScheduleAsDraft));
 router.get('/:id', requireAuth, validateParams(scheduleIdParams), asyncHandler(getSchedule));
 router.put(
   '/:id',

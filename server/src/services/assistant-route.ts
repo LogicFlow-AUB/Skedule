@@ -18,15 +18,33 @@ import { executeAssistantQuery } from './assistant-database.js';
 import { parseGeneratedQuery, type AssistantQuery } from './assistant-query.js';
 import { AppError } from '../utils/app-error.js';
 
-const GENERATOR_SYSTEM = [
-  `You are the query planner of a university information assistant.`,
-  `Translate the user's request into a SINGLE structured read-only database query proposed in JSON.`,
-  ``,
-  buildSchemaKnowledge(),
-  buildQueryFormatInstructions(),
-  ``,
-  `Remember: propose data retrieval only. If the request is conversational or outside the database, output {"intent": "no_query", "query": null}.`,
-].join('\n');
+/**
+ * Builds the query-planner system prompt. When a term is in view, the model is
+ * told that "my current schedule / draft / builder" means the saved=false draft
+ * for that term, so it resolves the schedule shown in the calendar correctly
+ * instead of reading across all of the user's terms.
+ */
+function buildGeneratorSystem(termId: number | null): string {
+  const base = [
+    `You are the query planner of a university information assistant.`,
+    `Translate the user's request into a SINGLE structured read-only database query proposed in JSON.`,
+    ``,
+    buildSchemaKnowledge(),
+    buildQueryFormatInstructions(),
+    ``,
+    `Remember: propose data retrieval only. If the request is conversational or outside the database, output {"intent": "no_query", "query": null}.`,
+  ];
+
+  if (termId != null) {
+    base.push(
+      ``,
+      `The user is currently viewing the term with id ${termId} in their schedule builder.`,
+      `When they refer to "my current schedule", "my draft", "the schedule in the calendar", or "the builder", query the schedules entity filtered to saved=false AND term_id=${termId}, so you read exactly the schedule shown in the calendar.`,
+    );
+  }
+
+  return base.join('\n');
+}
 
 export type QueryGenerationOutcome =
   | { kind: 'query'; query: AssistantQuery }
@@ -41,6 +59,7 @@ export async function proposeAssistantQuery(
   message: string,
   history: GeminiContent[],
   userId: string,
+  termId: number | null = null,
 ): Promise<QueryGenerationOutcome> {
   const contents: GeminiContent[] = [
     ...history.slice(-8),
@@ -63,7 +82,7 @@ export async function proposeAssistantQuery(
   ];
 
   const raw = await generateJson<{ intent?: unknown; query?: unknown }>({
-    systemInstruction: GENERATOR_SYSTEM,
+    systemInstruction: buildGeneratorSystem(termId),
     contents,
   });
 
@@ -84,10 +103,11 @@ export async function runAssistantRoute(
   message: string,
   userId: string,
   history: GeminiContent[],
+  termId: number | null = null,
 ): Promise<string> {
   let proposal: QueryGenerationOutcome;
   try {
-    proposal = await proposeAssistantQuery(message, history, userId);
+    proposal = await proposeAssistantQuery(message, history, userId, termId);
   } catch (error) {
     if (error instanceof AppError) {
       throw error;

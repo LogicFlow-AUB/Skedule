@@ -10,6 +10,7 @@ const chatBody = z
   .object({
     message: z.string().trim().min(1).max(2000),
     sessionId: z.string().trim().min(1).max(200).optional(),
+    termId: z.number().int().positive().nullable().optional(),
   })
   .strict();
 

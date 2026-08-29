@@ -23,15 +23,23 @@ function matchesLike(rowValue: unknown, pattern: string): boolean {
 /** Parses a PostgREST-style `or` expression such as `user_id.eq.X,friend_id.eq.X`. */
 function matchesOr(row: Row, expression: string): boolean {
   return expression.split(',').some((clause) => {
-    const match = /^([a-z_]+)\.(eq|neq)\.(.*)$/.exec(clause.trim());
-    if (!match) {
-      return false;
+    let match = /^([a-z_]+)\.(eq|neq)\.(.*)$/.exec(clause.trim());
+    if (match) {
+      const [, field, op, rawValue] = match;
+      if (op === 'eq') {
+        return String(row[field]) === rawValue;
+      }
+      return String(row[field]) !== rawValue;
     }
-    const [, field, op, rawValue] = match;
-    if (op === 'eq') {
-      return String(row[field]) === rawValue;
+    match = /^([a-z_]+)\.(ilike|like)\.(.*)$/.exec(clause.trim());
+    if (match) {
+      const [, field, op, rawValue] = match;
+      if (op === 'ilike') {
+        return matchesLike(String(row[field]).toLowerCase(), rawValue.toLowerCase());
+      }
+      return matchesLike(row[field], rawValue);
     }
-    return String(row[field]) !== rawValue;
+    return false;
   });
 }
 
@@ -89,7 +97,9 @@ export class FakeQuery {
   }
 
   ilike(column: string, pattern: string): FakeQuery {
-    return this.addFilter('ilike', column, pattern, (row) => matchesLike(row[column], pattern));
+    return this.addFilter('ilike', column, pattern, (row) =>
+      matchesLike(String(row[column] ?? '').toLowerCase(), pattern.toLowerCase()),
+    );
   }
 
   in(column: string, values: unknown[]): FakeQuery {

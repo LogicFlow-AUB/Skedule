@@ -10,6 +10,7 @@ type ScheduleCourseParams = { id: number; courseId: number };
 type SchedulesQuery = { page?: number; limit?: number };
 type SectionInput = { sectionId: number };
 type CompareSchedulesInput = { scheduleIds: number[] };
+type DraftQuery = { term_id?: number | null };
 
 function getUserId(req: Parameters<RequestHandler>[0]): string {
   if (!req.userId) {
@@ -60,6 +61,52 @@ export const deleteSchedule: RequestHandler = async (req, res) => {
   await schedulesService.deleteSchedule(getUserId(req), id);
 
   res.status(204).send();
+};
+
+export const getDraft: RequestHandler = async (req, res) => {
+  const query = getValidated<DraftQuery>(res, 'query');
+  const data = await schedulesService.getDraft(getUserId(req), query.term_id ?? null);
+
+  res.status(200).json({ data });
+};
+
+export const saveDraft: RequestHandler = async (req, res) => {
+  const query = getValidated<DraftQuery>(res, 'query');
+  const data = await schedulesService.saveDraft(
+    getUserId(req),
+    query.term_id ?? null,
+    getValidated<schedulesService.SaveDraftInput>(res, 'body'),
+  );
+
+  res.status(200).json({ data });
+};
+
+export const saveSchedule: RequestHandler = async (req, res) => {
+  const { id } = getValidated<ScheduleIdParams>(res, 'params');
+  const data = await schedulesService.saveSchedule(getUserId(req), id);
+
+  res.status(200).json({ data });
+};
+
+export const setFavorite: RequestHandler = async (req, res) => {
+  const { id } = getValidated<ScheduleIdParams>(res, 'params');
+  const data = await schedulesService.setFavorite(getUserId(req), id);
+
+  res.status(200).json({ data });
+};
+
+export const unsetFavorite: RequestHandler = async (req, res) => {
+  const { id } = getValidated<ScheduleIdParams>(res, 'params');
+  const data = await schedulesService.unsetFavorite(getUserId(req), id);
+
+  res.status(200).json({ data });
+};
+
+export const loadScheduleAsDraft: RequestHandler = async (req, res) => {
+  const { id } = getValidated<ScheduleIdParams>(res, 'params');
+  const data = await schedulesService.loadScheduleAsDraft(getUserId(req), id);
+
+  res.status(200).json({ data });
 };
 
 export const addScheduleCourse: RequestHandler = async (req, res) => {

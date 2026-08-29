@@ -14,6 +14,7 @@ type CourseListQuery = {
   limit?: number;
 };
 type CompareCoursesInput = { codes: string[] };
+type SectionsQuery = { term_id?: number | null };
 
 export const listCourses: RequestHandler = async (_req, res) => {
   const query = getValidated<CourseListQuery>(res, 'query');
@@ -35,9 +36,10 @@ export const getCourse: RequestHandler = async (_req, res) => {
   res.status(200).json({ data });
 };
 
-export const getSections: RequestHandler = async (_req, res) => {
+export const getSections: RequestHandler = async (req, res) => {
   const { code } = getValidated<CourseCodeParams>(res, 'params');
-  const data = await coursesService.getSections(code);
+  const { term_id } = getValidated<SectionsQuery>(res, 'query');
+  const data = await coursesService.getSections(code, term_id ?? null);
 
   res.status(200).json({ data });
 };

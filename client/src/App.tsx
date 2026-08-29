@@ -83,7 +83,7 @@ function AppGate() {
       case 'manual-builder':
         return <AIScheduler activeMode={activePage} setPage={setActivePage} />
       case 'saved-schedules':
-        return <SavedSchedules />
+        return <SavedSchedules setPage={setActivePage} />
       case 'course-reviews':
       case 'professor-reviews':
         return <Reviews activeTab={activePage as 'course-reviews' | 'professor-reviews'} />

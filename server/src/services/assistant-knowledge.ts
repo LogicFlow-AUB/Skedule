@@ -78,6 +78,12 @@ export function buildSchemaKnowledge(): string {
     '- Every query must be limited; keep results small (1–20 rows, at most 50).',
     '- Private entities (schedules, schedule_sections, course_saves, event_rsvps, friendships) are ',
     "  automatically limited to the signed-in user. Never guess another user's data.",
+    '- On "schedules": a row with saved=false is the user\'s current working draft for its term',
+    "  (at most one per user+term). saved=true means a permanently saved schedule. The single",
+    '  row with is_favorite=true per user is their favourite saved schedule. When the user asks',
+    '  about "my current schedule", "my draft", or the schedule in the builder, prefer the',
+    '  saved=false draft. When they ask about saved/favourite schedules, read rows with',
+    '  saved=true / is_favorite=true. Generating new schedules is NOT available in chat.',
     '',
   ].join('\n');
 }

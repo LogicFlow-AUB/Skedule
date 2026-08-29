@@ -1,4 +1,9 @@
-export type TermOption = { id: number; name: string; start_date?: string; end_date?: string }
+export type TermOption = { id: number; name: string; code?: string; description?: string; start_date?: string; end_date?: string }
+
+/** Human-readable label for a term: the AUB description, else the code, else the name. */
+export function termLabel(term: Pick<TermOption, 'description' | 'code' | 'name'>): string {
+  return term.description || term.code || term.name
+}
 export type AttributeOption = { id: number; name: string }
 export type ProfessorOption = { id: number; first_name: string; last_name: string }
 export type CourseOption = { id: number; code: string; title: string; credits: number; professors: ProfessorOption[] }
@@ -98,6 +103,46 @@ export function buildOptimizeRequest(state: OptimizerFormState): OptimizeSchedul
     professor_preferences: state.professorPreferences, excluded_section_ids: state.excludedSectionIds,
     ...(state.maxOccurrencesPerDay == null ? {} : { max_occurrences_per_day: state.maxOccurrencesPerDay }),
   }
+}
+
+/**
+ * Render an OptimizeScheduleRequest as a self-describing natural-language
+ * request that the existing assistant router can route to the optimizer route
+ * and whose extraction step can recover the exact selected preferences. The
+ * optimizer route's extraction treats explicit numeric ids (courses, attributes,
+ * professors, term, sections) as pass-through values, so the user's exact
+ * selections survive the round-trip rather than being re-guessed.
+ */
+export function buildOptimizerPrompt(request: OptimizeScheduleRequest): string {
+  const lines: string[] = [`Please generate an optimal schedule for term id ${request.term_id}.`]
+  if (request.required_course_ids.length > 0) {
+    lines.push(`Required course ids: ${request.required_course_ids.join(', ')}.`)
+  }
+  if (request.acceptable_elective_course_ids.length > 0) {
+    lines.push(`Acceptable elective course ids: ${request.acceptable_elective_course_ids.join(', ')}.`)
+  }
+  if (request.attribute_ids.length > 0) {
+    lines.push(`Required attribute ids: ${request.attribute_ids.join(', ')}.`)
+  }
+  if (request.min_credits === request.max_credits) {
+    lines.push(`Target credits: exactly ${request.min_credits}.`)
+  } else {
+    lines.push(`Target credits: at least ${request.min_credits} and at most ${request.max_credits}.`)
+  }
+  lines.push(
+    `Priority weights: days ${request.weights.days}, gaps ${request.weights.gaps}, professor ${request.weights.professor}.`,
+  )
+  const prefs = Object.entries(request.professor_preferences ?? {})
+  if (prefs.length > 0) {
+    lines.push(`Professor preferences: ${prefs.map(([id, score]) => `professor id ${id}: preference ${score}`).join(', ')}.`)
+  }
+  if (request.excluded_section_ids && request.excluded_section_ids.length > 0) {
+    lines.push(`Excluded section ids: ${request.excluded_section_ids.join(', ')}.`)
+  }
+  if (request.max_occurrences_per_day != null) {
+    lines.push(`At most ${request.max_occurrences_per_day} classes per day.`)
+  }
+  return lines.join('\n')
 }
 
 export function validateOptimizerResult(result: OptimizeScheduleResult) {

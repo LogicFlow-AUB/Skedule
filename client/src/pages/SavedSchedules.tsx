@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { BookmarkCheck, GitCompare, Eye, FileDown, X, Calendar, Clock, BookOpen, CheckCircle } from 'lucide-react'
+import { BookmarkCheck, GitCompare, Eye, FileDown, X, Calendar, Clock, BookOpen, CheckCircle, Star, Pencil, Sparkles } from 'lucide-react'
+import type { Page } from '../App'
 import { api, type ScheduleSummary, type ScheduleDetail } from '../lib/api'
 import { displayName, formatDate } from '../lib/format'
 
@@ -294,7 +295,7 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   )
 }
 
-export default function SavedSchedules() {
+export default function SavedSchedules({ setPage }: { setPage?: (p: Page) => void }) {
   const [viewDetail, setViewDetail] = useState<ScheduleDetail | null>(null)
   const [showCompare, setShowCompare] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -302,6 +303,48 @@ export default function SavedSchedules() {
   const [details, setDetails] = useState<Record<number, ScheduleDetail>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  async function handleFavorite(id: number, current: boolean) {
+    try {
+      if (current) {
+        await api.schedules.unfavorite(id)
+      } else {
+        await api.schedules.favorite(id)
+      }
+      // The list reload reflects the single per-user favorite.
+      await reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update favourite.')
+    }
+  }
+
+  async function handleLoad(id: number, mode: Page) {
+    try {
+      const res = await api.schedules.loadAsDraft(id)
+      // Remember which term the loaded draft belongs to so the builders open on
+      // it instead of defaulting to the first term (which would leave the
+      // calendar empty for drafts that live in a different / no term).
+      const term = res.data.termId
+      sessionStorage.setItem('logicflow.openTerm', term == null ? '' : String(term))
+      if (setPage) {
+        setPage(mode)
+        setToast('Loaded into the builder.')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load schedule.')
+    }
+  }
+
+  const reload = async () => {
+    const { data } = await api.schedules.list(1, 50)
+    setSummaries(data)
+    const loaded = await Promise.all(data.map((s) => api.schedules.get(s.id)))
+    const map: Record<number, ScheduleDetail> = {}
+    for (const res of loaded) {
+      map[res.data.id] = res.data
+    }
+    setDetails(map)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -422,15 +465,27 @@ export default function SavedSchedules() {
                       </div>
                       {s.notes && <p style={{ fontSize: 12, color: '#94A3B8', marginTop: 6, lineHeight: 1.5 }}>{s.notes}</p>}
                     </div>
-                    <button
-                      onClick={() => void handleDelete(s.id)}
-                      className="rounded-lg p-1.5 transition-colors"
-                      style={{ color: '#CBD5E1' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#EF4444' }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#CBD5E1' }}
-                    >
-                      <X size={15} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => void handleFavorite(s.id, s.isFavorite)}
+                        title={s.isFavorite ? 'Unfavourite' : 'Favourite'}
+                        className="rounded-lg p-1.5 transition-colors"
+                        style={{ color: s.isFavorite ? '#F59E0B' : '#CBD5E1' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#FFFBEB' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <Star size={15} fill={s.isFavorite ? '#F59E0B' : 'none'} />
+                      </button>
+                      <button
+                        onClick={() => void handleDelete(s.id)}
+                        className="rounded-lg p-1.5 transition-colors"
+                        style={{ color: '#CBD5E1' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#EF4444' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#CBD5E1' }}
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Course tags */}
@@ -476,6 +531,26 @@ export default function SavedSchedules() {
                     >
                       <FileDown size={13} />
                       Save as PDF
+                    </button>
+                    <button
+                      onClick={() => void handleLoad(s.id, 'manual-builder')}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all"
+                      style={{ fontSize: 12, background: '#F8FAFC', color: '#0F172A', border: '1px solid #E2E8F0' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#0F172A' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.color = '#0F172A' }}
+                    >
+                      <Pencil size={13} />
+                      Open in Manual Builder
+                    </button>
+                    <button
+                      onClick={() => void handleLoad(s.id, 'ai-scheduler')}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all"
+                      style={{ fontSize: 12, background: '#F8FAFC', color: '#0F172A', border: '1px solid #E2E8F0' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#0F172A' }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.color = '#0F172A' }}
+                    >
+                      <Sparkles size={13} />
+                      Open in AI Scheduler
                     </button>
                   </div>
                 </div>

@@ -256,14 +256,19 @@ export type CourseSection = Section & {
   section_meetings: SectionMeeting[];
 };
 
-export async function getSections(code: string): Promise<CourseSection[]> {
+export async function getSections(code: string, termId?: number | null): Promise<CourseSection[]> {
   const course = await getCourse(code);
   const db = requireSupabaseClient();
-  const { data, error } = await db
+  let query = db
     .from('sections')
     .select('*, professors(id, first_name, last_name), section_meetings(*)')
-    .eq('course_id', course.id)
-    .order('section_number');
+    .eq('course_id', course.id);
+
+  if (termId != null) {
+    query = query.eq('term_id', termId);
+  }
+
+  const { data, error } = await query.order('section_number');
 
   if (error) {
     throw error;

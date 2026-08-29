@@ -364,13 +364,15 @@ const ENTITY_ROWS: EntityRow[] = [
   {
     name: 'schedules',
     table: 'schedules',
-    defaultSelect: ['id', 'user_id', 'term_id', 'name', 'notes', 'created_at', 'updated_at'],
-    selectable: ['id', 'user_id', 'term_id', 'name', 'notes', 'created_at', 'updated_at'],
+    defaultSelect: ['id', 'user_id', 'term_id', 'name', 'notes', 'saved', 'is_favorite', 'created_at', 'updated_at'],
+    selectable: ['id', 'user_id', 'term_id', 'name', 'notes', 'saved', 'is_favorite', 'created_at', 'updated_at'],
     filterable: {
       id: 'number',
       user_id: 'uuid',
       term_id: 'number',
       name: 'string',
+      saved: 'boolean',
+      is_favorite: 'boolean',
       created_at: 'date_time',
       updated_at: 'date_time',
     },

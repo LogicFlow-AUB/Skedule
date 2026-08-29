@@ -106,6 +106,8 @@ export type Schedule = {
   name: string | null;
   notes: string | null;
   term_id: number | null;
+  saved: boolean;
+  is_favorite: boolean;
   created_at: string;
   updated_at: string;
 };

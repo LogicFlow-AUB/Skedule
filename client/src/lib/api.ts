@@ -1,4 +1,4 @@
-import type { AttributeOption, CourseOption, OptimizeScheduleRequest, OptimizeScheduleResult, TermOption } from './scheduleOptimizer'
+import type { AttributeOption, CourseOption, OptimizeScheduleRequest, OptimizeScheduleResult, SelectedSection, TermOption } from './scheduleOptimizer'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api'
 
@@ -291,6 +291,8 @@ export type ScheduleSummary = {
   name: string | null
   notes: string | null
   termId: number | null
+  saved: boolean
+  isFavorite: boolean
   createdAt: string
   updatedAt: string
   courseCount: number
@@ -471,6 +473,33 @@ export type ListProfessorsQuery = {
   limit?: number
 }
 
+/**
+ * Payload carried by the assistant chat response when the router picks the
+ * optimizer route. `selected_sections` has the same shape as the standalone
+ * `/schedules/optimize` result so it can be rendered identically.
+ */
+export type AssistantOptimizerPayload = {
+  status: string
+  request_id?: string | null
+  total_credits: number
+  campus_days: number
+  selected_section_ids: string[]
+  selected_sections: SelectedSection[]
+  input: {
+    term_id: number
+    required_course_ids: number[]
+    acceptable_elective_course_ids: number[]
+    min_credits: number
+    max_credits: number
+  }
+}
+
+export type AssistantChatResult = {
+  response: string
+  route: 'assistant' | 'optimizer' | string
+  optimizer?: AssistantOptimizerPayload
+}
+
 export const api = {
   auth: {
     login: (email: string, password: string) =>
@@ -510,8 +539,13 @@ export const api = {
     },
     get: (code: string) =>
       request<{ data: CourseSummary }>(`/courses/${encodeURIComponent(code)}`),
-    sections: (code: string) =>
-      request<{ data: CourseSection[] }>(`/courses/${encodeURIComponent(code)}/sections`),
+    sections: (code: string, termId?: number) => {
+      const params = new URLSearchParams()
+      if (termId != null) params.set('term_id', String(termId))
+      return request<{ data: CourseSection[] }>(
+        `/courses/${encodeURIComponent(code)}/sections?${params.toString()}`,
+      )
+    },
     gradeDistribution: (code: string) =>
       request<{ data: GradeDistributionRow[] }>(
         `/courses/${encodeURIComponent(code)}/grade-distribution`,
@@ -573,15 +607,20 @@ export const api = {
   },
 
   schedules: {
-    optimizerOptions: () => request<{ terms: TermOption[]; attributes: AttributeOption[] }>('/schedules/optimizer-options'),
+    optimizerOptions: () => request<{ terms: TermOption[]; attributes: AttributeOption[] }>('/schedule/optimizer-options'),
+    optimizerTerms: async () => {
+      const body = await request<{ data: TermOption[] }>('/schedule/terms')
+      if (!body || !Array.isArray(body.data)) throw new ApiError(502, 'MALFORMED_RESPONSE', 'Term list returned a malformed response.')
+      return body.data
+    },
     optimizerCourses: async (termId: number, search: string) => {
       const params = new URLSearchParams({ term_id: String(termId), search })
-      const body = await request<{ data: CourseOption[] }>(`/courses?${params.toString()}`)
+      const body = await request<{ data: CourseOption[] }>(`/schedule/courses?${params.toString()}`)
       if (!body || !Array.isArray(body.data)) throw new ApiError(502, 'MALFORMED_RESPONSE', 'Course search returned a malformed response.')
       return body.data
     },
     optimize: async (input: OptimizeScheduleRequest) => {
-      const body = await request<{ data?: OptimizeScheduleResult }>('/schedules/optimize', { method: 'POST', body: input })
+      const body = await request<{ data?: OptimizeScheduleResult }>('/schedule/optimize', { method: 'POST', body: input })
       if (!body?.data || typeof body.data.status !== 'string') throw new ApiError(502, 'MALFORMED_RESPONSE', 'Optimizer returned a malformed response.')
       return body.data
     },
@@ -612,6 +651,29 @@ export const api = {
       }),
     conflicts: (id: number) =>
       request<{ data: ScheduleConflicts }>(`/schedules/${id}/conflicts`),
+    getDraft: (termId?: number | null) => {
+      const params = new URLSearchParams()
+      if (termId != null) params.set('term_id', String(termId))
+      return request<{ data: ScheduleDetail | null }>(`/schedules/draft?${params.toString()}`)
+    },
+    saveDraft: (
+      termId: number | null,
+      input: { name?: string; notes?: string | null; sectionIds?: number[] },
+    ) => {
+      const params = new URLSearchParams()
+      if (termId != null) params.set('term_id', String(termId))
+      return request<{ data: ScheduleDetail }>(`/schedules/draft?${params.toString()}`, {
+        method: 'PUT',
+        body: input,
+      })
+    },
+    save: (id: number) => request<{ data: ScheduleDetail }>(`/schedules/${id}/save`, { method: 'POST' }),
+    favorite: (id: number) =>
+      request<{ data: ScheduleDetail }>(`/schedules/${id}/favorite`, { method: 'POST' }),
+    unfavorite: (id: number) =>
+      request<{ data: ScheduleDetail }>(`/schedules/${id}/favorite`, { method: 'DELETE' }),
+    loadAsDraft: (id: number) =>
+      request<{ data: ScheduleDetail }>(`/schedules/${id}/load`, { method: 'POST' }),
   },
 
   feed: {
@@ -656,10 +718,14 @@ export const api = {
   },
 
   assistant: {
-    chat: (message: string, sessionId?: string) =>
-      request<{ data: { response: string } }>('/assistant/chat', {
+    chat: (message: string, sessionId?: string, termId?: number | null) =>
+      request<{ data: AssistantChatResult }>('/assistant/chat', {
         method: 'POST',
-        body: { message, ...(sessionId ? { sessionId } : {}) },
+        body: {
+          message,
+          ...(sessionId ? { sessionId } : {}),
+          ...(termId != null ? { termId } : {}),
+        },
       }),
   },
 

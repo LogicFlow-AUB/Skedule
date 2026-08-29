@@ -16,6 +16,7 @@ import { AppError } from '../utils/app-error.js';
 import { routeMessage, type AssistantRoute } from './assistant-router.js';
 import { runAssistantRoute } from './assistant-route.js';
 import { runOptimizerRoute } from './assistant-optimizer.js';
+import type { OptimizeRequestInput } from './schedule-optimizer.service.js';
 import type { GeminiContent } from './assistant-gemini.js';
 import { logger } from '../utils/logger.js';
 
@@ -60,6 +61,20 @@ export function historyToGeminiContents(history: ConversationMessage[]): GeminiC
 export type AssistantResponse = {
   response: string;
   route: AssistantRoute;
+  /**
+   * Present only when the optimizer route ran and produced a result. Payload
+   * is the same shape as the standalone /schedules/optimize endpoint so the
+   * client can render it identically.
+   */
+  optimizer?: {
+    status: string;
+    request_id?: string | null;
+    total_credits: number;
+    campus_days: number;
+    selected_section_ids: string[];
+    selected_sections: Record<string, unknown>[];
+    input: OptimizeRequestInput;
+  };
 };
 
 /** Returns a user-safe answer message for a known assistant-stage failure. */
@@ -89,6 +104,7 @@ export async function handleMessage(
   message: string,
   userId: string,
   sessionId: string,
+  termId: number | null = null,
 ): Promise<AssistantResponse> {
   appendHistory(sessionId, { role: 'user', content: message, timestamp: Date.now() });
 
@@ -96,10 +112,23 @@ export async function handleMessage(
   const route = await routeMessage(message);
 
   let response: string;
+  let optimizer: AssistantResponse['optimizer'];
   if (route === 'optimizer') {
     try {
       const outcome = await runOptimizerRoute(message, history);
       response = outcome.response;
+      const { result, input } = outcome;
+      optimizer = {
+        status: result.status,
+        total_credits: result.total_credits,
+        campus_days: result.campus_days,
+        selected_section_ids: result.selected_section_ids,
+        selected_sections: result.selected_sections,
+        input,
+      };
+      if (result.request_id != null) {
+        optimizer.request_id = result.request_id;
+      }
     } catch (error) {
       if (error instanceof AppError && error.code === 'GEMINI_UNAVAILABLE') {
         throw error;
@@ -113,7 +142,7 @@ export async function handleMessage(
     }
   } else {
     try {
-      response = await runAssistantRoute(message, userId, history);
+      response = await runAssistantRoute(message, userId, history, termId);
     } catch (error) {
       if (error instanceof AppError && error.code === 'GEMINI_UNAVAILABLE') {
         throw error;
@@ -129,7 +158,7 @@ export async function handleMessage(
 
   appendHistory(sessionId, { role: 'assistant', content: response, timestamp: Date.now() });
 
-  return { response, route };
+  return optimizer === undefined ? { response, route } : { response, route, optimizer };
 }
 
 /** Returns a copy of the conversation history for a session (useful for tests). */

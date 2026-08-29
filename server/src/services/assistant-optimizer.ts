@@ -29,6 +29,17 @@ import {
 
 export type OptimizerOutcome = {
   response: string;
+  /**
+   * The optimizer input that was submitted for this request. Let the
+   * client surface the request that produced the schedule.
+   */
+  input: OptimizeRequestInput;
+  /**
+   * The real optimizer result (optimal / infeasible / etc.). When the
+   * status is "optimal", `selected_sections` can be rendered directly
+   * on the client calendar without any fabrication.
+   */
+  result: OptimizerResult;
 };
 
 /** Balanced default objective weights used when the user gives no preference. */
@@ -557,5 +568,5 @@ export async function runOptimizerRoute(
     );
   }
 
-  return { response: renderResult(result, input) };
+  return { response: renderResult(result, input), input, result };
 }

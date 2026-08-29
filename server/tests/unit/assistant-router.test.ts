@@ -23,14 +23,15 @@ beforeEach(() => {
 });
 
 describe('assistant router', () => {
-  it('routes to "assistant" when the LLM picks it', async () => {
+  it('always routes chat to "assistant" so it never auto-triggers the optimizer', async () => {
     routerOutput.value = { route: 'assistant' };
     await expect(routeMessage('What sections are available for CMPS 202?')).resolves.toBe('assistant');
   });
 
-  it('routes to "optimizer" when the LLM picks it', async () => {
+  it('keeps the optimizer out of ordinary chat even for optimization-sounding requests', async () => {
+    // Generate is only triggered from the AI Scheduler button, never from chat.
     routerOutput.value = { route: 'optimizer' };
-    await expect(routeMessage('Create my Fall schedule with 15 credits.')).resolves.toBe('optimizer');
+    await expect(routeMessage('Create my Fall schedule with 15 credits.')).resolves.toBe('assistant');
   });
 
   it('only ever accepts the two supported routes', () => {
@@ -42,37 +43,25 @@ describe('assistant router', () => {
     expect(isRoute(undefined)).toBe(false);
   });
 
-  it('falls back to a deterministic route when the LLM returns an invalid route', async () => {
-    routerOutput.value = { route: 'danger_course' };
-    await expect(routeMessage('hello there')).resolves.toBe('assistant');
-    await expect(routeMessage('build my best timetable')).resolves.toBe('optimizer');
-  });
-
-  it('falls back to "assistant" when the router LLM is unavailable and message is neutral', async () => {
+  it('never routes to optimizer when the routing LLM is unavailable', async () => {
     failRouter.value = true;
     await expect(routeMessage('Who teaches CMPS 202?')).resolves.toBe('assistant');
-    await expect(routeMessage('What are the office hours?')).resolves.toBe('assistant');
-  });
-
-  it('falls back to "optimizer" when the router LLM is unavailable but the message clearly wants optimization', async () => {
-    failRouter.value = true;
-    await expect(routeMessage('Find me the best schedule with no Friday classes.')).resolves.toBe('optimizer');
-    await expect(routeMessage('Optimize my courses to get 15 credits with no gaps.')).resolves.toBe('optimizer');
+    await expect(routeMessage('Find me the best schedule with no Friday classes.')).resolves.toBe('assistant');
   });
 });
 
 describe('deterministic fallback classifier', () => {
-  it('sends database-information questions to "assistant"', () => {
+  it('always answers as "assistant"', () => {
     expect(fallbackRoute('What sections are available for CMPS 202?')).toBe('assistant');
     expect(fallbackRoute('Show me the average professor rating for Bassam Shayya.')).toBe('assistant');
     expect(fallbackRoute('What events are coming up?')).toBe('assistant');
     expect(fallbackRoute('List PHIL courses.')).toBe('assistant');
   });
 
-  it('sends schedule-generation/optimization requests to "optimizer"', () => {
-    expect(fallbackRoute('Create my Fall schedule with 15 credits.')).toBe('optimizer');
-    expect(fallbackRoute('Find me the best schedule with no Friday classes.')).toBe('optimizer');
-    expect(fallbackRoute('Generate a timetable with no morning classes.')).toBe('optimizer');
-    expect(fallbackRoute('I want at least 12 credits and max 15.')).toBe('optimizer');
+  it('does not send schedule-generation/optimization requests to the optimizer', () => {
+    expect(fallbackRoute('Create my Fall schedule with 15 credits.')).toBe('assistant');
+    expect(fallbackRoute('Find me the best schedule with no Friday classes.')).toBe('assistant');
+    expect(fallbackRoute('Generate a timetable with no morning classes.')).toBe('assistant');
+    expect(fallbackRoute('I want at least 12 credits and max 15.')).toBe('assistant');
   });
 });
