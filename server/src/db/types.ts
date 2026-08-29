@@ -132,6 +132,7 @@ export type PostComment = {
   post_id: number;
   user_id: string;
   content: string;
+  parent_comment_id: number | null;
   created_at: string;
 };
 

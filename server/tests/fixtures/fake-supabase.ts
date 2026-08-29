@@ -50,6 +50,8 @@ export class FakeQuery {
   private orderAsc = true;
   private limitN: number | null = null;
   private singleMode = false;
+  private lastInserted: Row[] = [];
+  private deleteMode = false;
 
   /** The most recent `select(...)` argument received. */
   lastSelect: string | null = null;
@@ -142,6 +144,31 @@ export class FakeQuery {
     return this;
   }
 
+  /** Appends row(s) to the table and returns them via `.select().single()`. */
+  insert(row: Row | Row[]): FakeQuery {
+    const rows = Array.isArray(row) ? row : [row];
+    let nextId =
+      this.table.reduce((max, r) => Math.max(max, typeof r.id === 'number' ? r.id : 0), 0) + 1;
+    this.lastInserted = rows.map((r) => {
+      const next = { ...r };
+      if (next.id === undefined || next.id === null) {
+        next.id = nextId++;
+      }
+      if (next.created_at === undefined) {
+        next.created_at = new Date().toISOString();
+      }
+      this.table.push(next);
+      return next;
+    });
+    this.singleMode = true;
+    return this;
+  }
+
+  delete(): FakeQuery {
+    this.deleteMode = true;
+    return this;
+  }
+
   range(): FakeQuery {
     return this;
   }
@@ -152,6 +179,17 @@ export class FakeQuery {
   }
 
   private compute(): { data: Row[] | Row | null; error: null; count: number } {
+    if (this.deleteMode) {
+      const matching = this.table.filter((row) => this.predicates.every((p) => p(row)));
+      for (const row of matching) {
+        const index = this.table.indexOf(row);
+        if (index !== -1) {
+          this.table.splice(index, 1);
+        }
+      }
+      return { data: null, error: null, count: matching.length };
+    }
+
     let rows = this.table.filter((row) => this.predicates.every((p) => p(row)));
     if (this.orderCol) {
       const col = this.orderCol;
@@ -164,7 +202,11 @@ export class FakeQuery {
     if (this.limitN && this.limitN > 0) {
       rows = rows.slice(0, this.limitN);
     }
-    return { data: this.singleMode ? (rows[0] ?? null) : rows, error: null, count: rows.length };
+    return {
+      data: this.singleMode ? (this.lastInserted.length > 0 ? this.lastInserted[0] : (rows[0] ?? null)) : rows,
+      error: null,
+      count: rows.length,
+    };
   }
 
   then(resolve: (value: unknown) => unknown, reject: (reason?: unknown) => unknown) {

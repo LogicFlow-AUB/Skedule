@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   Heart,
   MessageCircle,
-  MoreHorizontal,
   UserPlus,
   Calendar,
   TrendingUp,
@@ -10,12 +9,16 @@ import {
   CheckCircle,
   X,
   Search,
+  Reply,
+  MoreVertical,
+  Trash2,
 } from "lucide-react";
 import {
   api,
   type Post as ApiPost,
   type FriendProfile,
   type FriendRequest,
+  type PostComment,
   type StudentSearchResult,
 } from "../lib/api";
 import { displayName, timeAgo } from "../lib/format";
@@ -53,6 +56,503 @@ function initialsOf(
   return ((firstName?.[0] ?? "") + (lastName?.[0] ?? "")).toUpperCase() || "?";
 }
 
+function currentInitialsFromEmail(email?: string): string {
+  const localPart = email?.split("@")[0] ?? "ST";
+  return (localPart.slice(0, 2) || "ST").toUpperCase();
+}
+
+type CommentWithReplies = PostComment & { replies: PostComment[] };
+
+function CommentAuthor({
+  author,
+  email,
+  size,
+}: {
+  author: PostComment["author"];
+  email?: string;
+  size?: number;
+}) {
+  const initials = author
+    ? initialsOf(author.firstName, author.lastName)
+    : currentInitialsFromEmail(email);
+  const px = size ?? 26;
+  return (
+    <div
+      className="rounded-full flex items-center justify-center shrink-0 font-bold"
+      style={{
+        width: px,
+        height: px,
+        background: "linear-gradient(135deg, var(--color-primary-grad, #6366F1) 0%, #8B5CF6 100%)",
+        color: "white",
+        fontSize: px * 0.36,
+      }}
+    >
+      {initials || "?"}
+    </div>
+  );
+}
+
+function CommentsSection({
+  post,
+  onCommentCountChange,
+}: {
+  post: ApiPost;
+  onCommentCountChange: (delta: number) => void;
+}) {
+  const { user } = useAuth();
+  const [expanded, setExpanded] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [comments, setComments] = useState<CommentWithReplies[]>([]);
+  const [commentText, setCommentText] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [postingReply, setPostingReply] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const [deleteMenuFor, setDeleteMenuFor] = useState<number | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const isMine = (item: PostComment) =>
+    !!item.author && !!user?.id && item.author.id === user.id;
+
+  const renderDeleteDot = (item: PostComment, kind: "comment" | "reply") => {
+    if (!isMine(item)) {
+      return null;
+    }
+    const menuOpen = deleteMenuFor === item.id;
+    return (
+      <div className="relative" style={{ position: "relative" }}>
+        <button
+          onClick={() => {
+            setDeleteMenuFor(menuOpen ? null : item.id);
+            if (!menuOpen && confirmingDelete !== item.id) {
+              setConfirmingDelete(null);
+            }
+          }}
+          className="p-1 rounded-lg hover:bg-slate-100 transition-all"
+          style={{ color: "#94A3B8" }}
+          aria-label={`More options for this ${kind}`}
+        >
+          <MoreVertical size={13} />
+        </button>
+        {menuOpen && (
+          <div
+            className="absolute right-0 top-full mt-1 z-30 rounded-xl overflow-hidden"
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid #E2E8F0",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+              minWidth: 160,
+            }}
+          >
+            {confirmingDelete === item.id ? (
+              <div className="p-3">
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#1E293B", marginBottom: 8 }}>
+                  Delete this {kind}?
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setDeleteMenuFor(null);
+                      void removeComment(item.id);
+                    }}
+                    disabled={deleting}
+                    className="flex-1 rounded-lg px-2 py-1.5 font-semibold"
+                    style={{ fontSize: 11, background: "#DC2626", color: "white" }}
+                  >
+                    {deleting ? "Deleting..." : "Delete"}
+                  </button>
+                  <button
+                    onClick={() => setConfirmingDelete(null)}
+                    className="flex-1 rounded-lg px-2 py-1.5 font-semibold"
+                    style={{ fontSize: 11, background: "#F1F5F9", color: "#64748B" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {deleteError && (
+                  <div style={{ fontSize: 10, color: "#B91C1C", marginTop: 6 }}>
+                    {deleteError}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingDelete(item.id)}
+                className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 transition-all"
+                style={{ fontSize: 12, fontWeight: 600, color: "#DC2626" }}
+              >
+                <Trash2 size={13} />
+                Delete {kind}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  async function load() {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await api.feed.comments(post.id, 1, 100);
+      const nodes = new Map<number, CommentWithReplies>();
+      for (const c of res.data) {
+        nodes.set(c.id, { ...c, replies: [] });
+      }
+      const top: CommentWithReplies[] = [];
+      for (const c of res.data) {
+        const node = nodes.get(c.id)!;
+        if (c.parentCommentId != null && nodes.has(c.parentCommentId)) {
+          nodes.get(c.parentCommentId)!.replies.push(node);
+        } else {
+          top.push(node);
+        }
+      }
+      setComments(top);
+      setLoaded(true);
+    } catch (err) {
+      setLoadError(
+        err instanceof Error ? err.message : "Could not load comments.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleExpanded() {
+    setExpanded((prev) => {
+      const next = !prev;
+      if (next && !loaded) {
+        void load();
+      }
+      return next;
+    });
+  }
+
+  async function submitComment() {
+    const content = commentText.trim();
+    if (!content || postingComment) {
+      return;
+    }
+    setPostingComment(true);
+    setCommentError(null);
+    try {
+      const { data: created } = await api.feed.createComment(post.id, content);
+      setComments((prev) => [...prev, { ...created, replies: [] }]);
+      setCommentText("");
+      onCommentCountChange(1);
+    } catch (err) {
+      setCommentError(
+        err instanceof Error ? err.message : "Could not add comment.",
+      );
+    } finally {
+      setPostingComment(false);
+    }
+  }
+
+  async function submitReply(parentId: number) {
+    const content = replyText.trim();
+    if (!content || postingReply) {
+      return;
+    }
+    setPostingReply(true);
+    setReplyError(null);
+    try {
+      const { data: created } = await api.feed.createComment(
+        post.id,
+        content,
+        parentId,
+      );
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === parentId ? { ...c, replies: [...c.replies, created] } : c,
+        ),
+      );
+      setReplyText("");
+      setReplyingTo(null);
+      onCommentCountChange(1);
+    } catch (err) {
+      setReplyError(
+        err instanceof Error ? err.message : "Could not add reply.",
+      );
+    } finally {
+      setPostingReply(false);
+    }
+  }
+
+  async function removeComment(id: number) {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.feed.deleteComment(id);
+      setComments((prev) => {
+        let removed = 0;
+        const next = prev
+          .map((c) => {
+            if (c.id === id) {
+              removed += 1 + c.replies.length;
+              return null;
+            }
+            const before = c.replies.length;
+            c.replies = c.replies.filter((r) => r.id !== id);
+            removed += before - c.replies.length;
+            return c;
+          })
+          .filter((c): c is CommentWithReplies => c !== null);
+        onCommentCountChange(-removed);
+        return next;
+      });
+      setDeleteMenuFor(null);
+      setConfirmingDelete(null);
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Could not delete.",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const renderReplyForm = (parentId: number) =>
+    replyingTo === parentId ? (
+      <div className="mt-2 flex gap-2 items-start">
+        <div className="flex-1">
+          <textarea
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder="Write a reply..."
+            rows={2}
+            className="w-full rounded-xl p-2.5 outline-none resize-none"
+            style={{
+              fontSize: 12,
+              border: "1px solid #E2E8F0",
+              background: "#FFFFFF",
+              color: "#374151",
+            }}
+            autoFocus
+          />
+          {replyError && (
+            <div style={{ fontSize: 11, color: "#B91C1C", marginTop: 4 }}>
+              {replyError}
+            </div>
+          )}
+          <div className="flex gap-2 mt-1.5">
+            <button
+              onClick={() => void submitReply(parentId)}
+              disabled={!replyText.trim() || postingReply}
+              className="px-3 py-1 rounded-lg font-semibold"
+              style={{
+                fontSize: 11,
+                background: replyText.trim() ? "var(--color-primary, #4338CA)" : "#E2E8F0",
+                color: replyText.trim() ? "white" : "#94A3B8",
+              }}
+            >
+              {postingReply ? "Posting..." : "Reply"}
+            </button>
+            <button
+              onClick={() => {
+                setReplyingTo(null);
+                setReplyError(null);
+              }}
+              className="px-2 py-1 rounded-lg"
+              style={{ fontSize: 11, color: "#64748B" }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
+  return (
+    <div
+      style={{
+        borderTop: "1px solid #F8FAFC",
+        padding: "12px 16px",
+      }}
+    >
+      <button
+        onClick={toggleExpanded}
+        className="flex items-center gap-1.5 text-xs font-semibold transition-all"
+        style={{ color: "#64748B" }}
+      >
+        <MessageCircle size={14} />
+        <span>
+          {expanded ? "Hide comments" : `Comments (${post.commentCount})`}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="mt-3 flex flex-col gap-1">
+          {loading && (
+            <div style={{ fontSize: 12, color: "#94A3B8", padding: "8px 0" }}>
+              Loading comments...
+            </div>
+          )}
+          {loadError && (
+            <div
+              className="rounded-xl px-3 py-2"
+              style={{
+                background: "#FEF2F2",
+                border: "1px solid #FECACA",
+                fontSize: 12,
+                color: "#B91C1C",
+              }}
+            >
+              {loadError}
+            </div>
+          )}
+          {!loading && !loadError && (
+            <>
+              {/* Add comment */}
+              <div className="flex gap-2 items-start">
+                <CommentAuthor author={null} email={user?.email} size={28} />
+                <div className="flex-1">
+                  <textarea
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    placeholder="Add a comment..."
+                    rows={2}
+                    className="w-full rounded-xl p-2.5 outline-none resize-none"
+                    style={{
+                      fontSize: 12,
+                      border: "1px solid #E2E8F0",
+                      background: "#F8FAFC",
+                      color: "#374151",
+                    }}
+                  />
+                  {commentError && (
+                    <div style={{ fontSize: 11, color: "#B91C1C", marginTop: 4 }}>
+                      {commentError}
+                    </div>
+                  )}
+                  <div className="flex justify-end mt-1.5">
+                    <button
+                      onClick={() => void submitComment()}
+                      disabled={!commentText.trim() || postingComment}
+                      className="px-3 py-1 rounded-lg font-semibold"
+                      style={{
+                        fontSize: 11,
+                        background: commentText.trim() ? "var(--color-primary, #4338CA)" : "#E2E8F0",
+                        color: commentText.trim() ? "white" : "#94A3B8",
+                      }}
+                    >
+                      {postingComment ? "Posting..." : "Post"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Comments + replies */}
+              {comments.length === 0 ? (
+                <div style={{ fontSize: 12, color: "#94A3B8", padding: "8px 0" }}>
+                  No comments yet. Be the first to comment.
+                </div>
+              ) : (
+                comments.map((comment) => (
+                  <div key={comment.id} className="mt-2">
+                    {/* Comment (replies allowed) */}
+                    <div className="flex gap-2 items-start">
+                      <CommentAuthor author={comment.author} size={28} />
+                      <div className="flex-1 min-w-0">
+                        <div
+                          className="rounded-xl px-3 py-2"
+                          style={{
+                            background: "#F8FAFC",
+                            border: "1px solid #F1F5F9",
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "#1E293B" }}>
+                                {comment.author
+                                  ? displayName(comment.author.firstName, comment.author.lastName)
+                                  : "You"}
+                              </div>
+                              <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.6 }}>
+                                {comment.content}
+                              </div>
+                            </div>
+                            {renderDeleteDot(comment, "comment")}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span style={{ fontSize: 10, color: "#94A3B8" }}>
+                            {timeAgo(comment.createdAt)}
+                          </span>
+                          <button
+                            onClick={() => {
+                              setReplyingTo(replyingTo === comment.id ? null : comment.id);
+                              setReplyError(null);
+                            }}
+                            className="flex items-center gap-1 text-xs font-semibold transition-all"
+                            style={{ color: "#4338CA" }}
+                          >
+                            <Reply size={11} />
+                            Reply
+                          </button>
+                        </div>
+                        {renderReplyForm(comment.id)}
+                      </div>
+                    </div>
+
+                    {/* Replies (no Reply action allowed) */}
+                    {comment.replies.length > 0 && (
+                      <div
+                        className="ml-8 mt-2 flex flex-col gap-2"
+                        style={{ borderLeft: "2px solid #EEF2FF", paddingLeft: 12 }}
+                      >
+                        {comment.replies.map((reply) => (
+                          <div key={reply.id} className="flex gap-2 items-start">
+                            <CommentAuthor author={reply.author} size={24} />
+                            <div className="flex-1 min-w-0">
+                              <div
+                                className="rounded-xl px-3 py-2"
+                                style={{
+                                  background: "#F8FAFC",
+                                  border: "1px solid #F1F5F9",
+                                }}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1E293B" }}>
+                                      {reply.author
+                                        ? displayName(reply.author.firstName, reply.author.lastName)
+                                        : "You"}
+                                    </div>
+                                    <div style={{ fontSize: 12, color: "#374151", lineHeight: 1.6 }}>
+                                      {reply.content}
+                                    </div>
+                                  </div>
+                                  {renderDeleteDot(reply, "reply")}
+                                </div>
+                              </div>
+                              <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 2 }}>
+                                {timeAgo(reply.createdAt)}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PostCard({
   post,
 }: {
@@ -60,6 +560,7 @@ function PostCard({
 }) {
   const [liked, setLiked] = useState(post.isLikedByCurrentUser);
   const [likeCount, setLikeCount] = useState(post.likeCount);
+  const [commentCount, setCommentCount] = useState(post.commentCount);
 
   const toggleLike = async () => {
     const next = !liked;
@@ -132,12 +633,6 @@ function PostCard({
               {post.type}
             </span>
           </div>
-          <button
-            style={{ color: "#94A3B8" }}
-            className="p-1 rounded-lg hover:bg-slate-50"
-          >
-            <MoreHorizontal size={15} />
-          </button>
         </div>
       </div>
 
@@ -165,7 +660,21 @@ function PostCard({
         >
           <Heart size={14} fill={liked ? "#EF4444" : "none"} /> {likeCount}
         </button>
+        <div
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
+          style={{ color: "#64748B", fontSize: 12, fontWeight: 500 }}
+        >
+          <MessageCircle size={14} /> {commentCount}
+        </div>
+        <div className="flex-1" />
       </div>
+
+      <CommentsSection
+        post={post}
+        onCommentCountChange={(delta) =>
+          setCommentCount((p) => Math.max(0, p + delta))
+        }
+      />
     </div>
   );
 }

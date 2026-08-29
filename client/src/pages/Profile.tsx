@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
   Star, Edit3, GitCompare,
-  Bell, Lock, Eye, Palette, Shield, X, CheckCircle,
+  Bell, Lock, Eye, Palette, Shield, X, CheckCircle, MessagesSquare, Trash2, Heart,
 } from 'lucide-react'
-import { api, type UserProfile, type UserStats, type UserReview, type FriendProfile, type FriendRequest, type NotificationPreferences, type ScheduleSummary, type ScheduleDetail } from '../lib/api'
+import { api, type UserProfile, type UserStats, type UserReview, type FriendProfile, type FriendRequest, type NotificationPreferences, type ScheduleSummary, type ScheduleDetail, type MyComment, type Post } from '../lib/api'
 import { displayName, formatDate, timeAgo } from '../lib/format'
 import { useAuth } from '../lib/auth'
 
@@ -56,10 +56,15 @@ function NotifToggle({ label, sub, on, onToggle }: { label: string; sub: string;
 
 export default function Profile() {
   const { user, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'schedules' | 'reviews' | 'settings'>('schedules')
+  const [activeTab, setActiveTab] = useState<'schedules' | 'reviews' | 'activity' | 'settings'>('schedules')
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [stats, setStats] = useState<UserStats | null>(null)
   const [reviews, setReviews] = useState<UserReview[]>([])
+  const [myComments, setMyComments] = useState<MyComment[]>([])
+  const [myPosts, setMyPosts] = useState<Post[]>([])
+  const [confirmingCommentId, setConfirmingCommentId] = useState<number | null>(null)
+  const [confirmingPostId, setConfirmingPostId] = useState<number | null>(null)
+  const [commentError, setCommentError] = useState<string | null>(null)
   const [friends, setFriends] = useState<FriendProfile[]>([])
   const [incomingRequests, setIncomingRequests] = useState<FriendRequest[]>([])
   const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([])
@@ -120,7 +125,7 @@ export default function Profile() {
     async function load() {
       setLoading(true)
       try {
-        const [p, s, r, friendsRes, requestsRes, schedulesRes, np] = await Promise.all([
+        const [p, s, r, friendsRes, requestsRes, schedulesRes, np, myCommentsRes, myPostsRes] = await Promise.all([
           api.users.profile(userId!),
           api.users.stats(userId!),
           api.users.reviews(userId!, 1, 50),
@@ -128,6 +133,8 @@ export default function Profile() {
           api.friends.requests(),
           api.schedules.list(1, 50),
           api.notifications.preferences(),
+          api.feed.myComments(1, 50),
+          api.feed.myPosts(1, 50),
         ])
         if (cancelled) {
           return
@@ -135,6 +142,8 @@ export default function Profile() {
         setProfile(p.data)
         setStats(s.data)
         setReviews(r.data)
+        setMyComments(myCommentsRes.data)
+        setMyPosts(myPostsRes.data)
         setFriends(friendsRes.data)
         setIncomingRequests(requestsRes.data.incoming)
         setOutgoingRequests(requestsRes.data.outgoing)
@@ -197,6 +206,28 @@ export default function Profile() {
       await refreshFriendData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not cancel friend request.')
+    }
+  }
+
+  const deleteMyComment = async (id: number) => {
+    try {
+      await api.feed.deleteComment(id)
+      setMyComments((prev) => prev.filter((c) => c.id !== id))
+      setToast('Comment deleted.')
+    } catch (err) {
+      setCommentError(err instanceof Error ? err.message : 'Could not delete comment.')
+      setConfirmingCommentId(null)
+    }
+  }
+
+  const removeMyPost = async (id: number) => {
+    try {
+      await api.feed.remove(id)
+      setMyPosts((prev) => prev.filter((p) => p.id !== id))
+      setToast('Post deleted.')
+    } catch (err) {
+      setCommentError(err instanceof Error ? err.message : 'Could not delete post.')
+      setConfirmingPostId(null)
     }
   }
 
@@ -351,6 +382,7 @@ export default function Profile() {
           {[
             { id: 'schedules', label: 'Saved Schedules' },
             { id: 'reviews', label: 'My Reviews' },
+            { id: 'activity', label: 'My Activity' },
             { id: 'settings', label: '⚙ Settings' },
           ].map((t) => (
             <button key={t.id} onClick={() => setActiveTab(t.id as typeof activeTab)}
@@ -492,6 +524,139 @@ export default function Profile() {
                     </span>
                   </div>
                 )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ---- MY ACTIVITY TAB ---- */}
+        {!loading && activeTab === 'activity' && (
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#0F172A', marginBottom: 12 }}>
+              My Activity
+            </div>
+            {commentError && (
+              <div className="rounded-xl px-4 py-3 mb-4" style={{ background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 12, fontWeight: 600, color: '#B91C1C' }}>
+                {commentError}
+              </div>
+            )}
+
+            {/* My Posts */}
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 10 }}>
+              My Posts ({myPosts.length})
+            </div>
+            {myPosts.length === 0 && (
+              <div style={{ fontSize: 13, color: '#94A3B8', marginBottom: 20 }}>
+                You haven't created any posts yet. Visit the Community to share a post.
+              </div>
+            )}
+            <div className="flex flex-col gap-3 mb-8">
+              {myPosts.map((post) => (
+                <div key={post.id} className="rounded-2xl p-5"
+                  style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-md px-2.5 py-0.5" style={{ fontSize: 10, fontWeight: 700, background: '#EEF2FF', color: '#4338CA', textTransform: 'capitalize' }}>
+                        {post.type}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#94A3B8' }}>{timeAgo(post.createdAt)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span style={{ fontSize: 11, color: '#94A3B8' }}>
+                        <Heart size={11} style={{ display: 'inline', marginRight: 4, color: '#EF4444' }} />{post.likeCount}
+                      </span>
+                      <span style={{ fontSize: 11, color: '#94A3B8' }}>
+                        <MessagesSquare size={11} style={{ display: 'inline', marginRight: 4, color: '#64748B' }} />{post.commentCount}
+                      </span>
+                      {confirmingPostId === post.id && (
+                        <span style={{ fontSize: 10, color: '#B91C1C', fontWeight: 700 }}>Delete this post?</span>
+                      )}
+                      <button
+                        onClick={() => {
+                          if (confirmingPostId === post.id) {
+                            setConfirmingPostId(null)
+                            void removeMyPost(post.id)
+                          } else {
+                            setCommentError(null)
+                            setConfirmingPostId(post.id)
+                          }
+                        }}
+                        className="ml-2 rounded-lg px-2.5 py-1.5 flex items-center gap-1"
+                        style={{ fontSize: 11, fontWeight: 700, background: confirmingPostId === post.id ? '#DC2626' : '#FEF2F2', color: confirmingPostId === post.id ? 'white' : '#DC2626', border: '1px solid #FECACA' }}
+                      >
+                        <Trash2 size={11} />
+                        {confirmingPostId === post.id ? 'Confirm' : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.7 }}>{post.content}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* My Comments & Replies */}
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 10 }}>
+              My Comments & Replies ({myComments.length})
+            </div>
+            {myComments.length === 0 && (
+              <div style={{ fontSize: 13, color: '#94A3B8' }}>
+                You haven't written any comments or replies yet. Visit the Community to join discussions.
+              </div>
+            )}
+            {myComments.map((c) => (
+              <div key={c.id} className="rounded-2xl p-5 mb-4"
+                style={{ background: '#FFFFFF', border: '1px solid #F1F5F9', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+                {/* Parent post */}
+                {c.post ? (
+                  <div className="rounded-xl px-4 py-3 mb-3" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                    <div className="flex items-center gap-2 mb-1" style={{ fontSize: 11, color: '#94A3B8' }}>
+                      <MessagesSquare size={13} style={{ color: '#64748B' }} />
+                      <span>You commented on</span>
+                      <span className="rounded-md px-2 py-0.5" style={{ fontSize: 10, fontWeight: 700, background: '#EEF2FF', color: '#4338CA', textTransform: 'capitalize' }}>
+                        {c.post.type} post
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.6 }}>{c.post.content}</div>
+                  </div>
+                ) : (
+                  <div className="rounded-xl px-4 py-3 mb-3" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: 11, color: '#94A3B8' }}>
+                    Post no longer available
+                  </div>
+                )}
+
+                {/* The student's comment / reply */}
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0 rounded-xl px-3 py-2.5"
+                    style={{ background: c.isReply ? '#F0FDF4' : '#EEF2FF', border: `1px solid ${c.isReply ? '#BBF7D0' : '#C7D2FE'}` }}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="rounded-md px-2 py-0.5" style={{ fontSize: 10, fontWeight: 700, background: '#FFFFFF', color: c.isReply ? '#047857' : '#4338CA', marginRight: 'auto' }}>
+                        {c.isReply ? 'Your reply' : 'Your comment'}
+                      </span>
+                      <span style={{ fontSize: 10, color: '#94A3B8' }}>{timeAgo(c.createdAt)}</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.7 }}>{c.content}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    {confirmingCommentId === c.id && (
+                      <span style={{ fontSize: 10, color: '#B91C1C', fontWeight: 700 }}>Delete this {c.isReply ? 'reply' : 'comment'}?</span>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (confirmingCommentId === c.id) {
+                          setConfirmingCommentId(null)
+                          void deleteMyComment(c.id)
+                        } else {
+                          setCommentError(null)
+                          setConfirmingCommentId(c.id)
+                        }
+                      }}
+                      className="rounded-lg px-3 py-1.5 flex items-center gap-1.5"
+                      style={{ fontSize: 11, fontWeight: 700, background: confirmingCommentId === c.id ? '#DC2626' : '#FEF2F2', color: confirmingCommentId === c.id ? 'white' : '#DC2626', border: '1px solid #FECACA' }}
+                    >
+                      {confirmingCommentId === c.id ? 'Confirm' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

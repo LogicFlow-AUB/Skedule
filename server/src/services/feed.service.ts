@@ -16,11 +16,12 @@ export type CreatePostInput = {
 
 export type CreateCommentInput = {
   content: string;
+  parentCommentId?: number;
 };
 
 const USER_COLUMNS = 'id, first_name, last_name, email, major, level';
 const POST_COLUMNS = 'id, user_id, type, content, tags, schedule_id, created_at';
-const COMMENT_COLUMNS = 'id, post_id, user_id, content, created_at';
+const COMMENT_COLUMNS = 'id, post_id, user_id, content, parent_comment_id, created_at';
 
 function postAuthor(user: User | null) {
   if (!user) {
@@ -61,6 +62,8 @@ function postResponse(
 
 type PostCommentRow = PostComment & { users: User | User[] | null };
 
+type MyCommentRow = PostComment & { posts: Post | Post[] | null };
+
 /**
  * PostgREST returns a to-one embed as an object, but a to-many embed as an
  * array. Normalises both shapes to a single row.
@@ -78,6 +81,7 @@ function commentResponse(comment: PostCommentRow) {
     id: comment.id,
     postId: comment.post_id,
     content: comment.content,
+    parentCommentId: comment.parent_comment_id,
     createdAt: comment.created_at,
     author: postAuthor(toOne(comment.users)),
   };
@@ -254,6 +258,25 @@ export async function listFeed(pagination: OffsetPagination, userId?: string): P
   return createOffsetPage(await getPostResponses((data ?? []) as Post[], userId), count ?? 0, pagination);
 }
 
+export async function listMyPosts(
+  userId: string,
+  pagination: OffsetPagination,
+): Promise<OffsetPage<unknown>> {
+  const db = requireSupabaseClient();
+  const { data, error, count } = await db
+    .from('posts')
+    .select(POST_COLUMNS, { count: 'exact' })
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(pagination.offset, pagination.offset + pagination.limit - 1);
+
+  if (error) {
+    throw error;
+  }
+
+  return createOffsetPage(await getPostResponses((data ?? []) as Post[], userId), count ?? 0, pagination);
+}
+
 export async function createPost(userId: string, input: CreatePostInput) {
   if (input.scheduleId !== undefined) {
     await assertScheduleOwnership(userId, input.scheduleId);
@@ -388,13 +411,62 @@ export async function getComments(
   );
 }
 
+async function getPostCommentRowOrThrow(commentId: number): Promise<PostComment> {
+  const db = requireSupabaseClient();
+  const { data, error } = await db
+    .from('post_comments')
+    .select(COMMENT_COLUMNS)
+    .eq('id', commentId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new AppError(404, 'COMMENT_NOT_FOUND', 'Comment not found.');
+  }
+
+  return data as PostComment;
+}
+
 export async function createComment(userId: string, postId: number, input: CreateCommentInput) {
   const post = await getPostRowOrThrow(postId);
+
+  let parentCommentId: number | null = null;
+  if (input.parentCommentId != null) {
+    const parent = await getPostCommentRowOrThrow(input.parentCommentId);
+
+    // A reply must belong to the same post as its parent comment.
+    if (parent.post_id !== postId) {
+      throw new AppError(
+        400,
+        'PARENT_COMMENT_MISMATCH',
+        'The parent comment does not belong to this post.',
+      );
+    }
+
+    // Enforce the single level of replies: a reply can never be replied to.
+    if (parent.parent_comment_id != null) {
+      throw new AppError(
+        400,
+        'REPLY_ON_REPLY_NOT_ALLOWED',
+        'Replies can only be added to comments, not to other replies.',
+      );
+    }
+
+    parentCommentId = parent.id;
+  }
 
   const db = requireSupabaseClient();
   const { data, error } = await db
     .from('post_comments')
-    .insert({ post_id: postId, user_id: userId, content: input.content })
+    .insert({
+      post_id: postId,
+      user_id: userId,
+      content: input.content,
+      parent_comment_id: parentCommentId,
+    })
     .select(`${COMMENT_COLUMNS}, users(${USER_COLUMNS})`)
     .single();
 
@@ -406,6 +478,7 @@ export async function createComment(userId: string, postId: number, input: Creat
   await trackActivity(userId, 'post_commented', 'You commented on a post.', {
     postId,
     commentId: comment.id,
+    parentCommentId,
   });
 
   if (post.user_id !== userId) {
@@ -413,4 +486,56 @@ export async function createComment(userId: string, postId: number, input: Creat
   }
 
   return commentResponse(comment);
+}
+
+export async function deleteComment(userId: string, commentId: number): Promise<void> {
+  const comment = await getPostCommentRowOrThrow(commentId);
+
+  if (comment.user_id !== userId) {
+    throw new AppError(403, 'FORBIDDEN', 'You cannot delete this comment.');
+  }
+
+  const db = requireSupabaseClient();
+  const { error } = await db.from('post_comments').delete().eq('id', commentId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+function myCommentResponse(comment: MyCommentRow) {
+  const post = toOne(comment.posts);
+  return {
+    id: comment.id,
+    content: comment.content,
+    parentCommentId: comment.parent_comment_id,
+    isReply: comment.parent_comment_id != null,
+    createdAt: comment.created_at,
+    post: post
+      ? { id: post.id, type: post.type, content: post.content }
+      : null,
+  };
+}
+
+export async function listMyComments(
+  userId: string,
+  pagination: OffsetPagination,
+): Promise<OffsetPage<ReturnType<typeof myCommentResponse>>> {
+  const db = requireSupabaseClient();
+  const { data, error, count } = await db
+    .from('post_comments')
+    .select(`${COMMENT_COLUMNS}, posts(${POST_COLUMNS})`, { count: 'exact' })
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(pagination.offset, pagination.offset + pagination.limit - 1);
+
+  if (error) {
+    throw error;
+  }
+
+  return createOffsetPage(
+    (data ?? []).map((comment) => myCommentResponse(comment as MyCommentRow)),
+    count ?? 0,
+    pagination,
+  );
 }

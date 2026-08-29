@@ -6,6 +6,7 @@ import { AppError } from '../utils/app-error.js';
 import { parseOffsetPagination } from '../utils/pagination.js';
 
 type PostIdParams = { id: number };
+type CommentIdParams = { commentId: number };
 type FeedQuery = { page?: number; limit?: number };
 
 function getUserId(req: Parameters<RequestHandler>[0]): string {
@@ -86,6 +87,24 @@ export const getComments: RequestHandler = async (_req, res) => {
   res.status(200).json({ data: page.data, pagination: page.pagination });
 };
 
+export const listMyComments: RequestHandler = async (req, res) => {
+  const page = await feedService.listMyComments(
+    getUserId(req),
+    parseOffsetPagination(getValidated<FeedQuery>(res, 'query')),
+  );
+
+  res.status(200).json({ data: page.data, pagination: page.pagination });
+};
+
+export const listMyPosts: RequestHandler = async (req, res) => {
+  const page = await feedService.listMyPosts(
+    getUserId(req),
+    parseOffsetPagination(getValidated<FeedQuery>(res, 'query')),
+  );
+
+  res.status(200).json({ data: page.data, pagination: page.pagination });
+};
+
 export const createComment: RequestHandler = async (req, res) => {
   const { id } = getValidated<PostIdParams>(res, 'params');
   const data = await feedService.createComment(
@@ -95,4 +114,11 @@ export const createComment: RequestHandler = async (req, res) => {
   );
 
   res.status(201).json({ data });
+};
+
+export const deleteComment: RequestHandler = async (req, res) => {
+  const { commentId } = getValidated<CommentIdParams>(res, 'params');
+  await feedService.deleteComment(getUserId(req), commentId);
+
+  res.status(204).send();
 };

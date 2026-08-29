@@ -359,8 +359,18 @@ export type PostComment = {
   id: number
   postId: number
   content: string
+  parentCommentId: number | null
   createdAt: string
   author: PostAuthor | null
+}
+
+export type MyComment = {
+  id: number
+  content: string
+  parentCommentId: number | null
+  isReply: boolean
+  createdAt: string
+  post: { id: number; type: string; content: string } | null
 }
 
 export type FriendProfile = {
@@ -688,8 +698,17 @@ export const api = {
     unsave: (id: number) => request<void>(`/feed/${id}/save`, { method: 'DELETE' }),
     comments: (id: number, page = 1, limit = 50) =>
       request<Page<PostComment>>(`/feed/${id}/comments?page=${page}&limit=${limit}`),
-    createComment: (id: number, content: string) =>
-      request<{ data: PostComment }>(`/feed/${id}/comments`, { method: 'POST', body: { content } }),
+    createComment: (id: number, content: string, parentCommentId?: number) =>
+      request<{ data: PostComment }>(`/feed/${id}/comments`, {
+        method: 'POST',
+        body: parentCommentId != null ? { content, parentCommentId } : { content },
+      }),
+    deleteComment: (commentId: number) =>
+      request<void>(`/feed/comments/${commentId}`, { method: 'DELETE' }),
+    myComments: (page = 1, limit = 50) =>
+      request<Page<MyComment>>(`/feed/my/comments?page=${page}&limit=${limit}`),
+    myPosts: (page = 1, limit = 50) =>
+      request<Page<Post>>(`/feed/my/posts?page=${page}&limit=${limit}`),
   },
 
   friends: {
