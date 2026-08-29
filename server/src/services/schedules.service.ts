@@ -591,6 +591,33 @@ export async function getSchedule(userId: string, scheduleId: number): Promise<S
   return getScheduleDetail(await getScheduleOrThrow(userId, scheduleId));
 }
 
+/** Returns the given user's most recently saved schedule, or null if they have none. */
+export async function getLatestSavedScheduleForUser(
+  userId: string,
+): Promise<ScheduleDetail | null> {
+  const db = requireSupabaseClient();
+  const { data, error } = await db
+    .from('schedules')
+    .select(SCHEDULE_COLUMNS)
+    .eq('user_id', userId)
+    .eq('saved', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const schedule = data as Schedule | null;
+
+  if (!schedule) {
+    return null;
+  }
+
+  return getScheduleDetail(schedule);
+}
+
 export async function updateSchedule(
   userId: string,
   scheduleId: number,

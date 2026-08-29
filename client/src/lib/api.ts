@@ -726,6 +726,8 @@ export const api = {
       request<void>(`/friends/requests/${userId}/reject`, { method: 'POST' }),
     remove: (userId: string) => request<void>(`/friends/${userId}`, { method: 'DELETE' }),
     commonFreeTime: () => request<{ data: CommonFreeTime }>('/friends/common-free-time'),
+    schedule: (userId: string) =>
+      request<{ data: ScheduleDetail | null }>(`/friends/${userId}/schedule`),
   },
 
   notifications: {

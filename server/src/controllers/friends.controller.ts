@@ -75,3 +75,10 @@ export const getCommonFreeTime: RequestHandler = async (req, res) => {
 
   res.status(200).json({ data });
 };
+
+export const getFriendSchedule: RequestHandler = async (req, res) => {
+  const { userId } = getValidated<UserIdParams>(res, 'params');
+  const data = await friendsService.getFriendSchedule(getUserId(req), userId);
+
+  res.status(200).json({ data });
+};

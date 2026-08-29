@@ -1,7 +1,8 @@
 import { requireSupabaseClient } from '../db/supabase.js';
 import type { Friendship } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
-import { parseDays, parseMinutes } from './schedules.service.js';
+import { getLatestSavedScheduleForUser, parseDays, parseMinutes } from './schedules.service.js';
+import type { ScheduleDetail } from './schedules.service.js';
 import { trackActivity } from './activity.service.js';
 import {
   notifyFriendRequestReceived,
@@ -508,6 +509,19 @@ function isBusyAt(
     (block) =>
       block.days.includes(day) && block.startMinutes < slotEnd && slotStart < block.endMinutes,
   );
+}
+
+export async function getFriendSchedule(
+  userId: string,
+  friendUserId: string,
+): Promise<ScheduleDetail | null> {
+  const friendship = await getFriendshipBetween(userId, friendUserId);
+
+  if (!friendship || friendship.status !== 'accepted') {
+    throw new AppError(403, 'NOT_FRIENDS', 'You can only view the schedules of your friends.');
+  }
+
+  return getLatestSavedScheduleForUser(friendUserId);
 }
 
 export async function getCommonFreeTime(userId: string) {

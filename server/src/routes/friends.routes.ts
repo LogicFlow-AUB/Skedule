@@ -5,6 +5,7 @@ import {
   acceptFriendRequest,
   getCommonFreeTime,
   getFriendRequests,
+  getFriendSchedule,
   getSuggestedFriends,
   listFriends,
   rejectFriendRequest,
@@ -39,6 +40,12 @@ router.get(
 router.get('/search', requireAuth, validateQuery(studentSearchQuery), asyncHandler(searchStudents));
 router.get('/requests', requireAuth, asyncHandler(getFriendRequests));
 router.get('/common-free-time', requireAuth, asyncHandler(getCommonFreeTime));
+router.get(
+  '/:userId/schedule',
+  requireAuth,
+  validateParams(userIdParams),
+  asyncHandler(getFriendSchedule),
+);
 router.post(
   '/requests/:userId',
   requireAuth,
