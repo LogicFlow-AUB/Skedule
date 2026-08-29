@@ -2,9 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Heart,
   MessageCircle,
-  Bookmark,
   MoreHorizontal,
-  Send,
   UserPlus,
   Calendar,
   TrendingUp,
@@ -22,13 +20,6 @@ import {
 } from "../lib/api";
 import { displayName, timeAgo } from "../lib/format";
 import { useAuth } from "../lib/auth";
-
-const TAG_COLORS: Record<string, { bg: string; text: string }> = {
-  "Schedule Tips": { bg: "#EEF2FF", text: "#4338CA" },
-  "Professor Reviews": { bg: "#FFF7ED", text: "#C2410C" },
-  Question: { bg: "#F0FDF4", text: "#15803D" },
-  "Registration Tips": { bg: "#FEF9C3", text: "#92400E" },
-};
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   schedule: <Calendar size={13} />,
@@ -55,12 +46,6 @@ const AVATAR_COLORS = [
   "#DC2626",
 ];
 
-const STATUS_COLORS: Record<string, string> = {
-  online: "#10B981",
-  away: "#F59E0B",
-  offline: "#CBD5E1",
-};
-
 function initialsOf(
   firstName?: string | null,
   lastName?: string | null,
@@ -70,20 +55,11 @@ function initialsOf(
 
 function PostCard({
   post,
-  currentUserInitials,
-  onCommented,
 }: {
   post: ApiPost;
-  currentUserInitials: string;
-  onCommented: (postId: number, content: string) => void;
 }) {
   const [liked, setLiked] = useState(post.isLikedByCurrentUser);
-  const [saved, setSaved] = useState(post.isSavedByCurrentUser);
   const [likeCount, setLikeCount] = useState(post.likeCount);
-  const [commentCount, setCommentCount] = useState(post.commentCount);
-  const [showComment, setShowComment] = useState(false);
-  const [comment, setComment] = useState("");
-  const [postingComment, setPostingComment] = useState(false);
 
   const toggleLike = async () => {
     const next = !liked;
@@ -98,38 +74,6 @@ function PostCard({
     } catch {
       setLiked(!next);
       setLikeCount((p) => p + (next ? -1 : 1));
-    }
-  };
-
-  const toggleSave = async () => {
-    const next = !saved;
-    setSaved(next);
-    try {
-      if (next) {
-        await api.feed.save(post.id);
-      } else {
-        await api.feed.unsave(post.id);
-      }
-    } catch {
-      setSaved(!next);
-    }
-  };
-
-  const submitComment = async () => {
-    const text = comment.trim();
-    if (!text || postingComment) {
-      return;
-    }
-    setPostingComment(true);
-    try {
-      await api.feed.createComment(post.id, text);
-      setComment("");
-      setCommentCount((p) => p + 1);
-      onCommented(post.id, text);
-    } catch {
-      // best-effort
-    } finally {
-      setPostingComment(false);
     }
   };
 
@@ -149,7 +93,7 @@ function PostCard({
           style={{
             width: 40,
             height: 40,
-            background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
+            background: "linear-gradient(135deg, var(--color-primary-grad, #6366F1) 0%, #8B5CF6 100%)",
             color: "white",
             fontSize: 14,
           }}
@@ -204,29 +148,6 @@ function PostCard({
         </p>
       </div>
 
-      {/* Tags */}
-      {post.tags && post.tags.length > 0 && (
-        <div className="flex gap-1.5 px-4 pb-3 flex-wrap">
-          {post.tags.map((t) => {
-            const tc = TAG_COLORS[t] ?? { bg: "#F1F5F9", text: "#64748B" };
-            return (
-              <span
-                key={t}
-                className="rounded-full px-2.5 py-0.5 cursor-pointer transition-colors"
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  background: tc.bg,
-                  color: tc.text,
-                }}
-              >
-                #{t.replace(/\s/g, "")}
-              </span>
-            );
-          })}
-        </div>
-      )}
-
       {/* Actions */}
       <div
         className="flex items-center gap-1 px-4 py-3"
@@ -244,71 +165,7 @@ function PostCard({
         >
           <Heart size={14} fill={liked ? "#EF4444" : "none"} /> {likeCount}
         </button>
-        <button
-          onClick={() => setShowComment(!showComment)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors"
-          style={{ color: "#64748B", fontSize: 12 }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#F8FAFC";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-          }}
-        >
-          <MessageCircle size={14} /> {commentCount}
-        </button>
-        <button
-          onClick={() => void toggleSave()}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg ml-auto transition-all"
-          style={{
-            color: saved ? "#4338CA" : "#64748B",
-            background: saved ? "#EEF2FF" : "transparent",
-          }}
-        >
-          <Bookmark size={14} fill={saved ? "#4338CA" : "none"} />
-        </button>
       </div>
-
-      {/* Comment input */}
-      {showComment && (
-        <div className="flex items-center gap-2 px-4 pb-3">
-          <div
-            className="rounded-full flex items-center justify-center shrink-0"
-            style={{
-              width: 28,
-              height: 28,
-              background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
-              fontSize: 10,
-              fontWeight: 700,
-              color: "white",
-            }}
-          >
-            {currentUserInitials}
-          </div>
-          <div
-            className="flex-1 flex items-center gap-2 rounded-xl px-3 py-1.5"
-            style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}
-          >
-            <input
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void submitComment();
-              }}
-              placeholder="Write a comment..."
-              className="flex-1 outline-none bg-transparent"
-              style={{ fontSize: 12, color: "#374151" }}
-            />
-            <button
-              onClick={() => void submitComment()}
-              style={{ color: comment ? "#4338CA" : "#CBD5E1" }}
-              disabled={postingComment}
-            >
-              <Send size={13} />
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -419,12 +276,6 @@ export default function Community() {
     };
   }, [studentQuery]);
 
-  const onlineCount = friends.filter(
-    (f) => f.presenceStatus === "online",
-  ).length;
-  const onlineFriends = friends.filter((f) => f.presenceStatus === "online");
-  const otherFriends = friends.filter((f) => f.presenceStatus !== "online");
-
   async function sendRequest(userId: string) {
     try {
       await api.friends.sendRequest(userId);
@@ -511,7 +362,7 @@ export default function Community() {
       <aside
         className="flex flex-col shrink-0 h-full overflow-y-auto"
         style={{
-          width: 220,
+          width: 232,
           background: "#FFFFFF",
           borderRight: "1px solid #F1F5F9",
         }}
@@ -531,8 +382,25 @@ export default function Community() {
             Friends
           </div>
           <div style={{ fontSize: 11, color: "#94A3B8" }}>
-            {onlineCount} online now
+            {friends.length} friend{friends.length === 1 ? "" : "s"}
           </div>
+          <div className="flex items-center gap-2 rounded-lg px-2.5 py-2 mt-3" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
+            <Search size={13} color="#94A3B8" />
+            <input value={studentQuery} onChange={(event) => setStudentQuery(event.target.value)} placeholder="Search by name or AUB email..." className="min-w-0 flex-1 bg-transparent outline-none" style={{ fontSize: 10, color: "#1E293B" }} />
+          </div>
+          {studentSearchLoading && <div style={{ fontSize: 10, color: "#94A3B8", padding: "6px 2px" }}>Searching...</div>}
+          {studentSearchError && <div style={{ fontSize: 10, color: "#B91C1C", padding: "6px 2px" }}>{studentSearchError}</div>}
+          {studentResults.map((student, index) => (
+            <div key={student.id} className="flex items-center gap-2 px-2 py-2 rounded-xl" style={{ background: "#F8FAFC", marginTop: 4 }}>
+              <div className="rounded-full flex items-center justify-center shrink-0" style={{ width: 30, height: 30, background: friendColor(student.id, index) + "20", color: friendColor(student.id, index), fontSize: 10, fontWeight: 700 }}>{initialsOf(student.firstName, student.lastName)}</div>
+              <div className="flex-1 min-w-0"><div className="truncate" style={{ fontSize: 11, fontWeight: 600, color: "#1E293B" }}>{displayName(student.firstName, student.lastName)}</div><div className="truncate" style={{ fontSize: 9, color: "#94A3B8" }}>{[student.major, student.level].filter(Boolean).join(" · ") || "AUB Student"}</div></div>
+              {student.relationship === "none" && <button onClick={() => void sendRequest(student.id)} className="rounded-md px-2 py-1" style={{ fontSize: 9, fontWeight: 700, color: "var(--color-primary, #4338CA)", background: "var(--color-primary-light, #EEF2FF)" }}>Add</button>}
+              {student.relationship === "self" && <span style={{ fontSize: 9, color: "#94A3B8" }}>You</span>}
+              {student.relationship === "friends" && <span style={{ fontSize: 9, color: "#059669" }}>Friends</span>}
+              {student.relationship === "request_sent" && <span style={{ fontSize: 9, color: "#D97706" }}>Sent</span>}
+              {student.relationship === "request_received" && <div className="flex gap-1"><button title="Accept" onClick={() => void acceptRequest(student.id)} style={{ color: "#059669" }}><CheckCircle size={12} /></button><button title="Decline" onClick={() => void rejectRequest(student.id)} style={{ color: "#DC2626" }}><X size={12} /></button></div>}
+            </div>
+          ))}
         </div>
 
         <div className="px-3 py-3 flex-1">
@@ -547,9 +415,9 @@ export default function Community() {
               paddingLeft: 4,
             }}
           >
-            Online — {onlineCount}
+            Friends
           </div>
-          {onlineFriends.map((f, i) => (
+          {friends.map((f, i) => (
             <button
               key={f.id}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
@@ -561,7 +429,7 @@ export default function Community() {
                 e.currentTarget.style.background = "transparent";
               }}
             >
-              <div className="relative shrink-0">
+              <div className="shrink-0">
                 <div
                   className="rounded-full flex items-center justify-center"
                   style={{
@@ -575,14 +443,6 @@ export default function Community() {
                 >
                   {initialsOf(f.firstName, f.lastName) || "?"}
                 </div>
-                <div
-                  className="absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-white"
-                  style={{
-                    width: 10,
-                    height: 10,
-                    background: STATUS_COLORS[f.presenceStatus] ?? "#CBD5E1",
-                  }}
-                />
               </div>
               <div className="flex-1 min-w-0">
                 <div
@@ -603,131 +463,28 @@ export default function Community() {
               </div>
             </button>
           ))}
-          {onlineFriends.length === 0 && !feedLoading && (
+          {friends.length === 0 && !feedLoading && (
             <div style={{ fontSize: 11, color: "#94A3B8", paddingLeft: 4 }}>
-              No friends online.
+              No friends yet. Search for AUB students above.
             </div>
           )}
 
-          {otherFriends.length > 0 && (
-            <>
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#94A3B8",
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  marginBottom: 6,
-                  paddingLeft: 4,
-                  marginTop: 12,
-                }}
-              >
-                Away / Offline
-              </div>
-              {otherFriends.map((f, i) => (
-                <button
-                  key={f.id}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-colors"
-                  style={{ textAlign: "left", opacity: 0.6 }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#F8FAFC";
-                    e.currentTarget.style.opacity = "1";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.opacity = "0.6";
-                  }}
-                >
-                  <div className="relative shrink-0">
-                    <div
-                      className="rounded-full flex items-center justify-center"
-                      style={{
-                        width: 32,
-                        height: 32,
-                        background: friendColor(f.id, i) + "20",
-                        color: friendColor(f.id, i),
-                        fontSize: 11,
-                        fontWeight: 700,
-                      }}
-                    >
-                      {initialsOf(f.firstName, f.lastName) || "?"}
-                    </div>
-                    <div
-                      className="absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-white"
-                      style={{
-                        width: 10,
-                        height: 10,
-                        background:
-                          STATUS_COLORS[f.presenceStatus] ?? "#CBD5E1",
-                      }}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: "#1E293B",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {displayName(f.firstName, f.lastName)}
-                    </div>
-                    <div style={{ fontSize: 10, color: "#94A3B8" }}>
-                      {[f.major, f.level].filter(Boolean).join(" · ") || "—"}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </>
-          )}
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, paddingLeft: 4, marginTop: 14 }}>Pending Requests ({incomingRequests.length})</div>
+          {incomingRequests.map((request, index) => <div key={request.id} className="flex items-center gap-2 px-2 py-2 rounded-xl mb-1" style={{ background: "#F8FAFC" }}>
+            <div className="rounded-full flex items-center justify-center shrink-0" style={{ width: 30, height: 30, background: friendColor(request.user.id, index) + "20", color: friendColor(request.user.id, index), fontSize: 10, fontWeight: 700 }}>{initialsOf(request.user.firstName, request.user.lastName)}</div>
+            <div className="flex-1 min-w-0"><div className="truncate" style={{ fontSize: 11, fontWeight: 600, color: "#1E293B" }}>{displayName(request.user.firstName, request.user.lastName)}</div><div className="truncate" style={{ fontSize: 9, color: "#94A3B8" }}>{[request.user.major, request.user.level].filter(Boolean).join(" · ") || "AUB Student"}</div></div>
+            <button title="Accept" onClick={() => void acceptRequest(request.user.id)} className="rounded-full p-1" style={{ background: "var(--color-primary-light, #EEF2FF)", color: "var(--color-primary, #4338CA)" }}><CheckCircle size={12} /></button>
+            <button title="Decline" onClick={() => void rejectRequest(request.user.id)} className="rounded-full p-1" style={{ background: "#FEF2F2", color: "#DC2626" }}><X size={12} /></button>
+          </div>)}
+          {incomingRequests.length === 0 && <div style={{ fontSize: 10, color: "#94A3B8", paddingLeft: 4 }}>No pending requests.</div>}
 
-          <div style={{ marginTop: 14, marginBottom: 10 }}>
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: "#94A3B8",
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                marginBottom: 6,
-                paddingLeft: 4,
-              }}
-            >
-              Find Students
-            </div>
-            <div className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={{ background: "#F8FAFC", border: "1px solid #E2E8F0" }}>
-              <Search size={13} color="#94A3B8" />
-              <input
-                value={studentQuery}
-                onChange={(event) => setStudentQuery(event.target.value)}
-                placeholder="Search students..."
-                className="min-w-0 flex-1 bg-transparent outline-none"
-                style={{ fontSize: 11, color: "#1E293B" }}
-              />
-            </div>
-            {studentSearchLoading && <div style={{ fontSize: 10, color: "#94A3B8", padding: "6px 4px" }}>Searching...</div>}
-            {studentSearchError && <div style={{ fontSize: 10, color: "#B91C1C", padding: "6px 4px" }}>{studentSearchError}</div>}
-            {studentResults.map((student, index) => (
-              <div key={student.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl" style={{ background: "#F8FAFC", marginTop: 4 }}>
-                <div className="rounded-full flex items-center justify-center shrink-0" style={{ width: 30, height: 30, background: friendColor(student.id, index) + "20", color: friendColor(student.id, index), fontSize: 10, fontWeight: 700 }}>
-                  {initialsOf(student.firstName, student.lastName)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#1E293B" }}>{displayName(student.firstName, student.lastName)}</div>
-                  <div style={{ fontSize: 10, color: "#94A3B8" }}>{[student.major, student.level].filter(Boolean).join(" · ") || "AUB Student"}</div>
-                </div>
-                {student.relationship === "none" && <button onClick={() => void sendRequest(student.id)} className="rounded-md px-2 py-1" style={{ fontSize: 10, fontWeight: 700, color: "#4338CA", background: "#EEF2FF" }}>Add</button>}
-                {student.relationship === "self" && <span style={{ fontSize: 10, color: "#94A3B8" }}>You</span>}
-                {student.relationship === "friends" && <span style={{ fontSize: 10, color: "#059669" }}>Friends</span>}
-                {student.relationship === "request_sent" && <span style={{ fontSize: 10, color: "#D97706" }}>Request sent</span>}
-                {student.relationship === "request_received" && <span style={{ fontSize: 10, color: "#4338CA" }}>Respond</span>}
-              </div>
-            ))}
-          </div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#94A3B8", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, paddingLeft: 4, marginTop: 14 }}>Sent Requests ({outgoingRequests.length})</div>
+          {outgoingRequests.map((request, index) => <div key={request.id} className="flex items-center gap-2 px-2 py-2 rounded-xl mb-1" style={{ background: "#F8FAFC" }}>
+            <div className="rounded-full flex items-center justify-center shrink-0" style={{ width: 30, height: 30, background: friendColor(request.user.id, index) + "20", color: friendColor(request.user.id, index), fontSize: 10, fontWeight: 700 }}>{initialsOf(request.user.firstName, request.user.lastName)}</div>
+            <div className="flex-1 min-w-0"><div className="truncate" style={{ fontSize: 11, fontWeight: 600, color: "#1E293B" }}>{displayName(request.user.firstName, request.user.lastName)}</div><div className="truncate" style={{ fontSize: 9, color: "#94A3B8" }}>{[request.user.major, request.user.level].filter(Boolean).join(" · ") || "AUB Student"}</div></div>
+            <button title="Cancel request" onClick={() => void cancelRequest(request.user.id)} className="rounded-full p-1" style={{ background: "#FEF2F2", color: "#DC2626" }}><X size={12} /></button>
+          </div>)}
+          {outgoingRequests.length === 0 && <div style={{ fontSize: 10, color: "#94A3B8", paddingLeft: 4 }}>No sent requests.</div>}
 
           <div
             style={{
@@ -774,7 +531,7 @@ export default function Community() {
               </div>
               <button
                 onClick={() => void sendRequest(s.id)}
-                style={{ color: "#4338CA" }}
+                style={{ color: "var(--color-primary, #4338CA)" }}
               >
                 <UserPlus size={14} />
               </button>
@@ -822,7 +579,7 @@ export default function Community() {
                   width: 36,
                   height: 36,
                   background:
-                    "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
+                    "linear-gradient(135deg, var(--color-primary-grad, #6366F1) 0%, #8B5CF6 100%)",
                   fontSize: 12,
                   fontWeight: 700,
                   color: "white",
@@ -840,7 +597,7 @@ export default function Community() {
                   border: "1px solid #E2E8F0",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.border = "1px solid #C7D2FE";
+                  e.currentTarget.style.border = "1px solid var(--color-primary-border, #C7D2FE)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.border = "1px solid #E2E8F0";
@@ -877,8 +634,8 @@ export default function Community() {
                             fontSize: 11,
                             fontWeight: 600,
                             background:
-                              composeType === type ? "#EEF2FF" : "#F1F5F9",
-                            color: composeType === type ? "#4338CA" : "#64748B",
+                              composeType === type ? "var(--color-primary-light, #EEF2FF)" : "#F1F5F9",
+                            color: composeType === type ? "var(--color-primary, #4338CA)" : "#64748B",
                             textTransform: "capitalize",
                           }}
                         >
@@ -901,7 +658,7 @@ export default function Community() {
                       className="px-4 py-1.5 rounded-lg font-semibold"
                       style={{
                         fontSize: 12,
-                        background: composeText.trim() ? "#4338CA" : "#E2E8F0",
+                        background: composeText.trim() ? "var(--color-primary, #4338CA)" : "#E2E8F0",
                         color: composeText.trim() ? "white" : "#94A3B8",
                       }}
                     >
@@ -942,172 +699,10 @@ export default function Community() {
             <PostCard
               key={post.id}
               post={post}
-              currentUserInitials={currentUserInitials}
-              onCommented={(postId, content) => {
-                // Keep feed data fresh when a comment is added.
-                void api.feed.comments(postId, 1, 1).catch(() => {
-                  void content;
-                });
-              }}
             />
           ))}
         </div>
       </main>
-
-      {/* Right: Sidebar */}
-      <aside
-        className="flex flex-col shrink-0 h-full overflow-y-auto"
-        style={{
-          width: 240,
-          borderLeft: "1px solid #F1F5F9",
-          background: "#FFFFFF",
-        }}
-      >
-        {/* Friend Requests */}
-        {(
-          <div className="p-4" style={{ borderBottom: "1px solid #F1F5F9" }}>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#0F172A",
-                marginBottom: 8,
-              }}
-            >
-              Friend Requests
-            </div>
-            {incomingRequests.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-center gap-2.5 mb-3 last:mb-0"
-              >
-                <div
-                  className="rounded-full flex items-center justify-center shrink-0"
-                  style={{
-                    width: 32,
-                    height: 32,
-                    background:
-                      "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "white",
-                  }}
-                >
-                  {initialsOf(r.user.firstName, r.user.lastName)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div
-                    style={{ fontSize: 12, fontWeight: 600, color: "#1E293B" }}
-                  >
-                    {displayName(r.user.firstName, r.user.lastName)}
-                  </div>
-                  <div style={{ fontSize: 10, color: "#94A3B8" }}>
-                    {[r.user.major, r.user.level].filter(Boolean).join(" · ") ||
-                      "AUB Student"}
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => void acceptRequest(r.user.id)}
-                    className="rounded-full p-1 transition-colors"
-                    style={{ background: "#EEF2FF", color: "#4338CA" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#4338CA";
-                      e.currentTarget.style.color = "white";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "#EEF2FF";
-                      e.currentTarget.style.color = "#4338CA";
-                    }}
-                  >
-                    <CheckCircle size={12} />
-                  </button>
-                  <button
-                    onClick={() => void rejectRequest(r.user.id)}
-                    className="rounded-full p-1 transition-colors"
-                    style={{ background: "#FEF2F2", color: "#DC2626" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#DC2626";
-                      e.currentTarget.style.color = "white";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "#FEF2F2";
-                      e.currentTarget.style.color = "#DC2626";
-                    }}
-                  >
-                    <X size={12} />
-                  </button>
-                </div>
-              </div>
-            ))}
-            {incomingRequests.length === 0 && <div style={{ fontSize: 11, color: "#94A3B8" }}>No incoming requests.</div>}
-          </div>
-        )}
-
-        {/* Outgoing friend requests */}
-        {(
-          <div className="p-4" style={{ borderBottom: "1px solid #F1F5F9" }}>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#0F172A",
-                marginBottom: 8,
-              }}
-            >
-              Sent Requests
-            </div>
-            {outgoingRequests.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-center gap-2.5 mb-3 last:mb-0"
-              >
-                <div
-                  className="rounded-full flex items-center justify-center shrink-0"
-                  style={{
-                    width: 32,
-                    height: 32,
-                    background: "#F1F5F9",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: "#64748B",
-                  }}
-                >
-                  {initialsOf(r.user.firstName, r.user.lastName)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div
-                    style={{ fontSize: 12, fontWeight: 600, color: "#1E293B" }}
-                  >
-                    {displayName(r.user.firstName, r.user.lastName)}
-                  </div>
-                  <div style={{ fontSize: 10, color: "#94A3B8" }}>
-                    {[r.user.major, r.user.level].filter(Boolean).join(" · ") ||
-                      "AUB Student"}
-                  </div>
-                </div>
-                <button
-                  onClick={() => void cancelRequest(r.user.id)}
-                  className="rounded-full p-1 transition-colors"
-                  style={{ background: "#FEF2F2", color: "#DC2626" }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#DC2626";
-                    e.currentTarget.style.color = "white";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#FEF2F2";
-                    e.currentTarget.style.color = "#DC2626";
-                  }}
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-            {outgoingRequests.length === 0 && <div style={{ fontSize: 11, color: "#94A3B8" }}>No sent requests are pending.</div>}
-          </div>
-        )}
-
-      </aside>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import type { AttributeOption, CourseOption, OptimizeScheduleRequest, OptimizeScheduleResult, TermOption } from './scheduleOptimizer'
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api'
 
 const ACCESS_TOKEN_KEY = 'logicflow.access_token'
@@ -453,6 +455,7 @@ export type NotificationPreferences = {
 
 export type ListCoursesQuery = {
   search?: string
+  termId?: number
   attribute?: string
   sort?: 'name' | 'rating' | 'difficulty' | 'workload' | 'popularity'
   order?: 'asc' | 'desc'
@@ -497,6 +500,7 @@ export const api = {
     list: (query: ListCoursesQuery = {}) => {
       const params = new URLSearchParams()
       if (query.search) params.set('search', query.search)
+      if (query.termId != null) params.set('term_id', String(query.termId))
       if (query.attribute) params.set('attribute', query.attribute)
       params.set('sort', query.sort ?? 'name')
       params.set('order', query.order ?? 'asc')
@@ -569,6 +573,18 @@ export const api = {
   },
 
   schedules: {
+    optimizerOptions: () => request<{ terms: TermOption[]; attributes: AttributeOption[] }>('/schedules/optimizer-options'),
+    optimizerCourses: async (termId: number, search: string) => {
+      const params = new URLSearchParams({ term_id: String(termId), search })
+      const body = await request<{ data: CourseOption[] }>(`/courses?${params.toString()}`)
+      if (!body || !Array.isArray(body.data)) throw new ApiError(502, 'MALFORMED_RESPONSE', 'Course search returned a malformed response.')
+      return body.data
+    },
+    optimize: async (input: OptimizeScheduleRequest) => {
+      const body = await request<{ data?: OptimizeScheduleResult }>('/schedules/optimize', { method: 'POST', body: input })
+      if (!body?.data || typeof body.data.status !== 'string') throw new ApiError(502, 'MALFORMED_RESPONSE', 'Optimizer returned a malformed response.')
+      return body.data
+    },
     list: (page = 1, limit = 50) =>
       request<Page<ScheduleSummary>>(`/schedules?page=${page}&limit=${limit}`),
     get: (id: number) => request<{ data: ScheduleDetail }>(`/schedules/${id}`),
