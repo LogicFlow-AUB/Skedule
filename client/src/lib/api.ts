@@ -468,6 +468,68 @@ export type NotificationPreferences = {
   registrationReminders: boolean
 }
 
+export type StudyGroupMeeting = {
+  days: number[]
+  startTime: string | null
+  endTime: string | null
+}
+
+export type StudyGroupRole = 'owner' | 'member' | 'pending' | 'none'
+
+export type StudyGroupSummary = {
+  id: number
+  name: string
+  course: { id: number; code: string; title: string } | null
+  bio: string | null
+  owner: { id: string; firstName: string | null; lastName: string | null } | null
+  memberCount: number
+  createdAt: string
+  meeting: StudyGroupMeeting | null
+  role: StudyGroupRole
+  joined: boolean
+  requested: boolean
+  /** Number of pending join requests. Only present for the group owner. */
+  pendingRequestCount?: number
+}
+
+export type StudyGroupDetail = StudyGroupSummary & {
+  members: {
+    id: string
+    firstName: string | null
+    lastName: string | null
+    joinedAt: string | null
+  }[]
+}
+
+export type StudyGroupJoinRequest = {
+  userId: string
+  user: { id: string; firstName: string | null; lastName: string | null } | null
+  createdAt: string
+}
+
+export type StudyGroupMessage = {
+  id: number
+  studyGroupId: number
+  sender: { id: string; firstName: string | null; lastName: string | null } | null
+  content: string
+  createdAt: string
+}
+
+export type ChatHistoryPage = {
+  data: StudyGroupMessage[]
+  hasMore: boolean
+  nextCursor: string | null
+}
+
+export type CreateStudyGroupInput = {
+  name: string
+  courseId: number
+  bio?: string
+  meetingDays?: number[]
+  startTime?: string | null
+  endTime?: string | null
+}
+
 export type ListCoursesQuery = {
   search?: string
   termId?: number
@@ -749,6 +811,43 @@ export const api = {
     markRead: (id: number) => request<void>(`/notifications/${id}/read`, { method: 'PUT' }),
     markAllRead: () => request<void>('/notifications/read-all', { method: 'PUT' }),
     preferences: () => request<{ data: NotificationPreferences }>('/notifications/preferences'),
+  },
+
+  studyGroups: {
+    list: (page = 1, limit = 100) =>
+      request<Page<StudyGroupSummary>>(`/study-groups?page=${page}&limit=${limit}`),
+    mine: (page = 1, limit = 100) =>
+      request<Page<StudyGroupSummary>>(`/study-groups/mine?page=${page}&limit=${limit}`),
+    get: (id: number) => request<StudyGroupDetail>(`/study-groups/${id}`),
+    create: (input: CreateStudyGroupInput) =>
+      request<StudyGroupDetail>('/study-groups', { method: 'POST', body: input }),
+    requestToJoin: (id: number) =>
+      request<{ joined: boolean; requested: boolean }>(`/study-groups/${id}/requests`, {
+        method: 'POST',
+      }),
+    cancelJoinRequest: (id: number) =>
+      request<void>(`/study-groups/${id}/requests`, { method: 'DELETE' }),
+    joinRequests: (id: number) =>
+      request<{ data: StudyGroupJoinRequest[] }>(`/study-groups/${id}/requests`),
+    acceptRequest: (id: number, userId: string) =>
+      request<void>(`/study-groups/${id}/requests/${userId}/accept`, { method: 'POST' }),
+    rejectRequest: (id: number, userId: string) =>
+      request<void>(`/study-groups/${id}/requests/${userId}/reject`, { method: 'POST' }),
+    messages: (id: number, query?: { before?: string; limit?: number }) => {
+      const q = new URLSearchParams()
+      if (query?.before) q.set('before', query.before)
+      if (query?.limit != null) q.set('limit', String(query.limit))
+      return request<ChatHistoryPage>(`/study-groups/${id}/messages${q.toString() ? `?${q.toString()}` : ''}`)
+    },
+    sendMessage: (id: number, content: string) =>
+      request<{ data: StudyGroupMessage }>(`/study-groups/${id}/messages`, {
+        method: 'POST',
+        body: { content },
+      }),
+    update: (id: number, input: CreateStudyGroupInput) =>
+      request<StudyGroupDetail>(`/study-groups/${id}`, { method: 'PATCH', body: input }),
+    removeMember: (id: number, userId: string) =>
+      request<void>(`/study-groups/${id}/members/${userId}`, { method: 'DELETE' }),
   },
 
   assistant: {

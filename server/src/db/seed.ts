@@ -620,6 +620,19 @@ async function createNotificationPreferences() {
 // Study groups + members
 // ---------------------------------------------------------------------------
 
+async function resolveCourseId(courseCode: string): Promise<number | null> {
+  const parts = courseCode.trim().toUpperCase().replace(/\s+/g, ' ').split(' ');
+  if (parts.length < 2) return null;
+  const subject = parts.slice(0, -1).join(' ');
+  const courseNumber = parts.at(-1) ?? '';
+  const rows = await select('courses', 'id', {
+    subject,
+    course_number: courseNumber,
+  });
+  const first = rows[0] as { id?: number } | undefined;
+  return first?.id ?? null;
+}
+
 async function createStudyGroups() {
   console.log('Creating study groups…');
   if ((await count('study_groups')) > 0) {
@@ -628,13 +641,16 @@ async function createStudyGroups() {
   }
 
   const ids = createdUsers.map((u) => u.id);
+  const [u0, u1, u2, u3] = ids;
 
-  const groups = await insert('study_groups', [
+  const definitions = [
     {
       name: 'CMPS 330 — HW 5',
       course_code: 'CMPS 330',
       description: 'Working through the database normalization homework together.',
-      meeting_time: 'Tonight 8 PM',
+      meeting_days: [1],
+      start_time: '18:00:00',
+      end_time: '19:00:00',
       location: 'Library Room 204',
       host_user_id: ids[0],
       max_members: 10,
@@ -643,7 +659,9 @@ async function createStudyGroups() {
       name: 'MATH 201 — Finals',
       course_code: 'MATH 201',
       description: 'Preparing for the calculus II final exam.',
-      meeting_time: 'Sat 2 PM',
+      meeting_days: [0, 2],
+      start_time: '17:00:00',
+      end_time: '18:30:00',
       location: 'AUB Science Hall',
       host_user_id: ids[1],
       max_members: 15,
@@ -652,29 +670,42 @@ async function createStudyGroups() {
       name: 'CMPS 214 — Project',
       course_code: 'CMPS 214',
       description: 'Final project collaboration for Data Structures.',
-      meeting_time: 'Wed 5 PM',
+      meeting_days: [2],
+      start_time: '17:00:00',
+      end_time: '18:00:00',
       location: 'Online (Zoom)',
       host_user_id: ids[2],
       max_members: 6,
     },
-  ]);
+  ];
+
+  const resolved = await Promise.all(
+    definitions.map(async (definition) => ({
+      ...definition,
+      course_id: await resolveCourseId(definition.course_code),
+    })),
+  );
+
+  const groups = await insert('study_groups', resolved);
 
   const groupIds = groups.map((g) => g.id as number);
 
-  // Add members
+  // Add members (owners are included so the member count reflects them).
   const members: { study_group_id: number; user_id: string }[] = [];
   const [g0, g1, g2] = groupIds;
-  const [u0, u1, u2, u3] = ids;
-  if (g0 && u1 && u2) {
+  if (g0 && u0 && u1 && u2) {
+    members.push({ study_group_id: g0, user_id: u0 });
     members.push({ study_group_id: g0, user_id: u1 });
     members.push({ study_group_id: g0, user_id: u2 });
   }
-  if (g1 && u0 && u2 && u3) {
+  if (g1 && u0 && u1 && u2 && u3) {
+    members.push({ study_group_id: g1, user_id: u1 });
     members.push({ study_group_id: g1, user_id: u0 });
     members.push({ study_group_id: g1, user_id: u2 });
     members.push({ study_group_id: g1, user_id: u3 });
   }
-  if (g2 && u0) {
+  if (g2 && u2 && u0) {
+    members.push({ study_group_id: g2, user_id: u2 });
     members.push({ study_group_id: g2, user_id: u0 });
   }
 

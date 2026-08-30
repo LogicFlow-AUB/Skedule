@@ -9,6 +9,15 @@ export type Row = Record<string, unknown>;
 
 export type AppliedFilter = { field: string; operator: string; value: unknown };
 
+function compareValues(a: unknown, b: unknown): number {
+  const aNumeric = typeof a === 'number' ? a : Number(a);
+  const bNumeric = typeof b === 'number' ? b : Number(b);
+  if (Number.isFinite(aNumeric) && Number.isFinite(bNumeric)) {
+    return aNumeric - bNumeric;
+  }
+  return String(a).localeCompare(String(b));
+}
+
 function matchesLike(rowValue: unknown, pattern: string): boolean {
   if (rowValue === null || rowValue === undefined) {
     return false;
@@ -138,19 +147,19 @@ export class FakeQuery {
   }
 
   gt(column: string, value: unknown): FakeQuery {
-    return this.addFilter('gt', column, value, (row) => Number(row[column]) > Number(value));
+    return this.addFilter('gt', column, value, (row) => compareValues(row[column], value) > 0);
   }
 
   gte(column: string, value: unknown): FakeQuery {
-    return this.addFilter('gte', column, value, (row) => Number(row[column]) >= Number(value));
+    return this.addFilter('gte', column, value, (row) => compareValues(row[column], value) >= 0);
   }
 
   lt(column: string, value: unknown): FakeQuery {
-    return this.addFilter('lt', column, value, (row) => Number(row[column]) < Number(value));
+    return this.addFilter('lt', column, value, (row) => compareValues(row[column], value) < 0);
   }
 
   lte(column: string, value: unknown): FakeQuery {
-    return this.addFilter('lte', column, value, (row) => Number(row[column]) <= Number(value));
+    return this.addFilter('lte', column, value, (row) => compareValues(row[column], value) <= 0);
   }
 
   like(column: string, pattern: string): FakeQuery {

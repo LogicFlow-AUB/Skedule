@@ -188,8 +188,12 @@ export type EventRsvp = {
 export type StudyGroup = {
   id: number;
   name: string;
+  course_id: number | null;
   course_code: string | null;
   description: string | null;
+  meeting_days: number[] | null;
+  start_time: string | null;
+  end_time: string | null;
   meeting_time: string | null;
   location: string | null;
   host_user_id: string;
@@ -201,4 +205,18 @@ export type StudyGroupMember = {
   study_group_id: number;
   user_id: string;
   joined_at: string;
+};
+
+export type StudyGroupJoinRequest = {
+  study_group_id: number;
+  user_id: string;
+  created_at: string;
+};
+
+export type StudyGroupMessage = {
+  id: number;
+  study_group_id: number;
+  sender_id: string;
+  content: string;
+  created_at: string;
 };
