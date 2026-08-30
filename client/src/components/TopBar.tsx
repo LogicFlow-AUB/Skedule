@@ -6,12 +6,13 @@ import { api, type Notification } from '../lib/api'
 
 const PAGE_TITLES: Record<Page, string> = {
   dashboard: 'Dashboard',
-  'ai-scheduler': 'AI Scheduler',
+  'ai-scheduler': 'Optimized Builder',
   'manual-builder': 'Manual Builder',
   'saved-schedules': 'Saved Schedules',
   'course-reviews': 'Course Reviews',
   'professor-reviews': 'Professor Reviews',
   community: 'Community',
+  'study-groups': 'Study Groups',
   'common-free-time': 'Common Free Time',
   friends: 'Community',
   profile: 'Profile & Settings',

@@ -564,7 +564,7 @@ export default function SavedSchedules({ setPage }: { setPage?: (p: Page) => voi
                       onMouseLeave={(e) => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.color = '#0F172A' }}
                     >
                       <Sparkles size={13} />
-                      Open in AI Scheduler
+                      Open in Optimized Builder
                     </button>
                   </div>
                 </div>
@@ -577,7 +577,7 @@ export default function SavedSchedules({ setPage }: { setPage?: (p: Page) => voi
           <div className="flex flex-col items-center justify-center py-20">
             <BookmarkCheck size={48} color="#CBD5E1" />
             <div style={{ fontSize: 16, fontWeight: 700, color: '#94A3B8', marginTop: 12 }}>No saved schedules</div>
-            <p style={{ fontSize: 13, color: '#CBD5E1', marginTop: 4 }}>Generate and save schedules from the AI Scheduler</p>
+            <p style={{ fontSize: 13, color: '#CBD5E1', marginTop: 4 }}>Generate and save schedules from the Optimized Builder</p>
           </div>
         )}
       </div>

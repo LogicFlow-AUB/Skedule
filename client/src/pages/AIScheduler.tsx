@@ -898,7 +898,7 @@ function OptimizerPreferences({ form, setForm, terms, attributes, loading, optim
     <div className="h-full overflow-y-auto flex flex-col gap-3 p-4 shrink-0" style={{ width: 304, background: '#FFFFFF', borderRight: '1px solid #F1F5F9' }}>
       <div>
         <div className="flex items-center gap-1.5" style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>
-          <Sparkles size={15} color="#4338CA" />AI Scheduler
+          <Sparkles size={15} color="#4338CA" />Optimized Builder
         </div>
         <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>Set your preferences, then generate a schedule.</div>
       </div>
@@ -1583,13 +1583,13 @@ export default function AIScheduler({ activeMode, setPage }: { activeMode: Page;
 
   const moveToManual = () => {
     if (optimizerResult?.status !== 'optimal' || optimizerResult.selected_sections.length === 0) {
-      setToast('Generate an AI schedule before moving it to the manual builder.')
+      setToast('Generate an optimized schedule before moving it to the manual builder.')
       return
     }
     setManualCourses(optimizerSectionsToCourses(optimizerResult.selected_sections))
     setMode('manual')
     setPage('manual-builder')
-    setToast('AI schedule moved to the manual builder.')
+    setToast('Optimized schedule moved to the manual builder.')
   }
 
   const activeCourses = mode === 'manual'
@@ -1628,7 +1628,7 @@ export default function AIScheduler({ activeMode, setPage }: { activeMode: Page;
       <div className="flex items-center gap-3 px-4 py-2.5 shrink-0" style={{ background: '#FFFFFF', borderBottom: '1px solid #F1F5F9' }}>
         {/* Mode toggle */}
         <div className="flex rounded-lg p-0.5" style={{ background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
-          {[{ id: 'ai', label: 'AI Builder', icon: <Sparkles size={12} /> }, { id: 'manual', label: 'Manual Builder', icon: <CalendarDays size={12} /> }].map((m) => (
+          {[{ id: 'ai', label: 'Optimized Builder', icon: <Sparkles size={12} /> }, { id: 'manual', label: 'Manual Builder', icon: <CalendarDays size={12} /> }].map((m) => (
             <button
               key={m.id}
               onClick={() => setPage(m.id === 'ai' ? 'ai-scheduler' : 'manual-builder')}
@@ -1699,7 +1699,7 @@ export default function AIScheduler({ activeMode, setPage }: { activeMode: Page;
               <div className="px-3 pt-3 flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5">
                   <Sparkles size={12} color="#4338CA" />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#4338CA' }}>AI-generated schedule</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#4338CA' }}>Optimized schedule</span>
                 </div>
                 <div className="flex gap-2">{[['Credits', optimizerResult.total_credits], ['Campus days', optimizerResult.campus_days], ['Largest gaps', optimizerResult.weekly_largest_gaps_sum_minutes == null ? undefined : `${optimizerResult.weekly_largest_gaps_sum_minutes} min`], ['Professor penalty', optimizerResult.professor_preference_penalty]].map(([label,value]) => value == null ? null : <div key={String(label)} className="rounded-lg px-3 py-2" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: 11 }}><b>{String(value)}</b> {label}</div>)}</div>
               </div>

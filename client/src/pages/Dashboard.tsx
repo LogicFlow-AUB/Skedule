@@ -48,7 +48,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
               onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)' }}
             >
               <Sparkles size={16} />
-              AI Scheduler
+              Optimized Builder
             </button>
             <button
               onClick={() => setPage('manual-builder')}
@@ -84,7 +84,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
                   <Sparkles size={20} color="white" />
                 </div>
                 <div className="flex-1">
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1E293B' }}>AI Scheduler</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#1E293B' }}>Optimized Builder</div>
                   <div style={{ fontSize: 12, color: '#64748B' }}>Generate optimized schedules with AI preferences</div>
                 </div>
                 <ChevronRight size={16} color="#818CF8" />

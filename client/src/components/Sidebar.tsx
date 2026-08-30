@@ -9,18 +9,20 @@ import {
   Clock3,
   User,
   GraduationCap,
+  MessagesSquare,
 } from 'lucide-react'
 import type { Page } from '../App'
 import { useAuth } from '../lib/auth'
 
 const NAV_ITEMS: { id: Page; label: string; icon: React.ReactNode; section: string; badge?: { text: string; color: string; bg: string } }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={16} />, section: 'main' },
-  { id: 'ai-scheduler', label: 'AI Scheduler', icon: <Sparkles size={16} />, section: 'main', badge: { text: 'AI', color: '#4338CA', bg: '#EEF2FF' } },
+  { id: 'ai-scheduler', label: 'Optimized Builder', icon: <Sparkles size={16} />, section: 'main' },
   { id: 'manual-builder', label: 'Manual Builder', icon: <CalendarDays size={16} />, section: 'main' },
   { id: 'saved-schedules', label: 'Saved Schedules', icon: <BookmarkCheck size={16} />, section: 'main' },
   { id: 'course-reviews', label: 'Course Reviews', icon: <Star size={16} />, section: 'review' },
   { id: 'professor-reviews', label: 'Professor Reviews', icon: <UserCheck size={16} />, section: 'review' },
   { id: 'community', label: 'Community', icon: <Users size={16} />, section: 'social' },
+  { id: 'study-groups', label: 'Study Groups', icon: <MessagesSquare size={16} />, section: 'social' },
   { id: 'common-free-time', label: 'Common Free Time', icon: <Clock3 size={16} />, section: 'social' },
   { id: 'profile', label: 'Profile & Settings', icon: <User size={16} />, section: 'account' },
 ]
