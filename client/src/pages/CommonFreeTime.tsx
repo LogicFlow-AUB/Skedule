@@ -72,13 +72,14 @@ export default function CommonFreeTime() {
 
     async function load() {
       try {
-        const [friendsRes, schedulesRes] = await Promise.all([api.friends.list(), api.schedules.list(1, 1)])
+        const [friendsRes, schedulesRes] = await Promise.all([api.friends.list(), api.schedules.list(1, 100)])
         if (cancelled) return
         setFriends(friendsRes.data)
 
-        const latest = schedulesRes.data[0]
-        if (latest) {
-          const detail = await api.schedules.get(latest.id)
+        // Only the current student's PREFERRED saved schedule participates.
+        const preferred = schedulesRes.data.find((schedule) => schedule.isFavorite)
+        if (preferred) {
+          const detail = await api.schedules.get(preferred.id)
           if (!cancelled) setOwnSchedule(detail.data)
         } else if (!cancelled) {
           setOwnSchedule(null)

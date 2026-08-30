@@ -17,7 +17,6 @@ import {
   saveSchedule,
   setFavorite,
   swapScheduleSection,
-  unsetFavorite,
   updateSchedule,
 } from '../controllers/schedules.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
@@ -115,7 +114,6 @@ router.get(
 );
 router.post('/:id/save', requireAuth, validateParams(scheduleIdParams), asyncHandler(saveSchedule));
 router.post('/:id/favorite', requireAuth, validateParams(scheduleIdParams), asyncHandler(setFavorite));
-router.delete('/:id/favorite', requireAuth, validateParams(scheduleIdParams), asyncHandler(unsetFavorite));
 router.post('/:id/load', requireAuth, validateParams(scheduleIdParams), asyncHandler(loadScheduleAsDraft));
 router.get('/:id/pdf', requireAuth, validateParams(scheduleIdParams), asyncHandler(exportSchedulePdf));
 router.get('/:id', requireAuth, validateParams(scheduleIdParams), asyncHandler(getSchedule));

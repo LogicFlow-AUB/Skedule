@@ -304,17 +304,13 @@ export default function SavedSchedules({ setPage }: { setPage?: (p: Page) => voi
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleFavorite(id: number, current: boolean) {
+  async function handleSetFavorite(id: number) {
     try {
-      if (current) {
-        await api.schedules.unfavorite(id)
-      } else {
-        await api.schedules.favorite(id)
-      }
+      await api.schedules.favorite(id)
       // The list reload reflects the single per-user favorite.
       await reload()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update favourite.')
+      setError(err instanceof Error ? err.message : 'Could not update preferred schedule.')
     }
   }
 
@@ -480,16 +476,28 @@ export default function SavedSchedules({ setPage }: { setPage?: (p: Page) => voi
                       {s.notes && <p style={{ fontSize: 12, color: '#94A3B8', marginTop: 6, lineHeight: 1.5 }}>{s.notes}</p>}
                     </div>
                     <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => void handleFavorite(s.id, s.isFavorite)}
-                        title={s.isFavorite ? 'Unfavourite' : 'Favourite'}
-                        className="rounded-lg p-1.5 transition-colors"
-                        style={{ color: s.isFavorite ? '#F59E0B' : '#CBD5E1' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = '#FFFBEB' }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-                      >
-                        <Star size={15} fill={s.isFavorite ? '#F59E0B' : 'none'} />
-                      </button>
+                      {s.isFavorite ? (
+                        <button
+                          title="Preferred schedule"
+                          className="rounded-lg p-1.5"
+                          style={{ color: '#F59E0B', cursor: 'default' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#FFFBEB' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          <Star size={15} fill="#F59E0B" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => void handleSetFavorite(s.id)}
+                          title={summaries.length > 1 ? 'Make preferred' : 'Preferred schedule'}
+                          className="rounded-lg p-1.5 transition-colors"
+                          style={{ color: summaries.length > 1 ? '#CBD5E1' : '#F59E0B' }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = '#FFFBEB' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          <Star size={15} fill={summaries.length > 1 ? 'none' : '#F59E0B'} />
+                        </button>
+                      )}
                       <button
                         onClick={() => void handleDelete(s.id)}
                         className="rounded-lg p-1.5 transition-colors"

@@ -413,6 +413,27 @@ async function getScheduleOrThrow(userId: string, scheduleId: number): Promise<S
   return schedule;
 }
 
+/**
+ * Counts the user's saved schedules. When `excludeId` is given, that schedule
+ * is not counted (used to tell whether a schedule being saved is the first one).
+ */
+async function countSavedSchedules(userId: string, excludeId?: number): Promise<number> {
+  const db = requireSupabaseClient();
+  let query = db.from('schedules').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('saved', true);
+
+  if (excludeId !== undefined) {
+    query = query.neq('id', excludeId);
+  }
+
+  const { count, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return count ?? 0;
+}
+
 async function getScheduleSectionRows(scheduleIds: number[]): Promise<ScheduleSectionRow[]> {
   if (scheduleIds.length === 0) {
     return [];
@@ -551,16 +572,30 @@ export async function createSchedule(
   const sectionIds = [...new Set(input.sectionIds ?? [])];
   await getSectionsOrThrow(sectionIds);
 
+  const saved = input.saved ?? true;
   const db = requireSupabaseClient();
+
+  let isFirstSaved = false;
+
+  if (saved) {
+    isFirstSaved = (await countSavedSchedules(userId)) === 0;
+  }
+
+  const insertRow: Record<string, unknown> = {
+    user_id: userId,
+    name: input.name,
+    notes: input.notes ?? null,
+    term_id: input.termId ?? null,
+    saved,
+  };
+
+  if (isFirstSaved) {
+    insertRow.is_favorite = true;
+  }
+
   const { data, error } = await db
     .from('schedules')
-    .insert({
-      user_id: userId,
-      name: input.name,
-      notes: input.notes ?? null,
-      term_id: input.termId ?? null,
-      saved: input.saved ?? true,
-    })
+    .insert(insertRow)
     .select(SCHEDULE_COLUMNS)
     .single();
 
@@ -618,6 +653,36 @@ export async function getLatestSavedScheduleForUser(
   return getScheduleDetail(schedule);
 }
 
+/**
+ * Returns the user's preferred saved schedule (the single schedule marked
+ * `is_favorite`), or null when they have none. Never falls back to another
+ * saved schedule.
+ */
+export async function getPreferredScheduleForUser(
+  userId: string,
+): Promise<ScheduleDetail | null> {
+  const db = requireSupabaseClient();
+  const { data, error } = await db
+    .from('schedules')
+    .select(SCHEDULE_COLUMNS)
+    .eq('user_id', userId)
+    .eq('saved', true)
+    .eq('is_favorite', true)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const schedule = data as Schedule | null;
+
+  if (!schedule) {
+    return null;
+  }
+
+  return getScheduleDetail(schedule);
+}
+
 export async function updateSchedule(
   userId: string,
   scheduleId: number,
@@ -651,7 +716,8 @@ export async function updateSchedule(
 }
 
 export async function deleteSchedule(userId: string, scheduleId: number): Promise<void> {
-  await getScheduleOrThrow(userId, scheduleId);
+  const schedule = await getScheduleOrThrow(userId, scheduleId);
+  const wasPreferred = schedule.is_favorite;
 
   const db = requireSupabaseClient();
   const { error: sectionsError } = await db
@@ -667,6 +733,34 @@ export async function deleteSchedule(userId: string, scheduleId: number): Promis
 
   if (error) {
     throw error;
+  }
+
+  // Deleting the preferred schedule promotes the latest remaining saved
+  // schedule so the user still has exactly one preferred schedule.
+  if (wasPreferred) {
+    const { data: remaining, error: remainingError } = await db
+      .from('schedules')
+      .select(SCHEDULE_COLUMNS)
+      .eq('user_id', userId)
+      .eq('saved', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (remainingError) {
+      throw remainingError;
+    }
+
+    if (remaining) {
+      const { error: promoteError } = await db
+        .from('schedules')
+        .update({ is_favorite: true, updated_at: new Date().toISOString() })
+        .eq('id', (remaining as Schedule).id);
+
+      if (promoteError) {
+        throw promoteError;
+      }
+    }
   }
 }
 
@@ -808,6 +902,12 @@ export async function saveSchedule(userId: string, scheduleId: number): Promise<
     patch.is_favorite = false;
   }
 
+  // A draft can never be a favorite, so if this is the user's first saved
+  // schedule it automatically becomes their preferred schedule.
+  if ((await countSavedSchedules(userId)) === 0) {
+    patch.is_favorite = true;
+  }
+
   const { data, error } = await db
     .from('schedules')
     .update(patch)
@@ -843,24 +943,6 @@ export async function setFavorite(userId: string, scheduleId: number): Promise<S
   const { data, error } = await db
     .from('schedules')
     .update({ is_favorite: true, updated_at: new Date().toISOString() })
-    .eq('id', scheduleId)
-    .select(SCHEDULE_COLUMNS)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return getScheduleDetail(data as Schedule);
-}
-
-export async function unsetFavorite(userId: string, scheduleId: number): Promise<ScheduleDetail> {
-  await getScheduleOrThrow(userId, scheduleId);
-
-  const db = requireSupabaseClient();
-  const { data, error } = await db
-    .from('schedules')
-    .update({ is_favorite: false, updated_at: new Date().toISOString() })
     .eq('id', scheduleId)
     .select(SCHEDULE_COLUMNS)
     .single();

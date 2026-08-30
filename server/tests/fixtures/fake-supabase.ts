@@ -20,26 +20,84 @@ function matchesLike(rowValue: unknown, pattern: string): boolean {
   return new RegExp(`^${escaped}$`).test(String(rowValue));
 }
 
-/** Parses a PostgREST-style `or` expression such as `user_id.eq.X,friend_id.eq.X`. */
+/** Splits a PostgREST expression on top-level commas, respecting parentheses. */
+function splitTopLevel(expression: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+
+  for (const character of expression) {
+    if (character === '(') {
+      depth += 1;
+      current += character;
+      continue;
+    }
+
+    if (character === ')') {
+      depth -= 1;
+      current += character;
+      continue;
+    }
+
+    if (character === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+
+    current += character;
+  }
+
+  if (current.trim() !== '') {
+    parts.push(current);
+  }
+
+  return parts;
+}
+
+function matchesPredicate(row: Row, clause: string): boolean {
+  const trimmed = clause.trim();
+  const equality = /^([a-z_]+)\.(eq|neq)\.(.*)$/.exec(trimmed);
+
+  if (equality) {
+    const [, field, op, rawValue] = equality;
+    if (op === 'eq') {
+      return String(row[field]) === rawValue;
+    }
+    return String(row[field]) !== rawValue;
+  }
+
+  const like = /^([a-z_]+)\.(ilike|like)\.(.*)$/.exec(trimmed);
+
+  if (like) {
+    const [, field, op, rawValue] = like;
+    if (op === 'ilike') {
+      return matchesLike(String(row[field]).toLowerCase(), rawValue.toLowerCase());
+    }
+    return matchesLike(row[field], rawValue);
+  }
+
+  return false;
+}
+
+function matchesClauseGroup(row: Row, expression: string, operation: 'and' | 'or'): boolean {
+  const results = splitTopLevel(expression).map((clause) => matchesPredicate(row, clause));
+
+  return operation === 'and' ? results.every(Boolean) : results.some(Boolean);
+}
+
+/** Parses a PostgREST-style `or` expression such as `and(a.eq.1,b.eq.2),c.eq.3`. */
 function matchesOr(row: Row, expression: string): boolean {
-  return expression.split(',').some((clause) => {
-    let match = /^([a-z_]+)\.(eq|neq)\.(.*)$/.exec(clause.trim());
-    if (match) {
-      const [, field, op, rawValue] = match;
-      if (op === 'eq') {
-        return String(row[field]) === rawValue;
-      }
-      return String(row[field]) !== rawValue;
+  return splitTopLevel(expression).some((item) => {
+    const trimmed = item.trim();
+    const group = /^(and|or)\((.*)\)$/s.exec(trimmed);
+
+    if (group) {
+      const [, operation, inner] = group;
+      return matchesClauseGroup(row, inner, operation as 'and' | 'or');
     }
-    match = /^([a-z_]+)\.(ilike|like)\.(.*)$/.exec(clause.trim());
-    if (match) {
-      const [, field, op, rawValue] = match;
-      if (op === 'ilike') {
-        return matchesLike(String(row[field]).toLowerCase(), rawValue.toLowerCase());
-      }
-      return matchesLike(row[field], rawValue);
-    }
-    return false;
+
+    return matchesPredicate(row, trimmed);
   });
 }
 

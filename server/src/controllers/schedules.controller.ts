@@ -110,13 +110,6 @@ export const setFavorite: RequestHandler = async (req, res) => {
   res.status(200).json({ data });
 };
 
-export const unsetFavorite: RequestHandler = async (req, res) => {
-  const { id } = getValidated<ScheduleIdParams>(res, 'params');
-  const data = await schedulesService.unsetFavorite(getUserId(req), id);
-
-  res.status(200).json({ data });
-};
-
 export const loadScheduleAsDraft: RequestHandler = async (req, res) => {
   const { id } = getValidated<ScheduleIdParams>(res, 'params');
   const data = await schedulesService.loadScheduleAsDraft(getUserId(req), id);

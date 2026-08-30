@@ -1,7 +1,7 @@
 import { requireSupabaseClient } from '../db/supabase.js';
 import type { Friendship } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
-import { getLatestSavedScheduleForUser, parseDays, parseMinutes } from './schedules.service.js';
+import { getPreferredScheduleForUser, parseDays, parseMinutes } from './schedules.service.js';
 import type { ScheduleDetail } from './schedules.service.js';
 import { trackActivity } from './activity.service.js';
 import {
@@ -439,23 +439,24 @@ async function getBusyBlocksByUser(
   const db = requireSupabaseClient();
   const { data: schedules, error: schedulesError } = await db
     .from('schedules')
-    .select('id, user_id, created_at')
+    .select('id, user_id')
     .in('user_id', userIds)
-    .order('created_at', { ascending: false });
+    .eq('is_favorite', true)
+    .eq('saved', true);
 
   if (schedulesError) {
     throw schedulesError;
   }
 
-  const latestScheduleIdByUser = new Map<string, number>();
+  const preferredScheduleIdByUser = new Map<string, number>();
 
   for (const schedule of (schedules ?? []) as { id: number; user_id: string }[]) {
-    if (!latestScheduleIdByUser.has(schedule.user_id)) {
-      latestScheduleIdByUser.set(schedule.user_id, schedule.id);
+    if (!preferredScheduleIdByUser.has(schedule.user_id)) {
+      preferredScheduleIdByUser.set(schedule.user_id, schedule.id);
     }
   }
 
-  const scheduleIds = [...latestScheduleIdByUser.values()];
+  const scheduleIds = [...preferredScheduleIdByUser.values()];
 
   if (scheduleIds.length === 0) {
     return busyByUser;
@@ -471,7 +472,7 @@ async function getBusyBlocksByUser(
   }
 
   const scheduleIdByUser = new Map(
-    [...latestScheduleIdByUser.entries()].map(([user, scheduleId]) => [scheduleId, user]),
+    [...preferredScheduleIdByUser.entries()].map(([user, scheduleId]) => [scheduleId, user]),
   );
 
   for (const row of (sectionRows ?? []) as ScheduleSectionTimeRow[]) {
@@ -521,7 +522,7 @@ export async function getFriendSchedule(
     throw new AppError(403, 'NOT_FRIENDS', 'You can only view the schedules of your friends.');
   }
 
-  return getLatestSavedScheduleForUser(friendUserId);
+  return getPreferredScheduleForUser(friendUserId);
 }
 
 export async function getCommonFreeTime(userId: string) {

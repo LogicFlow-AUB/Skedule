@@ -677,8 +677,6 @@ export const api = {
     save: (id: number) => request<{ data: ScheduleDetail }>(`/schedules/${id}/save`, { method: 'POST' }),
     favorite: (id: number) =>
       request<{ data: ScheduleDetail }>(`/schedules/${id}/favorite`, { method: 'POST' }),
-    unfavorite: (id: number) =>
-      request<{ data: ScheduleDetail }>(`/schedules/${id}/favorite`, { method: 'DELETE' }),
     loadAsDraft: (id: number) =>
       request<{ data: ScheduleDetail }>(`/schedules/${id}/load`, { method: 'POST' }),
     pdf: async (id: number): Promise<Blob> => {
