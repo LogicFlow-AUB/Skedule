@@ -304,15 +304,6 @@ export default function SavedSchedules({ setPage }: { setPage?: (p: Page) => voi
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleSetFavorite(id: number) {
-    try {
-      await api.schedules.favorite(id)
-      // The list reload reflects the single per-user favorite.
-      await reload()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not update preferred schedule.')
-    }
-  }
 
   async function handleLoad(id: number, mode: Page) {
     try {
@@ -329,17 +320,6 @@ export default function SavedSchedules({ setPage }: { setPage?: (p: Page) => voi
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load schedule.')
     }
-  }
-
-  const reload = async () => {
-    const { data } = await api.schedules.list(1, 50)
-    setSummaries(data)
-    const loaded = await Promise.all(data.map((s) => api.schedules.get(s.id)))
-    const map: Record<number, ScheduleDetail> = {}
-    for (const res of loaded) {
-      map[res.data.id] = res.data
-    }
-    setDetails(map)
   }
 
   useEffect(() => {
