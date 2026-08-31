@@ -889,7 +889,6 @@ function PrefLabel({ children, hint }: { children: React.ReactNode; hint?: strin
 
 function OptimizerPreferences({ form, setForm, terms, attributes, loading, optimizing, error, onGenerate }: { form: OptimizerFormState; setForm: React.Dispatch<React.SetStateAction<OptimizerFormState>>; terms: TermOption[]; attributes: AttributeOption[]; loading: boolean; optimizing: boolean; error: string | null; onGenerate: () => void }) {
   const allIds = [...form.requiredCourses, ...form.acceptableElectives].map((course) => course.id)
-  const requiredCredits = form.requiredCourses.reduce((sum, course) => sum + course.credits, 0)
   const rate = (id: number, value: number | null) => setForm((current) => { const professorPreferences = { ...current.professorPreferences }; if (value == null) delete professorPreferences[String(id)]; else professorPreferences[String(id)] = value; return { ...current, professorPreferences } })
   const updateWeight = (key: keyof OptimizerFormState['weights'], value: number) => { const others = (Object.keys(form.weights) as (keyof OptimizerFormState['weights'])[]).filter((candidate) => candidate !== key); const remaining = 100 - value; const old = form.weights[others[0]] + form.weights[others[1]]; const first = old === 0 ? Math.floor(remaining / 2) : Math.round(remaining * form.weights[others[0]] / old); setForm((current) => ({ ...current, weights: { ...current.weights, [key]: value, [others[0]]: first, [others[1]]: remaining - first } })) }
   const selectTerm = (value: string) => { const termId = value ? Number(value) : null; setForm({ ...DEFAULT_OPTIMIZER_FORM, termId }) }
@@ -910,33 +909,6 @@ function OptimizerPreferences({ form, setForm, terms, attributes, loading, optim
             <option value="">{loading ? 'Loading terms...' : 'Select a term'}</option>
             {terms.map((term) => <option key={term.id} value={term.id}>{termLabel(term)}</option>)}
           </select>
-
-          <PrefLabel hint="Choose an exact or ranged credit target.">Credit load</PrefLabel>
-          <div className="flex rounded-lg p-0.5" style={{ background: '#E2E8F0' }}>
-            {(['exact', 'range'] as const).map((mode) => (
-              <button key={mode} onClick={() => setForm((current) => ({ ...current, creditMode: mode }))} className="flex-1 rounded-md py-1.5 transition-all" style={{ fontSize: 10, fontWeight: 700, textTransform: 'capitalize', background: form.creditMode === mode ? '#FFFFFF' : 'transparent', color: form.creditMode === mode ? 'var(--color-primary, #4338CA)' : '#64748B', boxShadow: form.creditMode === mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>{mode}</button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {form.creditMode === 'exact' ? (
-              <label>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8' }}>Credits</span>
-                <input aria-label="Exact credits" type="number" min="0" value={form.exactCredits} onChange={(e) => setForm((current) => ({ ...current, exactCredits: Number(e.target.value) }))} className="w-full rounded-lg px-2 py-1.5 outline-none" style={fieldStyle} />
-              </label>
-            ) : (
-              <>
-                <label>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8' }}>Minimum</span>
-                  <input aria-label="Minimum credits" type="number" min="0" value={form.minCredits} onChange={(e) => setForm((current) => ({ ...current, minCredits: Number(e.target.value) }))} className="w-full rounded-lg px-2 py-1.5 outline-none" style={fieldStyle} />
-                </label>
-                <label>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8' }}>Maximum</span>
-                  <input aria-label="Maximum credits" type="number" min="0" value={form.maxCredits} onChange={(e) => setForm((current) => ({ ...current, maxCredits: Number(e.target.value) }))} className="w-full rounded-lg px-2 py-1.5 outline-none" style={fieldStyle} />
-                </label>
-              </>
-            )}
-          </div>
-          <div style={{ fontSize: 9, color: '#94A3B8' }}>Required: {requiredCredits} cr · Need {Math.max(0, (form.creditMode === 'exact' ? form.exactCredits : form.minCredits) - requiredCredits)} elective cr.</div>
 
           <PrefLabel>Priorities</PrefLabel>
           {([['days', 'Minimize days on campus'], ['gaps', 'Compact days / fewer gaps'], ['professor', 'Professor preference']] as [keyof OptimizerFormState['weights'], string][]).map(([key, label]) => (
@@ -1695,15 +1667,6 @@ export default function AIScheduler({ activeMode, setPage }: { activeMode: Page;
           <div className="flex-1 overflow-hidden flex flex-col">
             {requestError && <div className="m-3 rounded-xl p-3" style={{ background: '#FEF2F2', color: '#B91C1C', fontSize: 12 }}>{requestError}</div>}
             {optimizerResult?.status === 'infeasible' && <div className="m-3 rounded-xl p-4" style={{ background: '#FFF7ED', color: '#9A3412' }}><b>No feasible schedule was found.</b>{optimizerResult.message && <div className="mt-1 text-sm">{optimizerResult.message}</div>}</div>}
-            {optimizerResult?.status === 'optimal' && (
-              <div className="px-3 pt-3 flex flex-col gap-1.5">
-                <div className="flex items-center gap-1.5">
-                  <Sparkles size={12} color="#4338CA" />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#4338CA' }}>Optimized schedule</span>
-                </div>
-                <div className="flex gap-2">{[['Credits', optimizerResult.total_credits], ['Campus days', optimizerResult.campus_days], ['Largest gaps', optimizerResult.weekly_largest_gaps_sum_minutes == null ? undefined : `${optimizerResult.weekly_largest_gaps_sum_minutes} min`], ['Professor penalty', optimizerResult.professor_preference_penalty]].map(([label,value]) => value == null ? null : <div key={String(label)} className="rounded-lg px-3 py-2" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', fontSize: 11 }}><b>{String(value)}</b> {label}</div>)}</div>
-              </div>
-            )}
             {onlineSections.length > 0 && <div className="mx-3 mt-2 rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}><b style={{ fontSize: 11 }}>Online / Asynchronous</b><div className="flex flex-wrap gap-2 mt-1">{onlineSections.map((section) => <span key={String(section.id)} className="rounded-lg px-2 py-1" style={{ background: '#FFFFFF', fontSize: 10 }}>{section.course_code ?? section.course_id}{section.component_type ? ` — ${section.component_type}` : ''}</span>)}</div></div>}
             <WeeklyCalendar courses={activeCourses} onCourseClick={setSelectedCourse} onRemove={handleRemoveCourse} />
           </div>
