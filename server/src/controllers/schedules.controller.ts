@@ -3,7 +3,6 @@ import type { RequestHandler } from 'express';
 import { getValidated } from '../middleware/validation.middleware.js';
 import { generateSchedulePdf } from '../services/schedule-export.service.js';
 import * as schedulesService from '../services/schedules.service.js';
-import { generateSchedulePdf } from '../services/schedule-export.service.js';
 import { AppError } from '../utils/app-error.js';
 import { parseOffsetPagination } from '../utils/pagination.js';
 
@@ -45,20 +44,6 @@ export const getSchedule: RequestHandler = async (req, res) => {
   const data = await schedulesService.getSchedule(getUserId(req), id);
 
   res.status(200).json({ data });
-};
-
-export const exportSchedulePdf: RequestHandler = async (req, res) => {
-  const { id } = getValidated<ScheduleIdParams>(res, 'params');
-  const schedule = await schedulesService.getSchedule(getUserId(req), id);
-  const buffer = await generateSchedulePdf(schedule);
-  const safeName = (schedule.name ?? `Schedule-${id}`).replace(/[^a-z0-9-_ ]/gi, '').trim();
-
-  res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader(
-    'Content-Disposition',
-    `attachment; filename="${safeName || 'Schedule'}.pdf"`,
-  );
-  res.status(200).send(buffer);
 };
 
 export const updateSchedule: RequestHandler = async (req, res) => {
