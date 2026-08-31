@@ -6,6 +6,27 @@
   --font-mono: 'JetBrains Mono', monospace;
 }
 
+:root {
+  --color-primary: #172554;
+  --color-primary-hover: #1E3A8A;
+  --color-primary-light: #EAF0FF;
+  --color-primary-border: #D7E1FF;
+  --color-primary-grad: linear-gradient(135deg, #172554 0%, #1E3A8A 100%);
+
+  --color-accent: #0F766E;
+  --color-accent-light: #CCFBF1;
+  --color-accent-border: #99F6E4;
+
+  --color-bg: #F8FAFC;
+  --color-card: #FFFFFF;
+  --color-text: #0F172A;
+  --color-text-secondary: #64748B;
+  --color-border: #E2E8F0;
+
+  --color-primary-rgb: 23, 37, 84;
+  --color-accent-rgb: 15, 118, 110;
+}
+
 * {
   scrollbar-width: thin;
   scrollbar-color: #CBD5E1 transparent;

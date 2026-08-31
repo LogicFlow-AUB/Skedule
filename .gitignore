@@ -4,3 +4,8 @@ dist/
 .env.local
 server.err
 *.log
+AI-ASSISTANT-REDESIGN-REPORT.md
+unwanted-backend.md
+BACKEND-TODO.md
+__pycache__/
+*.pyc

@@ -20,6 +20,14 @@ export const listStudyGroups: RequestHandler = async (req, res) => {
   res.status(200).json({ data: page.data, pagination: page.pagination });
 };
 
+export const listMyStudyGroups: RequestHandler = async (req, res) => {
+  const pagination = parseOffsetPagination(
+    getValidated<{ page?: number; limit?: number }>(res, 'query'),
+  );
+  const page = await studyGroupsService.listMyStudyGroups(getUserId(req), pagination);
+  res.status(200).json({ data: page.data, pagination: page.pagination });
+};
+
 export const getStudyGroup: RequestHandler = async (req, res) => {
   const { id } = getValidated<{ id: number }>(res, 'params');
   const group = await studyGroupsService.getStudyGroup(id, req.userId);
@@ -34,14 +42,62 @@ export const createStudyGroup: RequestHandler = async (req, res) => {
   res.status(201).json(data);
 };
 
-export const joinStudyGroup: RequestHandler = async (req, res) => {
+export const requestToJoinStudyGroup: RequestHandler = async (req, res) => {
   const { id } = getValidated<{ id: number }>(res, 'params');
-  await studyGroupsService.joinStudyGroup(getUserId(req), id);
+  await studyGroupsService.requestToJoin(getUserId(req), id);
+  res.status(201).json({ joined: false, requested: true });
+};
+
+export const cancelJoinRequest: RequestHandler = async (req, res) => {
+  const { id } = getValidated<{ id: number }>(res, 'params');
+  await studyGroupsService.cancelJoinRequest(getUserId(req), id);
   res.status(204).send();
 };
 
-export const leaveStudyGroup: RequestHandler = async (req, res) => {
+export const listJoinRequests: RequestHandler = async (req, res) => {
   const { id } = getValidated<{ id: number }>(res, 'params');
-  await studyGroupsService.leaveStudyGroup(getUserId(req), id);
+  const requests = await studyGroupsService.listJoinRequests(getUserId(req), id);
+  res.status(200).json({ data: requests });
+};
+
+export const acceptJoinRequest: RequestHandler = async (req, res) => {
+  const { id, userId: requesterId } = getValidated<{ id: number; userId: string }>(res, 'params');
+  await studyGroupsService.acceptJoinRequest(getUserId(req), id, requesterId);
+  res.status(204).send();
+};
+
+export const rejectJoinRequest: RequestHandler = async (req, res) => {
+  const { id, userId: requesterId } = getValidated<{ id: number; userId: string }>(res, 'params');
+  await studyGroupsService.rejectJoinRequest(getUserId(req), id, requesterId);
+  res.status(204).send();
+};
+
+export const listStudyGroupMessages: RequestHandler = async (req, res) => {
+  const { id } = getValidated<{ id: number }>(res, 'params');
+  const query = getValidated<{ before?: string; limit?: number }>(res, 'query') ?? {};
+  const history = await studyGroupsService.listStudyGroupMessages(getUserId(req), id, query);
+  res.status(200).json(history);
+};
+
+export const sendStudyGroupMessage: RequestHandler = async (req, res) => {
+  const { id } = getValidated<{ id: number }>(res, 'params');
+  const { content } = getValidated<{ content: string }>(res, 'body');
+  const message = await studyGroupsService.sendStudyGroupMessage(getUserId(req), id, content);
+  res.status(201).json({ data: message });
+};
+
+export const updateStudyGroup: RequestHandler = async (req, res) => {
+  const { id } = getValidated<{ id: number }>(res, 'params');
+  const data = await studyGroupsService.updateStudyGroup(
+    getUserId(req),
+    id,
+    getValidated<studyGroupsService.CreateStudyGroupInput>(res, 'body'),
+  );
+  res.status(200).json(data);
+};
+
+export const removeStudyGroupMember: RequestHandler = async (req, res) => {
+  const { id, userId: memberId } = getValidated<{ id: number; userId: string }>(res, 'params');
+  await studyGroupsService.removeStudyGroupMember(getUserId(req), id, memberId);
   res.status(204).send();
 };

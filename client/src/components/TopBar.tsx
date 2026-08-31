@@ -1,17 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Search, ChevronDown, Bell, MessageSquare, Sparkles, ChevronRight, LogOut } from 'lucide-react'
+import { Bell, ChevronRight, LogOut } from 'lucide-react'
 import type { Page } from '../App'
 import { useAuth } from '../lib/auth'
 import { api, type Notification } from '../lib/api'
 
 const PAGE_TITLES: Record<Page, string> = {
   dashboard: 'Dashboard',
-  'ai-scheduler': 'AI Scheduler',
+  'ai-scheduler': 'Optimized Builder',
   'manual-builder': 'Manual Builder',
   'saved-schedules': 'Saved Schedules',
   'course-reviews': 'Course Reviews',
   'professor-reviews': 'Professor Reviews',
   community: 'Community',
+  'study-groups': 'Study Groups',
+  'common-free-time': 'Common Free Time',
   friends: 'Community',
   profile: 'Profile & Settings',
   settings: 'Profile & Settings',
@@ -19,7 +21,6 @@ const PAGE_TITLES: Record<Page, string> = {
 
 export default function TopBar({ activePage }: { activePage: Page }) {
   const { user, logout } = useAuth()
-  const [search, setSearch] = useState('')
   const [showNotifications, setShowNotifications] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -115,75 +116,12 @@ export default function TopBar({ activePage }: { activePage: Page }) {
     >
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 mr-2">
-        <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>Smart Schedule</span>
+        <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>Skedule</span>
         <ChevronRight size={12} color="#CBD5E1" />
         <span style={{ fontSize: 13, color: '#1E293B', fontWeight: 600 }}>{PAGE_TITLES[activePage]}</span>
       </div>
 
-      {/* Search */}
-      <div className="flex-1 max-w-md relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#94A3B8' }} />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search courses, professors, students..."
-          className="w-full pl-9 pr-4 py-1.5 rounded-lg outline-none transition-all"
-          style={{
-            fontSize: 13,
-            background: '#F8FAFC',
-            border: '1px solid #E2E8F0',
-            color: '#1E293B',
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.border = '1px solid #818CF8'
-            e.currentTarget.style.background = '#FFFFFF'
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.border = '1px solid #E2E8F0'
-            e.currentTarget.style.background = '#F8FAFC'
-          }}
-        />
-        <kbd
-          className="absolute right-3 top-1/2 -translate-y-1/2 rounded"
-          style={{ fontSize: 10, color: '#94A3B8', background: '#F1F5F9', padding: '1px 5px', fontFamily: 'inherit' }}
-        >
-          ⌘K
-        </kbd>
-      </div>
-
       <div className="flex items-center gap-1 ml-auto">
-        {/* Semester dropdown */}
-        <button
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors"
-          style={{ fontSize: 12, fontWeight: 600, color: '#4338CA', background: '#EEF2FF', border: '1px solid #C7D2FE' }}
-        >
-          Fall 2025
-          <ChevronDown size={12} />
-        </button>
-
-        {/* AI shortcut */}
-        <button
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors"
-          style={{ fontSize: 12, fontWeight: 600, color: '#FFFFFF', background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}
-        >
-          <Sparkles size={12} />
-          Ask AI
-        </button>
-
-        {/* Messages */}
-        <button
-          className="flex items-center justify-center rounded-lg transition-colors relative"
-          style={{ width: 34, height: 34, color: '#64748B' }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-        >
-          <MessageSquare size={16} />
-          <span
-            className="absolute top-1.5 right-1.5 rounded-full"
-            style={{ width: 6, height: 6, background: '#10B981' }}
-          />
-        </button>
-
         {/* Notifications */}
         <div className="relative">
           <button
@@ -197,7 +135,7 @@ export default function TopBar({ activePage }: { activePage: Page }) {
             {unreadCount > 0 && (
               <span
                 className="absolute top-1.5 right-1.5 rounded-full flex items-center justify-center"
-                style={{ width: 14, height: 14, background: '#EF4444', fontSize: 8, fontWeight: 700, color: 'white' }}
+                style={{ width: 14, height: 14, background: '#B91C1C', fontSize: 8, fontWeight: 700, color: 'white' }}
               >
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
@@ -231,7 +169,7 @@ export default function TopBar({ activePage }: { activePage: Page }) {
                       <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{timeAgo(n.createdAt)}</div>
                     </div>
                     {!n.read && (
-                      <div className="shrink-0 rounded-full mt-1" style={{ width: 6, height: 6, background: '#4338CA' }} />
+                      <div className="shrink-0 rounded-full mt-1" style={{ width: 6, height: 6, background: '#8b1e2d' }} />
                     )}
                   </div>
                 ))
@@ -243,7 +181,7 @@ export default function TopBar({ activePage }: { activePage: Page }) {
         {/* Avatar */}
         <button
           className="rounded-full flex items-center justify-center ml-1"
-          style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', fontSize: 12, fontWeight: 700, color: 'white' }}
+          style={{ width: 32, height: 32, background: 'var(--color-primary-grad, linear-gradient(135deg, #7f1d2d 0%, #bf3d45 100%))', fontSize: 12, fontWeight: 700, color: 'white' }}
         >
           {initials}
         </button>

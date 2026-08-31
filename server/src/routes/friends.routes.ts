@@ -5,11 +5,13 @@ import {
   acceptFriendRequest,
   getCommonFreeTime,
   getFriendRequests,
+  getFriendSchedule,
   getSuggestedFriends,
   listFriends,
   rejectFriendRequest,
   removeFriend,
   sendFriendRequest,
+  searchStudents,
 } from '../controllers/friends.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { validateParams, validateQuery } from '../middleware/validation.middleware.js';
@@ -18,6 +20,12 @@ import { asyncHandler } from '../utils/async-handler.js';
 const userIdParams = z.object({ userId: z.string().uuid() }).strict();
 const suggestedQuery = z
   .object({ limit: z.coerce.number().int().positive().max(50).optional() })
+  .strict();
+const studentSearchQuery = z
+  .object({
+    query: z.string().trim().min(2).max(100),
+    limit: z.coerce.number().int().positive().max(50).optional(),
+  })
   .strict();
 
 const router = Router();
@@ -29,8 +37,15 @@ router.get(
   validateQuery(suggestedQuery),
   asyncHandler(getSuggestedFriends),
 );
+router.get('/search', requireAuth, validateQuery(studentSearchQuery), asyncHandler(searchStudents));
 router.get('/requests', requireAuth, asyncHandler(getFriendRequests));
 router.get('/common-free-time', requireAuth, asyncHandler(getCommonFreeTime));
+router.get(
+  '/:userId/schedule',
+  requireAuth,
+  validateParams(userIdParams),
+  asyncHandler(getFriendSchedule),
+);
 router.post(
   '/requests/:userId',
   requireAuth,

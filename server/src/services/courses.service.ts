@@ -1,15 +1,18 @@
 import { requireSupabaseClient } from '../db/supabase.js';
-import type { Course, CourseReview } from '../db/types.js';
+import type { Course, CourseReview, Professor, Section, SectionMeeting } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
 
 export type CourseListInput = {
   search?: string;
   attribute?: string;
+  termId?: number;
   sort: 'name' | 'rating' | 'difficulty' | 'workload' | 'popularity';
   order: 'asc' | 'desc';
   pagination: OffsetPagination;
 };
+
+export type OptimizerProfessorOption = { id: number; first_name: string; last_name: string };
 
 export type CourseSummary = {
   id: number;
@@ -26,6 +29,8 @@ export type CourseSummary = {
   averageDifficulty: number | null;
   averageWorkload: number | null;
   wouldRetakePercentage: number | null;
+  /** Professors teaching this course in the requested term (only populated when a term is specified). */
+  professors?: OptimizerProfessorOption[];
 };
 
 type SectionEnrollment = {
@@ -44,16 +49,23 @@ function round(value: number): number {
 }
 
 function splitCourseCode(code: string) {
-  const parts = code.trim().toUpperCase().split(/\s+/);
+  const normalized = code.trim().toUpperCase().replace(/\s+/g, ' ').trim();
+  const parts = normalized.split(' ');
 
-  if (parts.length < 2) {
-    throw new AppError(404, 'COURSE_NOT_FOUND', 'Course not found.');
+  if (parts.length >= 2) {
+    return {
+      subject: parts.slice(0, -1).join(' '),
+      courseNumber: parts.at(-1) ?? '',
+    };
   }
 
-  return {
-    subject: parts.slice(0, -1).join(' '),
-    courseNumber: parts.at(-1) ?? '',
-  };
+  // Handle unspaced codes such as "MATH201" or "CMPS214L".
+  const unspaced = /^([A-Z]{2,6})(\d{1,4}[A-Z]?)$/.exec(normalized);
+  if (unspaced?.[1] && unspaced?.[2]) {
+    return { subject: unspaced[1], courseNumber: unspaced[2] };
+  }
+
+  throw new AppError(404, 'COURSE_NOT_FOUND', 'Course not found.');
 }
 
 async function getCourseSummaries(courses: Course[]): Promise<CourseSummary[]> {
@@ -166,6 +178,57 @@ async function getCourseSummaries(courses: Course[]): Promise<CourseSummary[]> {
   });
 }
 
+type SectionProfessorRow = {
+  course_id: number | null;
+  professors: OptimizerProfessorOption | OptimizerProfessorOption[] | null;
+};
+
+function toOne<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+/**
+ * Attaches each course the professors who teach it in a given term, gathered
+ * from that term's sections. Used to keep the shared course search (which is
+ * term-agnostic for the course set) able to surface term-professors for the
+ * schedule builder's professor preferences.
+ */
+async function attachTermProfessors(
+  summaries: CourseSummary[],
+  termId: number,
+): Promise<void> {
+  if (summaries.length === 0) return;
+
+  const db = requireSupabaseClient();
+  const courseIds = summaries.map((course) => course.id);
+  const { data, error } = await db
+    .from('sections')
+    .select('course_id, professors(id, first_name, last_name)')
+    .eq('term_id', termId)
+    .in('course_id', courseIds);
+  if (error) throw error;
+
+  const byCourse = new Map<number, OptimizerProfessorOption[]>();
+  const seen = new Set<string>();
+  for (const row of (data ?? []) as SectionProfessorRow[]) {
+    const professor = toOne(row.professors);
+    if (!professor || row.course_id == null) continue;
+    const key = `${row.course_id}:${professor.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const list = byCourse.get(row.course_id) ?? [];
+    list.push(professor);
+    byCourse.set(row.course_id, list);
+  }
+
+  for (const course of summaries) {
+    course.professors = (byCourse.get(course.id) ?? []).sort((a, b) =>
+      a.last_name.localeCompare(b.last_name),
+    );
+  }
+}
+
 export async function listCourses(input: CourseListInput): Promise<OffsetPage<CourseSummary>> {
   const db = requireSupabaseClient();
   let query = db.from('courses').select('*');
@@ -190,6 +253,10 @@ export async function listCourses(input: CourseListInput): Promise<OffsetPage<Co
     courses = courses.filter((course) =>
       course.attributes.some((courseAttribute) => courseAttribute.toLowerCase() === attribute),
     );
+  }
+
+  if (input.termId != null) {
+    await attachTermProfessors(courses, input.termId);
   }
 
   const direction = input.order === 'asc' ? 1 : -1;
@@ -244,20 +311,30 @@ export async function getCourse(code: string): Promise<CourseSummary> {
   return summary;
 }
 
-export async function getSections(code: string): Promise<unknown[]> {
+export type CourseSection = Section & {
+  professors: Pick<Professor, 'id' | 'first_name' | 'last_name'> | null;
+  section_meetings: SectionMeeting[];
+};
+
+export async function getSections(code: string, termId?: number | null): Promise<CourseSection[]> {
   const course = await getCourse(code);
   const db = requireSupabaseClient();
-  const { data, error } = await db
+  let query = db
     .from('sections')
-    .select('*, professors(id, first_name, last_name)')
-    .eq('course_id', course.id)
-    .order('section_number');
+    .select('*, professors(id, first_name, last_name), section_meetings(*)')
+    .eq('course_id', course.id);
+
+  if (termId != null) {
+    query = query.eq('term_id', termId);
+  }
+
+  const { data, error } = await query.order('section_number');
 
   if (error) {
     throw error;
   }
 
-  return data ?? [];
+  return (data ?? []) as CourseSection[];
 }
 
 export async function getGradeDistribution(code: string): Promise<unknown[]> {

@@ -2,7 +2,7 @@
  * End-to-end smoke test for all 11 backend phases.
  *
  * Starts the server, hits every endpoint category, and reports results.
- * Run:  npx tsx src/e2e-smoke.test.ts
+ * Run from server/:  npx tsx tests/e2e/e2e-smoke.test.ts
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';

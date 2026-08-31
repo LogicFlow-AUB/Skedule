@@ -30,11 +30,12 @@ export const createCourseReview: RequestHandler = async (req, res) => {
   res.status(201).json({ data });
 };
 
-export const getCourseReviews: RequestHandler = async (_req, res) => {
+export const getCourseReviews: RequestHandler = async (req, res) => {
   const { code } = getValidated<CourseCodeParams>(res, 'params');
   const page = await reviewsService.getCourseReviews(
     code,
     parseOffsetPagination(getValidated<ReviewsQuery>(res, 'query')),
+    req.userId,
   );
 
   res.status(200).json({ data: page.data, pagination: page.pagination });
@@ -54,6 +55,15 @@ export const unsaveCourse: RequestHandler = async (req, res) => {
   res.status(204).send();
 };
 
+export const listSavedCourses: RequestHandler = async (req, res) => {
+  const page = await reviewsService.listSavedCourses(
+    getUserId(req),
+    parseOffsetPagination(getValidated<ReviewsQuery>(res, 'query')),
+  );
+
+  res.status(200).json({ data: page.data, pagination: page.pagination });
+};
+
 export const createProfessorReview: RequestHandler = async (req, res) => {
   const { id } = getValidated<ProfessorIdParams>(res, 'params');
   const data = await reviewsService.createProfessorReview(
@@ -65,11 +75,12 @@ export const createProfessorReview: RequestHandler = async (req, res) => {
   res.status(201).json({ data });
 };
 
-export const getProfessorReviews: RequestHandler = async (_req, res) => {
+export const getProfessorReviews: RequestHandler = async (req, res) => {
   const { id } = getValidated<ProfessorIdParams>(res, 'params');
   const page = await reviewsService.getProfessorReviews(
     id,
     parseOffsetPagination(getValidated<ReviewsQuery>(res, 'query')),
+    req.userId,
   );
 
   res.status(200).json({ data: page.data, pagination: page.pagination });

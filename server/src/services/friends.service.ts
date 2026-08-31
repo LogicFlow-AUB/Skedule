@@ -1,7 +1,8 @@
 import { requireSupabaseClient } from '../db/supabase.js';
 import type { Friendship } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
-import { parseDays, parseMinutes } from './schedules.service.js';
+import { getPreferredScheduleForUser, parseDays, parseMinutes } from './schedules.service.js';
+import type { ScheduleDetail } from './schedules.service.js';
 import { trackActivity } from './activity.service.js';
 import {
   notifyFriendRequestReceived,
@@ -9,6 +10,7 @@ import {
 } from './notifications.service.js';
 
 export type FriendRequestDirection = 'incoming' | 'outgoing';
+export type StudentRelationship = 'self' | 'friends' | 'request_sent' | 'request_received' | 'none';
 
 type UserProfileRow = {
   id: string;
@@ -57,6 +59,10 @@ function friendProfile(user: UserProfileRow) {
     lastSeenAt: user.last_seen_at,
   };
 }
+
+export type StudentSearchResult = ReturnType<typeof friendProfile> & {
+  relationship: StudentRelationship;
+};
 
 async function getProfilesByUserId(userIds: string[]): Promise<Map<string, UserProfileRow>> {
   const ids = [...new Set(userIds)];
@@ -205,6 +211,61 @@ export async function getSuggestedFriends(userId: string, limit: number) {
   });
 
   return candidates.slice(0, limit).map(friendProfile);
+}
+
+export async function searchStudents(userId: string, query: string, limit: number) {
+  const db = requireSupabaseClient();
+  const search = query.replace(/[(),]/g, '');
+  const [{ data: users, error: usersError }, { data: relationships, error: relationshipsError }] =
+    await Promise.all([
+      db
+        .from('users')
+        .select(PROFILE_COLUMNS)
+        .or(
+          `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%,major.ilike.%${search}%`,
+        )
+        .order('last_name')
+        .limit(limit),
+      db
+        .from('friendships')
+        .select(FRIENDSHIP_COLUMNS)
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`),
+    ]);
+
+  if (usersError) {
+    throw usersError;
+  }
+
+  if (relationshipsError) {
+    throw relationshipsError;
+  }
+
+  const relationshipByUserId = new Map<string, Friendship>();
+  for (const relationship of (relationships ?? []) as Friendship[]) {
+    const otherUserId =
+      relationship.user_id === userId ? relationship.friend_id : relationship.user_id;
+    relationshipByUserId.set(otherUserId, relationship);
+  }
+
+  return ((users ?? []) as UserProfileRow[]).map((student): StudentSearchResult => {
+    if (student.id === userId) {
+      return { ...friendProfile(student), relationship: 'self' };
+    }
+
+    const relationship = relationshipByUserId.get(student.id);
+    if (!relationship || relationship.status === 'rejected') {
+      return { ...friendProfile(student), relationship: 'none' };
+    }
+
+    if (relationship.status === 'accepted') {
+      return { ...friendProfile(student), relationship: 'friends' };
+    }
+
+    return {
+      ...friendProfile(student),
+      relationship: relationship.user_id === userId ? 'request_sent' : 'request_received',
+    };
+  });
 }
 
 export async function getFriendRequests(userId: string) {
@@ -378,23 +439,24 @@ async function getBusyBlocksByUser(
   const db = requireSupabaseClient();
   const { data: schedules, error: schedulesError } = await db
     .from('schedules')
-    .select('id, user_id, created_at')
+    .select('id, user_id')
     .in('user_id', userIds)
-    .order('created_at', { ascending: false });
+    .eq('is_favorite', true)
+    .eq('saved', true);
 
   if (schedulesError) {
     throw schedulesError;
   }
 
-  const latestScheduleIdByUser = new Map<string, number>();
+  const preferredScheduleIdByUser = new Map<string, number>();
 
   for (const schedule of (schedules ?? []) as { id: number; user_id: string }[]) {
-    if (!latestScheduleIdByUser.has(schedule.user_id)) {
-      latestScheduleIdByUser.set(schedule.user_id, schedule.id);
+    if (!preferredScheduleIdByUser.has(schedule.user_id)) {
+      preferredScheduleIdByUser.set(schedule.user_id, schedule.id);
     }
   }
 
-  const scheduleIds = [...latestScheduleIdByUser.values()];
+  const scheduleIds = [...preferredScheduleIdByUser.values()];
 
   if (scheduleIds.length === 0) {
     return busyByUser;
@@ -410,7 +472,7 @@ async function getBusyBlocksByUser(
   }
 
   const scheduleIdByUser = new Map(
-    [...latestScheduleIdByUser.entries()].map(([user, scheduleId]) => [scheduleId, user]),
+    [...preferredScheduleIdByUser.entries()].map(([user, scheduleId]) => [scheduleId, user]),
   );
 
   for (const row of (sectionRows ?? []) as ScheduleSectionTimeRow[]) {
@@ -448,6 +510,19 @@ function isBusyAt(
     (block) =>
       block.days.includes(day) && block.startMinutes < slotEnd && slotStart < block.endMinutes,
   );
+}
+
+export async function getFriendSchedule(
+  userId: string,
+  friendUserId: string,
+): Promise<ScheduleDetail | null> {
+  const friendship = await getFriendshipBetween(userId, friendUserId);
+
+  if (!friendship || friendship.status !== 'accepted') {
+    throw new AppError(403, 'NOT_FRIENDS', 'You can only view the schedules of your friends.');
+  }
+
+  return getPreferredScheduleForUser(friendUserId);
 }
 
 export async function getCommonFreeTime(userId: string) {

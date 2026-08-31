@@ -5,6 +5,7 @@ export type User = {
   email: string;
   major: string | null;
   level: string | null;
+  profile_visibility: 'public' | 'friends_only' | 'private' | null;
 };
 
 export type CourseReview = {
@@ -65,6 +66,39 @@ export type Section = {
   seats_remaining: number | null;
   status: string | null;
   room: string | null;
+  link_identifier: string | null;
+  meeting_schedule_type: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  has_monday: boolean;
+  has_tuesday: boolean;
+  has_wednesday: boolean;
+  has_thursday: boolean;
+  has_friday: boolean;
+  has_saturday: boolean;
+  has_sunday: boolean;
+};
+
+export type SectionMeeting = {
+  id: number;
+  section_id: number;
+  term_id: number;
+  monday: boolean;
+  tuesday: boolean;
+  wednesday: boolean;
+  thursday: boolean;
+  friday: boolean;
+  saturday: boolean;
+  sunday: boolean;
+  start_time: string | null;
+  end_time: string | null;
+  building: string | null;
+  room: string | null;
+  meeting_type: string | null;
+  hours_week: number | null;
+  start_date: string | null;
+  end_date: string | null;
+  created_at: string;
 };
 
 export type Schedule = {
@@ -73,6 +107,8 @@ export type Schedule = {
   name: string | null;
   notes: string | null;
   term_id: number | null;
+  saved: boolean;
+  is_favorite: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -97,6 +133,7 @@ export type PostComment = {
   post_id: number;
   user_id: string;
   content: string;
+  parent_comment_id: number | null;
   created_at: string;
 };
 
@@ -151,8 +188,12 @@ export type EventRsvp = {
 export type StudyGroup = {
   id: number;
   name: string;
+  course_id: number | null;
   course_code: string | null;
   description: string | null;
+  meeting_days: number[] | null;
+  start_time: string | null;
+  end_time: string | null;
   meeting_time: string | null;
   location: string | null;
   host_user_id: string;
@@ -164,4 +205,18 @@ export type StudyGroupMember = {
   study_group_id: number;
   user_id: string;
   joined_at: string;
+};
+
+export type StudyGroupJoinRequest = {
+  study_group_id: number;
+  user_id: string;
+  created_at: string;
+};
+
+export type StudyGroupMessage = {
+  id: number;
+  study_group_id: number;
+  sender_id: string;
+  content: string;
+  created_at: string;
 };

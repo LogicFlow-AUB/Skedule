@@ -9,11 +9,19 @@ export type CreateScheduleInput = {
   notes?: string;
   termId?: number;
   sectionIds?: number[];
+  saved?: boolean;
 };
 
 export type UpdateScheduleInput = {
   name?: string;
   notes?: string | null;
+};
+
+/** Replaces the current draft for a (user, term) with the given sections. */
+export type SaveDraftInput = {
+  name?: string;
+  notes?: string | null;
+  sectionIds?: number[];
 };
 
 export type ScheduleCourse = {
@@ -33,6 +41,20 @@ export type ScheduleCourse = {
     durationMinutes: number | null;
     seatsTotal: number | null;
     seatsRemaining: number | null;
+    linkIdentifier: string | null;
+    scheduleType: string | null;
+    meetings: Array<{
+      id: number;
+      days: number[];
+      startTime: string | null;
+      endTime: string | null;
+      startMinutes: number | null;
+      endMinutes: number | null;
+      durationMinutes: number | null;
+      building: string | null;
+      room: string | null;
+      meetingType: string | null;
+    }>;
   };
   professor: { id: number; firstName: string; lastName: string } | null;
 };
@@ -42,6 +64,8 @@ export type ScheduleSummary = {
   name: string | null;
   notes: string | null;
   termId: number | null;
+  saved: boolean;
+  isFavorite: boolean;
   createdAt: string;
   updatedAt: string;
   courseCount: number;
@@ -81,6 +105,22 @@ type SectionProfessorRow = {
   last_name: string;
 };
 
+type SectionMeetingRow = {
+  id: number;
+  monday: boolean;
+  tuesday: boolean;
+  wednesday: boolean;
+  thursday: boolean;
+  friday: boolean;
+  saturday: boolean;
+  sunday: boolean;
+  start_time: string | null;
+  end_time: string | null;
+  building: string | null;
+  room: string | null;
+  meeting_type: string | null;
+};
+
 type SectionRow = {
   id: number;
   course_id: number | null;
@@ -92,8 +132,11 @@ type SectionRow = {
   room: string | null;
   seats_total: number | null;
   seats_remaining: number | null;
+  link_identifier: string | null;
+  schedule_type: string | null;
   courses: SectionCourseRow | SectionCourseRow[] | null;
   professors: SectionProfessorRow | SectionProfessorRow[] | null;
+  section_meetings: SectionMeetingRow | SectionMeetingRow[] | null;
 };
 
 type ScheduleSectionRow = {
@@ -102,9 +145,10 @@ type ScheduleSectionRow = {
   sections: SectionRow | SectionRow[] | null;
 };
 
-const SCHEDULE_COLUMNS = 'id, user_id, name, notes, term_id, created_at, updated_at';
+const SCHEDULE_COLUMNS =
+  'id, user_id, name, notes, term_id, saved, is_favorite, created_at, updated_at';
 const SECTION_COLUMNS =
-  'id, course_id, professor_id, section_number, days, start_time, end_time, room, seats_total, seats_remaining, courses(id, subject, course_number, title, credits), professors(id, first_name, last_name)';
+  'id, course_id, professor_id, section_number, days, start_time, end_time, room, seats_total, seats_remaining, link_identifier, schedule_type, courses(id, subject, course_number, title, credits), professors(id, first_name, last_name), section_meetings(id, monday, tuesday, wednesday, thursday, friday, saturday, sunday, start_time, end_time, building, room, meeting_type)';
 const SCHEDULE_SECTION_COLUMNS = `schedule_id, section_id, sections(${SECTION_COLUMNS})`;
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
@@ -182,11 +226,47 @@ function courseLabel(course: ScheduleCourse): string {
   return `${course.code ?? 'Unknown course'} (${course.section.sectionNumber})`;
 }
 
+function parseSectionMeetingDays(mt: SectionMeetingRow): number[] {
+  const days: number[] = [];
+  if (mt.monday) days.push(0);
+  if (mt.tuesday) days.push(1);
+  if (mt.wednesday) days.push(2);
+  if (mt.thursday) days.push(3);
+  if (mt.friday) days.push(4);
+  return days;
+}
+
 function scheduleCourseResponse(section: SectionRow): ScheduleCourse {
   const course = toOne(section.courses);
   const professor = toOne(section.professors);
   const startMinutes = parseMinutes(section.start_time);
   const endMinutes = parseMinutes(section.end_time);
+
+  const rawMeetings = section.section_meetings;
+  const meetingsList: SectionMeetingRow[] = Array.isArray(rawMeetings)
+    ? rawMeetings.filter((m): m is SectionMeetingRow => m !== null)
+    : rawMeetings
+      ? [rawMeetings]
+      : [];
+
+  const meetings = meetingsList.map((mt) => {
+    const mtDays = parseSectionMeetingDays(mt);
+    const mtStart = parseMinutes(mt.start_time);
+    const mtEnd = parseMinutes(mt.end_time);
+    return {
+      id: mt.id,
+      days: mtDays,
+      startTime: mt.start_time,
+      endTime: mt.end_time,
+      startMinutes: mtStart,
+      endMinutes: mtEnd,
+      durationMinutes:
+        mtStart === null || mtEnd === null ? null : mtEnd - mtStart,
+      building: mt.building,
+      room: mt.room,
+      meetingType: mt.meeting_type,
+    };
+  });
 
   return {
     courseId: course?.id ?? section.course_id,
@@ -206,6 +286,9 @@ function scheduleCourseResponse(section: SectionRow): ScheduleCourse {
         startMinutes === null || endMinutes === null ? null : endMinutes - startMinutes,
       seatsTotal: section.seats_total,
       seatsRemaining: section.seats_remaining,
+      linkIdentifier: section.link_identifier,
+      scheduleType: section.schedule_type,
+      meetings,
     },
     professor: professor
       ? { id: professor.id, firstName: professor.first_name, lastName: professor.last_name }
@@ -241,6 +324,8 @@ function scheduleSummaryResponse(schedule: Schedule, courses: ScheduleCourse[]):
     name: schedule.name,
     notes: schedule.notes,
     termId: schedule.term_id,
+    saved: schedule.saved,
+    isFavorite: schedule.is_favorite,
     createdAt: schedule.created_at,
     updatedAt: schedule.updated_at,
     courseCount: courses.length,
@@ -328,6 +413,27 @@ async function getScheduleOrThrow(userId: string, scheduleId: number): Promise<S
   return schedule;
 }
 
+/**
+ * Counts the user's saved schedules. When `excludeId` is given, that schedule
+ * is not counted (used to tell whether a schedule being saved is the first one).
+ */
+async function countSavedSchedules(userId: string, excludeId?: number): Promise<number> {
+  const db = requireSupabaseClient();
+  let query = db.from('schedules').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('saved', true);
+
+  if (excludeId !== undefined) {
+    query = query.neq('id', excludeId);
+  }
+
+  const { count, error } = await query;
+
+  if (error) {
+    throw error;
+  }
+
+  return count ?? 0;
+}
+
 async function getScheduleSectionRows(scheduleIds: number[]): Promise<ScheduleSectionRow[]> {
   if (scheduleIds.length === 0) {
     return [];
@@ -406,26 +512,6 @@ async function getSectionOrThrow(sectionId: number): Promise<SectionRow> {
   return section;
 }
 
-function assertOneSectionPerCourse(sections: SectionRow[]): void {
-  const courseIds = new Set<number>();
-
-  for (const section of sections) {
-    if (section.course_id === null) {
-      continue;
-    }
-
-    if (courseIds.has(section.course_id)) {
-      throw new AppError(
-        409,
-        'DUPLICATE_COURSE',
-        'A schedule cannot contain two sections of the same course.',
-      );
-    }
-
-    courseIds.add(section.course_id);
-  }
-}
-
 async function touchSchedule(scheduleId: number): Promise<Schedule> {
   const db = requireSupabaseClient();
   const { data, error } = await db
@@ -459,6 +545,7 @@ export async function listSchedules(
     .from('schedules')
     .select(SCHEDULE_COLUMNS, { count: 'exact' })
     .eq('user_id', userId)
+    .eq('saved', true)
     .order('created_at', { ascending: false })
     .range(pagination.offset, pagination.offset + pagination.limit - 1);
 
@@ -483,17 +570,32 @@ export async function createSchedule(
   input: CreateScheduleInput,
 ): Promise<ScheduleDetail> {
   const sectionIds = [...new Set(input.sectionIds ?? [])];
-  assertOneSectionPerCourse(await getSectionsOrThrow(sectionIds));
+  await getSectionsOrThrow(sectionIds);
 
+  const saved = input.saved ?? true;
   const db = requireSupabaseClient();
+
+  let isFirstSaved = false;
+
+  if (saved) {
+    isFirstSaved = (await countSavedSchedules(userId)) === 0;
+  }
+
+  const insertRow: Record<string, unknown> = {
+    user_id: userId,
+    name: input.name,
+    notes: input.notes ?? null,
+    term_id: input.termId ?? null,
+    saved,
+  };
+
+  if (isFirstSaved) {
+    insertRow.is_favorite = true;
+  }
+
   const { data, error } = await db
     .from('schedules')
-    .insert({
-      user_id: userId,
-      name: input.name,
-      notes: input.notes ?? null,
-      term_id: input.termId ?? null,
-    })
+    .insert(insertRow)
     .select(SCHEDULE_COLUMNS)
     .single();
 
@@ -522,6 +624,63 @@ export async function createSchedule(
 
 export async function getSchedule(userId: string, scheduleId: number): Promise<ScheduleDetail> {
   return getScheduleDetail(await getScheduleOrThrow(userId, scheduleId));
+}
+
+/** Returns the given user's most recently saved schedule, or null if they have none. */
+export async function getLatestSavedScheduleForUser(
+  userId: string,
+): Promise<ScheduleDetail | null> {
+  const db = requireSupabaseClient();
+  const { data, error } = await db
+    .from('schedules')
+    .select(SCHEDULE_COLUMNS)
+    .eq('user_id', userId)
+    .eq('saved', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const schedule = data as Schedule | null;
+
+  if (!schedule) {
+    return null;
+  }
+
+  return getScheduleDetail(schedule);
+}
+
+/**
+ * Returns the user's preferred saved schedule (the single schedule marked
+ * `is_favorite`), or null when they have none. Never falls back to another
+ * saved schedule.
+ */
+export async function getPreferredScheduleForUser(
+  userId: string,
+): Promise<ScheduleDetail | null> {
+  const db = requireSupabaseClient();
+  const { data, error } = await db
+    .from('schedules')
+    .select(SCHEDULE_COLUMNS)
+    .eq('user_id', userId)
+    .eq('saved', true)
+    .eq('is_favorite', true)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  const schedule = data as Schedule | null;
+
+  if (!schedule) {
+    return null;
+  }
+
+  return getScheduleDetail(schedule);
 }
 
 export async function updateSchedule(
@@ -557,7 +716,8 @@ export async function updateSchedule(
 }
 
 export async function deleteSchedule(userId: string, scheduleId: number): Promise<void> {
-  await getScheduleOrThrow(userId, scheduleId);
+  const schedule = await getScheduleOrThrow(userId, scheduleId);
+  const wasPreferred = schedule.is_favorite;
 
   const db = requireSupabaseClient();
   const { error: sectionsError } = await db
@@ -574,6 +734,248 @@ export async function deleteSchedule(userId: string, scheduleId: number): Promis
   if (error) {
     throw error;
   }
+
+  // Deleting the preferred schedule promotes the latest remaining saved
+  // schedule so the user still has exactly one preferred schedule.
+  if (wasPreferred) {
+    const { data: remaining, error: remainingError } = await db
+      .from('schedules')
+      .select(SCHEDULE_COLUMNS)
+      .eq('user_id', userId)
+      .eq('saved', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (remainingError) {
+      throw remainingError;
+    }
+
+    if (remaining) {
+      const { error: promoteError } = await db
+        .from('schedules')
+        .update({ is_favorite: true, updated_at: new Date().toISOString() })
+        .eq('id', (remaining as Schedule).id);
+
+      if (promoteError) {
+        throw promoteError;
+      }
+    }
+  }
+}
+
+async function findDraft(userId: string, termId: number | null): Promise<Schedule | null> {
+  const db = requireSupabaseClient();
+  let query = db
+    .from('schedules')
+    .select(SCHEDULE_COLUMNS)
+    .eq('user_id', userId)
+    .eq('saved', false);
+
+  if (termId == null) {
+    query = query.is('term_id', null);
+  } else {
+    query = query.eq('term_id', termId);
+  }
+
+  const { data, error } = await query.maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as Schedule | null) ?? null;
+}
+
+/**
+ * Returns the current unsaved draft for a (user, term), or `null` when none
+ * exists. Both builders share this single draft per term so Manual Builder and
+ * AI Scheduler always see the same working schedule.
+ */
+export async function getDraft(
+  userId: string,
+  termId: number | null,
+): Promise<ScheduleDetail | null> {
+  const schedule = await findDraft(userId, termId);
+
+  if (!schedule) {
+    return null;
+  }
+
+  return getScheduleDetail(schedule);
+}
+
+/**
+ * Replaces the current draft for a (user, term) with the given sections. If no
+ * draft exists yet it is created; otherwise its sections are reset to exactly
+ * the supplied ones. This keeps `saved=false` so the draft never shows up in
+ * Saved Schedules until the user explicitly saves it.
+ */
+export async function saveDraft(
+  userId: string,
+  termId: number | null,
+  input: SaveDraftInput,
+): Promise<ScheduleDetail> {
+  const sectionIds = [...new Set(input.sectionIds ?? [])];
+  await getSectionsOrThrow(sectionIds);
+
+  const db = requireSupabaseClient();
+  let schedule = await findDraft(userId, termId);
+
+  if (schedule) {
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+    if (input.name !== undefined) {
+      patch.name = input.name;
+    }
+
+    if (input.notes !== undefined) {
+      patch.notes = input.notes;
+    }
+
+    const { error: updateError } = await db.from('schedules').update(patch).eq('id', schedule.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    const { error: resetError } = await db
+      .from('schedule_sections')
+      .delete()
+      .eq('schedule_id', schedule.id);
+
+    if (resetError) {
+      throw resetError;
+    }
+  } else {
+    const { data, error } = await db
+      .from('schedules')
+      .insert({
+        user_id: userId,
+        name: input.name ?? null,
+        notes: input.notes ?? null,
+        term_id: termId,
+        saved: false,
+      })
+      .select(SCHEDULE_COLUMNS)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    schedule = data as Schedule;
+  }
+
+  if (sectionIds.length) {
+    const { error: sectionsError } = await db.from('schedule_sections').insert(
+      sectionIds.map((sectionId) => ({ schedule_id: (schedule as Schedule).id, section_id: sectionId })),
+    );
+
+    if (sectionsError) {
+      throw sectionsError;
+    }
+  }
+
+  return getScheduleDetail(schedule as Schedule);
+}
+
+/**
+ * Permanently saves a draft (or an existing unsaved schedule): sets `saved` to
+ * true so it appears in Saved Schedules. Also invokes the one-favorite index by
+ * clearing the favorite flag first when it is already set.
+ */
+export async function saveSchedule(userId: string, scheduleId: number): Promise<ScheduleDetail> {
+  const schedule = await getScheduleOrThrow(userId, scheduleId);
+
+  if (schedule.saved) {
+    return getScheduleDetail(schedule);
+  }
+
+  const db = requireSupabaseClient();
+  const patch: Record<string, unknown> = {
+    saved: true,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (schedule.is_favorite) {
+    patch.is_favorite = false;
+  }
+
+  // A draft can never be a favorite, so if this is the user's first saved
+  // schedule it automatically becomes their preferred schedule.
+  if ((await countSavedSchedules(userId)) === 0) {
+    patch.is_favorite = true;
+  }
+
+  const { data, error } = await db
+    .from('schedules')
+    .update(patch)
+    .eq('id', scheduleId)
+    .select(SCHEDULE_COLUMNS)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return getScheduleDetail(data as Schedule);
+}
+
+/**
+ * Marks a schedule as the single favorite for the user. Any previously
+ * favourite schedule is un-favourited in the same transaction.
+ */
+export async function setFavorite(userId: string, scheduleId: number): Promise<ScheduleDetail> {
+  await getScheduleOrThrow(userId, scheduleId);
+
+  const db = requireSupabaseClient();
+  const { error: clearError } = await db
+    .from('schedules')
+    .update({ is_favorite: false })
+    .eq('user_id', userId)
+    .eq('is_favorite', true);
+
+  if (clearError) {
+    throw clearError;
+  }
+
+  const { data, error } = await db
+    .from('schedules')
+    .update({ is_favorite: true, updated_at: new Date().toISOString() })
+    .eq('id', scheduleId)
+    .select(SCHEDULE_COLUMNS)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return getScheduleDetail(data as Schedule);
+}
+
+/**
+ * Copies a saved schedule into a fresh unsaved draft for its term. Both
+ * builders pick this draft up, letting the user "load" a saved schedule and
+ * then edit it / regenerate freely without mutating the saved original.
+ */
+export async function loadScheduleAsDraft(
+  userId: string,
+  scheduleId: number,
+): Promise<ScheduleDetail> {
+  const source = await getScheduleOrThrow(userId, scheduleId);
+
+  if (!source.saved) {
+    throw new AppError(400, 'SCHEDULE_NOT_SAVED', 'Only saved schedules can be loaded.');
+  }
+
+  const draftInput: SaveDraftInput = {
+    ...(source.name != null ? { name: source.name } : {}),
+    notes: source.notes ?? null,
+    sectionIds: (await getScheduleSectionRows([source.id])).map((row) => row.section_id),
+  };
+
+  return saveDraft(userId, source.term_id, draftInput);
 }
 
 export async function addScheduleCourse(
@@ -583,22 +985,11 @@ export async function addScheduleCourse(
 ): Promise<ScheduleDetail> {
   await getScheduleOrThrow(userId, scheduleId);
 
-  const section = await getSectionOrThrow(sectionId);
+  await getSectionsOrThrow([sectionId]);
   const rows = await getScheduleSectionRows([scheduleId]);
 
   if (rows.some((row) => row.section_id === sectionId)) {
     throw new AppError(409, 'SECTION_ALREADY_IN_SCHEDULE', 'This section is already scheduled.');
-  }
-
-  if (
-    section.course_id !== null &&
-    rows.some((row) => toOne(row.sections)?.course_id === section.course_id)
-  ) {
-    throw new AppError(
-      409,
-      'COURSE_ALREADY_IN_SCHEDULE',
-      'This course is already in the schedule. Swap the section instead.',
-    );
   }
 
   const db = requireSupabaseClient();

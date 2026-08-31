@@ -6,24 +6,25 @@ import {
   Star,
   UserCheck,
   Users,
+  Clock3,
   User,
-  Settings,
-  Bell,
   GraduationCap,
+  MessagesSquare,
 } from 'lucide-react'
 import type { Page } from '../App'
 import { useAuth } from '../lib/auth'
 
 const NAV_ITEMS: { id: Page; label: string; icon: React.ReactNode; section: string; badge?: { text: string; color: string; bg: string } }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={16} />, section: 'main' },
-  { id: 'ai-scheduler', label: 'AI Scheduler', icon: <Sparkles size={16} />, section: 'main', badge: { text: 'AI', color: '#4338CA', bg: '#EEF2FF' } },
+  { id: 'ai-scheduler', label: 'Optimized Builder', icon: <Sparkles size={16} />, section: 'main' },
   { id: 'manual-builder', label: 'Manual Builder', icon: <CalendarDays size={16} />, section: 'main' },
-  { id: 'saved-schedules', label: 'Saved Schedules', icon: <BookmarkCheck size={16} />, section: 'main', badge: { text: '3', color: '#059669', bg: '#ECFDF5' } },
+  { id: 'saved-schedules', label: 'Saved Schedules', icon: <BookmarkCheck size={16} />, section: 'main' },
   { id: 'course-reviews', label: 'Course Reviews', icon: <Star size={16} />, section: 'review' },
   { id: 'professor-reviews', label: 'Professor Reviews', icon: <UserCheck size={16} />, section: 'review' },
-  { id: 'community', label: 'Community', icon: <Users size={16} />, section: 'social', badge: { text: '3', color: '#10B981', bg: '#ECFDF5' } },
+  { id: 'community', label: 'Community', icon: <Users size={16} />, section: 'social' },
+  { id: 'study-groups', label: 'Study Groups', icon: <MessagesSquare size={16} />, section: 'social' },
+  { id: 'common-free-time', label: 'Common Free Time', icon: <Clock3 size={16} />, section: 'social' },
   { id: 'profile', label: 'Profile & Settings', icon: <User size={16} />, section: 'account' },
-  { id: 'settings', label: 'Settings', icon: <Settings size={16} />, section: 'account' },
 ]
 
 const SECTIONS: { key: string; label: string }[] = [
@@ -41,7 +42,10 @@ interface SidebarProps {
 export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
   const { user } = useAuth()
   // Profile and Settings both resolve to the same page
-  const effectivePage = activePage === 'settings' ? 'profile' : activePage
+  const effectivePage =
+    activePage === 'settings' ? 'profile'
+    : activePage === 'friends' ? 'community'
+    : activePage
 
   const displayName = user?.email ? user.email.split('@')[0] ?? 'Student' : 'Student'
 
@@ -54,12 +58,12 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
       <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
         <div
           className="flex items-center justify-center rounded-xl"
-          style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}
+          style={{ width: 32, height: 32, background: 'var(--color-primary-grad, linear-gradient(135deg, #172554 0%, #1E3A8A 100%))' }}
         >
           <Sparkles size={16} color="white" />
         </div>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>Smart Schedule</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>Skedule</div>
           <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 500, letterSpacing: '0.02em' }}>BUILDER</div>
         </div>
       </div>
@@ -86,8 +90,8 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
                     style={{
                       fontSize: 13,
                       fontWeight: active ? 600 : 500,
-                      color: active ? '#4338CA' : '#475569',
-                      background: active ? '#EEF2FF' : 'transparent',
+                      color: active ? 'var(--color-primary, #172554)' : '#475569',
+                      background: active ? 'var(--color-primary-light, #EAF0FF)' : 'transparent',
                     }}
                     onMouseEnter={(e) => {
                       if (!active) {
@@ -102,7 +106,7 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
                       }
                     }}
                   >
-                    <span style={{ color: active ? '#4338CA' : '#94A3B8' }}>{item.icon}</span>
+                    <span style={{ color: active ? 'var(--color-primary, #172554)' : '#94A3B8' }}>{item.icon}</span>
                     {item.label}
                     {item.badge && (
                       <span
@@ -130,7 +134,7 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
         >
           <div
             className="rounded-full flex items-center justify-center shrink-0"
-            style={{ width: 34, height: 34, background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' }}
+            style={{ width: 34, height: 34, background: 'var(--color-primary-grad, linear-gradient(135deg, #172554 0%, #1E3A8A 100%))' }}
           >
             <GraduationCap size={16} color="white" />
           </div>
@@ -138,9 +142,6 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
             <div style={{ fontSize: 12, fontWeight: 600, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
             <div style={{ fontSize: 11, color: '#64748B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email ?? ''}</div>
           </div>
-          <button className="shrink-0" style={{ color: '#94A3B8' }}>
-            <Bell size={14} />
-          </button>
         </div>
       </div>
     </aside>

@@ -3,6 +3,7 @@ import type { Post, PostComment, User } from '../db/types.js';
 import { AppError } from '../utils/app-error.js';
 import { trackActivity } from './activity.service.js';
 import { notifyPostLiked, notifyPostCommented } from './notifications.service.js';
+import { getRevealedAuthorIds } from './profile-visibility.service.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
 
 export type PostType = 'schedule' | 'review' | 'question' | 'tip';
@@ -16,15 +17,26 @@ export type CreatePostInput = {
 
 export type CreateCommentInput = {
   content: string;
+  parentCommentId?: number;
 };
 
-const USER_COLUMNS = 'id, first_name, last_name, email, major, level';
+const USER_COLUMNS = 'id, first_name, last_name, email, major, level, profile_visibility';
 const POST_COLUMNS = 'id, user_id, type, content, tags, schedule_id, created_at';
-const COMMENT_COLUMNS = 'id, post_id, user_id, content, created_at';
+const COMMENT_COLUMNS = 'id, post_id, user_id, content, parent_comment_id, created_at';
 
-function postAuthor(user: User | null) {
+function postAuthor(user: User | null, revealed: boolean) {
   if (!user) {
     return null;
+  }
+
+  if (!revealed) {
+    return {
+      id: user.id,
+      firstName: null,
+      lastName: null,
+      major: null,
+      level: null,
+    };
   }
 
   return {
@@ -36,7 +48,15 @@ function postAuthor(user: User | null) {
   };
 }
 
-function postResponse(post: Post, author: User | null, likeCount: number, commentCount: number) {
+function postResponse(
+  post: Post,
+  author: User | null,
+  likeCount: number,
+  commentCount: number,
+  isLikedByCurrentUser: boolean,
+  isSavedByCurrentUser: boolean,
+  revealed: boolean,
+) {
   return {
     id: post.id,
     type: post.type,
@@ -44,13 +64,17 @@ function postResponse(post: Post, author: User | null, likeCount: number, commen
     tags: post.tags,
     scheduleId: post.schedule_id,
     createdAt: post.created_at,
-    author: postAuthor(author),
+    author: postAuthor(author, revealed),
     likeCount,
     commentCount,
+    isLikedByCurrentUser,
+    isSavedByCurrentUser,
   };
 }
 
 type PostCommentRow = PostComment & { users: User | User[] | null };
+
+type MyCommentRow = PostComment & { posts: Post | Post[] | null };
 
 /**
  * PostgREST returns a to-one embed as an object, but a to-many embed as an
@@ -64,13 +88,14 @@ function toOne<T>(value: T | T[] | null | undefined): T | null {
   return value ?? null;
 }
 
-function commentResponse(comment: PostCommentRow) {
+function commentResponse(comment: PostCommentRow, revealed: boolean) {
   return {
     id: comment.id,
     postId: comment.post_id,
     content: comment.content,
+    parentCommentId: comment.parent_comment_id,
     createdAt: comment.created_at,
-    author: postAuthor(toOne(comment.users)),
+    author: postAuthor(toOne(comment.users), revealed),
   };
 }
 
@@ -115,17 +140,77 @@ async function countRowsByPost(
   return counts;
 }
 
-async function getPostResponses(posts: Post[]) {
+async function getPostResponses(posts: Post[], userId?: string) {
   if (posts.length === 0) {
     return [];
   }
 
   const postIds = posts.map((post) => post.id);
-  const [authorsByUserId, likeCounts, commentCounts] = await Promise.all([
+  const promises: Promise<unknown>[] = [
     getAuthorsByUserId(posts.map((post) => post.user_id)),
     countRowsByPost('post_likes', postIds),
     countRowsByPost('post_comments', postIds),
+  ];
+
+  let userLikedPostIds: Set<number> = new Set();
+  let userSavedPostIds: Set<number> = new Set();
+
+  if (userId) {
+    promises.push(
+      (async () => {
+        const db = requireSupabaseClient();
+        const { data } = await db
+          .from('post_likes')
+          .select('post_id')
+          .eq('user_id', userId)
+          .in('post_id', postIds);
+        return (data ?? []) as { post_id: number }[];
+      })(),
+      (async () => {
+        const db = requireSupabaseClient();
+        const { data } = await db
+          .from('post_saves')
+          .select('post_id')
+          .eq('user_id', userId)
+          .in('post_id', postIds);
+        return (data ?? []) as { post_id: number }[];
+      })(),
+    );
+
+    const [authorsByUserId, likeCounts, commentCounts, likedRows, savedRows] =
+      await Promise.all(promises as [
+        Promise<Map<string, User>>,
+        Promise<Map<number, number>>,
+        Promise<Map<number, number>>,
+        Promise<{ post_id: number }[]>,
+        Promise<{ post_id: number }[]>,
+      ]);
+
+    userLikedPostIds = new Set(likedRows.map((r) => r.post_id));
+    userSavedPostIds = new Set(savedRows.map((r) => r.post_id));
+
+    const revealedIds = await getRevealedAuthorIds(authorsByUserId ? [...authorsByUserId.values()] : [], userId);
+
+    return posts.map((post) =>
+      postResponse(
+        post,
+        authorsByUserId.get(post.user_id) ?? null,
+        likeCounts.get(post.id) ?? 0,
+        commentCounts.get(post.id) ?? 0,
+        userLikedPostIds.has(post.id),
+        userSavedPostIds.has(post.id),
+        revealedIds.has(post.user_id),
+      ),
+    );
+  }
+
+  const [authorsByUserId, likeCounts, commentCounts] = await Promise.all(promises as [
+    Promise<Map<string, User>>,
+    Promise<Map<number, number>>,
+    Promise<Map<number, number>>,
   ]);
+
+  const revealedIds = await getRevealedAuthorIds(authorsByUserId ? [...authorsByUserId.values()] : [], userId);
 
   return posts.map((post) =>
     postResponse(
@@ -133,6 +218,9 @@ async function getPostResponses(posts: Post[]) {
       authorsByUserId.get(post.user_id) ?? null,
       likeCounts.get(post.id) ?? 0,
       commentCounts.get(post.id) ?? 0,
+      false,
+      false,
+      revealedIds.has(post.user_id),
     ),
   );
 }
@@ -173,7 +261,7 @@ async function assertScheduleOwnership(userId: string, scheduleId: number): Prom
   }
 }
 
-export async function listFeed(pagination: OffsetPagination): Promise<OffsetPage<unknown>> {
+export async function listFeed(pagination: OffsetPagination, userId?: string): Promise<OffsetPage<unknown>> {
   const db = requireSupabaseClient();
   const { data, error, count } = await db
     .from('posts')
@@ -185,7 +273,26 @@ export async function listFeed(pagination: OffsetPagination): Promise<OffsetPage
     throw error;
   }
 
-  return createOffsetPage(await getPostResponses((data ?? []) as Post[]), count ?? 0, pagination);
+  return createOffsetPage(await getPostResponses((data ?? []) as Post[], userId), count ?? 0, pagination);
+}
+
+export async function listMyPosts(
+  userId: string,
+  pagination: OffsetPagination,
+): Promise<OffsetPage<unknown>> {
+  const db = requireSupabaseClient();
+  const { data, error, count } = await db
+    .from('posts')
+    .select(POST_COLUMNS, { count: 'exact' })
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(pagination.offset, pagination.offset + pagination.limit - 1);
+
+  if (error) {
+    throw error;
+  }
+
+  return createOffsetPage(await getPostResponses((data ?? []) as Post[], userId), count ?? 0, pagination);
 }
 
 export async function createPost(userId: string, input: CreatePostInput) {
@@ -213,12 +320,12 @@ export async function createPost(userId: string, input: CreatePostInput) {
   const post = data as Post;
   await trackActivity(userId, 'post_created', 'You shared a new post.', { postId: post.id });
 
-  const [response] = await getPostResponses([post]);
+  const [response] = await getPostResponses([post], userId);
   return response;
 }
 
-export async function getPost(postId: number) {
-  const [response] = await getPostResponses([await getPostRowOrThrow(postId)]);
+export async function getPost(postId: number, userId?: string) {
+  const [response] = await getPostResponses([await getPostRowOrThrow(postId)], userId);
   return response;
 }
 
@@ -300,6 +407,7 @@ export async function unsavePost(userId: string, postId: number): Promise<void> 
 export async function getComments(
   postId: number,
   pagination: OffsetPagination,
+  viewerId?: string,
 ): Promise<OffsetPage<ReturnType<typeof commentResponse>>> {
   await getPostRowOrThrow(postId);
 
@@ -315,20 +423,81 @@ export async function getComments(
     throw error;
   }
 
+  const rows = (data ?? []) as PostCommentRow[];
+  const revealedIds = await getRevealedAuthorIds(
+    rows
+      .map((comment) => toOne(comment.users))
+      .filter((author): author is User => author !== null)
+      .map((author) => ({ id: author.id, profile_visibility: author.profile_visibility })),
+    viewerId,
+  );
+
   return createOffsetPage(
-    (data ?? []).map((comment) => commentResponse(comment as PostCommentRow)),
+    rows.map((comment) => {
+      const author = toOne(comment.users);
+      return commentResponse(comment, author ? revealedIds.has(author.id) : true);
+    }),
     count ?? 0,
     pagination,
   );
 }
 
+async function getPostCommentRowOrThrow(commentId: number): Promise<PostComment> {
+  const db = requireSupabaseClient();
+  const { data, error } = await db
+    .from('post_comments')
+    .select(COMMENT_COLUMNS)
+    .eq('id', commentId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new AppError(404, 'COMMENT_NOT_FOUND', 'Comment not found.');
+  }
+
+  return data as PostComment;
+}
+
 export async function createComment(userId: string, postId: number, input: CreateCommentInput) {
   const post = await getPostRowOrThrow(postId);
+
+  let parentCommentId: number | null = null;
+  if (input.parentCommentId != null) {
+    const parent = await getPostCommentRowOrThrow(input.parentCommentId);
+
+    // A reply must belong to the same post as its parent comment.
+    if (parent.post_id !== postId) {
+      throw new AppError(
+        400,
+        'PARENT_COMMENT_MISMATCH',
+        'The parent comment does not belong to this post.',
+      );
+    }
+
+    // Enforce the single level of replies: a reply can never be replied to.
+    if (parent.parent_comment_id != null) {
+      throw new AppError(
+        400,
+        'REPLY_ON_REPLY_NOT_ALLOWED',
+        'Replies can only be added to comments, not to other replies.',
+      );
+    }
+
+    parentCommentId = parent.id;
+  }
 
   const db = requireSupabaseClient();
   const { data, error } = await db
     .from('post_comments')
-    .insert({ post_id: postId, user_id: userId, content: input.content })
+    .insert({
+      post_id: postId,
+      user_id: userId,
+      content: input.content,
+      parent_comment_id: parentCommentId,
+    })
     .select(`${COMMENT_COLUMNS}, users(${USER_COLUMNS})`)
     .single();
 
@@ -340,11 +509,64 @@ export async function createComment(userId: string, postId: number, input: Creat
   await trackActivity(userId, 'post_commented', 'You commented on a post.', {
     postId,
     commentId: comment.id,
+    parentCommentId,
   });
 
   if (post.user_id !== userId) {
     await notifyPostCommented(post.user_id, userId, postId);
   }
 
-  return commentResponse(comment);
+  return commentResponse(comment, true);
+}
+
+export async function deleteComment(userId: string, commentId: number): Promise<void> {
+  const comment = await getPostCommentRowOrThrow(commentId);
+
+  if (comment.user_id !== userId) {
+    throw new AppError(403, 'FORBIDDEN', 'You cannot delete this comment.');
+  }
+
+  const db = requireSupabaseClient();
+  const { error } = await db.from('post_comments').delete().eq('id', commentId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+function myCommentResponse(comment: MyCommentRow) {
+  const post = toOne(comment.posts);
+  return {
+    id: comment.id,
+    content: comment.content,
+    parentCommentId: comment.parent_comment_id,
+    isReply: comment.parent_comment_id != null,
+    createdAt: comment.created_at,
+    post: post
+      ? { id: post.id, type: post.type, content: post.content }
+      : null,
+  };
+}
+
+export async function listMyComments(
+  userId: string,
+  pagination: OffsetPagination,
+): Promise<OffsetPage<ReturnType<typeof myCommentResponse>>> {
+  const db = requireSupabaseClient();
+  const { data, error, count } = await db
+    .from('post_comments')
+    .select(`${COMMENT_COLUMNS}, posts(${POST_COLUMNS})`, { count: 'exact' })
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(pagination.offset, pagination.offset + pagination.limit - 1);
+
+  if (error) {
+    throw error;
+  }
+
+  return createOffsetPage(
+    (data ?? []).map((comment) => myCommentResponse(comment as MyCommentRow)),
+    count ?? 0,
+    pagination,
+  );
 }

@@ -28,9 +28,15 @@ const config = {
   aub: {
     baseUrl:
       process.env.AUB_REGISTRATION_URL ?? 'https://sturegss.aub.edu.lb/StudentRegistrationSsb',
-    termCode: process.env.AUB_SYNC_TERM_CODE ?? '202710',
-    syncIntervalMs: Number(process.env.AUB_SYNC_INTERVAL_MS ?? 600_000),
+    syncIntervalMs: Number(process.env.AUB_SYNC_INTERVAL_MS ?? 1_200_000),
     syncOnStartup: (process.env.AUB_SYNC_ON_STARTUP ?? 'true') === 'true',
+  },
+  gemini: {
+    apiKey: readOptionalValue(process.env.GEMINI_API_KEY),
+    model: readOptionalValue(process.env.GEMINI_MODEL) ?? 'gemini-3.6-flash',
+  },
+  scheduleOptimizer: {
+    url: readOptionalValue(process.env.SCHEDULE_OPTIMIZER_URL),
   },
 } as const;
 

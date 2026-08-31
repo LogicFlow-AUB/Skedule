@@ -8,7 +8,7 @@ import {
   likeProfessorReview,
   reportProfessorReview,
 } from '../controllers/reviews.controller.js';
-import { requireAuth } from '../middleware/auth.middleware.js';
+import { optionalAuth, requireAuth } from '../middleware/auth.middleware.js';
 import {
   validateBody,
   validateParams,
@@ -60,6 +60,7 @@ router.post(
 );
 router.get(
   '/:id/reviews',
+  optionalAuth,
   validateParams(professorIdParams),
   validateQuery(reviewsQuery),
   asyncHandler(getProfessorReviews),

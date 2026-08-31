@@ -11,10 +11,11 @@ import {
 import {
   createCourseReview,
   getCourseReviews,
+  listSavedCourses,
   saveCourse,
   unsaveCourse,
 } from '../controllers/reviews.controller.js';
-import { requireAuth } from '../middleware/auth.middleware.js';
+import { optionalAuth, requireAuth } from '../middleware/auth.middleware.js';
 import {
   validateBody,
   validateParams,
@@ -33,6 +34,7 @@ const courseListQuery = z
   .object({
     search: z.string().trim().min(1).max(100).optional(),
     attribute: z.string().trim().min(1).max(100).optional(),
+    term_id: z.coerce.number().int().positive().optional(),
     sort: z.enum(['name', 'rating', 'difficulty', 'workload', 'popularity']).default('name'),
     order: z.enum(['asc', 'desc']).default('asc'),
     page: z.coerce.number().int().positive().optional(),
@@ -49,6 +51,11 @@ const reviewsQuery = z
     limit: z.coerce.number().int().positive().max(100).optional(),
   })
   .strict();
+const sectionsQuery = z
+  .object({
+    term_id: z.coerce.number().int().positive().nullable().optional(),
+  })
+  .strict();
 const courseReviewBody = z
   .object({
     rating: z.number().int().min(1).max(5),
@@ -61,6 +68,7 @@ const courseReviewBody = z
 
 const router = Router();
 
+router.get('/saved', requireAuth, validateQuery(reviewsQuery), asyncHandler(listSavedCourses));
 router.get('/', validateQuery(courseListQuery), asyncHandler(listCourses));
 router.post('/compare', validateBody(compareCoursesBody), asyncHandler(compareCourses));
 router.post(
@@ -72,6 +80,7 @@ router.post(
 );
 router.get(
   '/:code/reviews',
+  optionalAuth,
   validateParams(courseCodeParams),
   validateQuery(reviewsQuery),
   asyncHandler(getCourseReviews),
@@ -83,7 +92,7 @@ router.delete(
   validateParams(courseCodeParams),
   asyncHandler(unsaveCourse),
 );
-router.get('/:code/sections', validateParams(courseCodeParams), asyncHandler(getSections));
+router.get('/:code/sections', validateParams(courseCodeParams), validateQuery(sectionsQuery), asyncHandler(getSections));
 router.get(
   '/:code/grade-distribution',
   validateParams(courseCodeParams),

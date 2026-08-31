@@ -23,6 +23,6 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 app.listen(config.port, () => {
-  logger.info({ port: config.port }, 'LogicFlow API listening');
+  logger.info({ port: config.port }, 'Skedule API listening');
   startAubSyncJob();
 });

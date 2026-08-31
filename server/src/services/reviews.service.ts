@@ -4,6 +4,7 @@ import { AppError } from '../utils/app-error.js';
 import { getCourse } from './courses.service.js';
 import { trackActivity } from './activity.service.js';
 import { notifyReviewLiked } from './notifications.service.js';
+import { getRevealedAuthorIds } from './profile-visibility.service.js';
 import { createOffsetPage, type OffsetPage, type OffsetPagination } from '../utils/pagination.js';
 
 export type CreateCourseReviewInput = {
@@ -24,9 +25,19 @@ export type CreateProfessorReviewInput = {
 type CourseReviewWithAuthor = CourseReview & { users: User | null };
 type ProfessorReviewWithAuthor = ProfessorReview & { users: User | null };
 
-function reviewAuthor(user: User | null) {
+const REVIEWER_COLUMNS = 'id, first_name, last_name, email, major, level, profile_visibility';
+
+function reviewAuthor(user: User | null, revealed: boolean) {
   if (!user) {
     return null;
+  }
+
+  if (!revealed) {
+    return {
+      id: user.id,
+      firstName: null,
+      lastName: null,
+    };
   }
 
   return {
@@ -36,7 +47,7 @@ function reviewAuthor(user: User | null) {
   };
 }
 
-function courseReviewResponse(review: CourseReviewWithAuthor) {
+function courseReviewResponse(review: CourseReviewWithAuthor, revealed: boolean) {
   return {
     id: review.id,
     rating: review.rating,
@@ -45,11 +56,11 @@ function courseReviewResponse(review: CourseReviewWithAuthor) {
     wouldRetake: review.would_retake,
     comment: review.comment,
     createdAt: review.created_at,
-    author: reviewAuthor(review.users),
+    author: reviewAuthor(review.users, revealed),
   };
 }
 
-function professorReviewResponse(review: ProfessorReviewWithAuthor) {
+function professorReviewResponse(review: ProfessorReviewWithAuthor, revealed: boolean) {
   return {
     id: review.id,
     rating: review.rating,
@@ -57,7 +68,7 @@ function professorReviewResponse(review: ProfessorReviewWithAuthor) {
     wouldRetake: review.would_retake,
     comment: review.comment,
     createdAt: review.created_at,
-    author: reviewAuthor(review.users),
+    author: reviewAuthor(review.users, revealed),
   };
 }
 
@@ -122,14 +133,14 @@ export async function createCourseReview(
       would_retake: input.wouldRetake ?? null,
       comment: input.comment ?? null,
     })
-    .select('*, users(id, first_name, last_name, email, major, level)')
+    .select(`*, users(${REVIEWER_COLUMNS})`)
     .single();
 
   if (error) {
     throw error;
   }
 
-  const review = courseReviewResponse(data as CourseReviewWithAuthor);
+  const review = courseReviewResponse(data as CourseReviewWithAuthor, true);
   const stats = await getCourseReviewStats(course.id);
 
   await trackActivity(userId, 'course_review_created', `You reviewed ${course.code}.`, {
@@ -143,12 +154,13 @@ export async function createCourseReview(
 export async function getCourseReviews(
   courseCode: string,
   pagination: OffsetPagination,
+  viewerId?: string,
 ): Promise<OffsetPage<ReturnType<typeof courseReviewResponse>>> {
   const course = await getCourse(courseCode);
   const db = requireSupabaseClient();
   const { data, error, count } = await db
     .from('course_reviews')
-    .select('*, users(id, first_name, last_name, email, major, level)', { count: 'exact' })
+    .select(`*, users(${REVIEWER_COLUMNS})`, { count: 'exact' })
     .eq('course_id', course.id)
     .order('created_at', { ascending: false })
     .range(pagination.offset, pagination.offset + pagination.limit - 1);
@@ -157,8 +169,19 @@ export async function getCourseReviews(
     throw error;
   }
 
+  const rows = (data ?? []) as CourseReviewWithAuthor[];
+  const revealedIds = await getRevealedAuthorIds(
+    rows
+      .map((review) => review.users)
+      .filter((author): author is User => author !== null)
+      .map((author) => ({ id: author.id, profile_visibility: author.profile_visibility })),
+    viewerId,
+  );
+
   return createOffsetPage(
-    (data ?? []).map((review) => courseReviewResponse(review as CourseReviewWithAuthor)),
+    rows.map((review) =>
+      courseReviewResponse(review, review.users ? revealedIds.has(review.users.id) : true),
+    ),
     count ?? 0,
     pagination,
   );
@@ -188,6 +211,100 @@ export async function unsaveCourse(userId: string, courseCode: string): Promise<
   if (error) {
     throw error;
   }
+}
+
+export async function listSavedCourses(
+  userId: string,
+  pagination: OffsetPagination,
+): Promise<
+  OffsetPage<{
+    id: number;
+    code: string;
+    title: string;
+    department: string | null;
+    credits: string;
+    averageRating: number | null;
+    reviewCount: number;
+  }>
+> {
+  const db = requireSupabaseClient();
+  const { data, error, count } = await db
+    .from('course_saves')
+    .select('course_id, courses(id, subject, course_number, title, department, credits)')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(pagination.offset, pagination.offset + pagination.limit - 1);
+
+  if (error) {
+    throw error;
+  }
+
+  const courseIds = (data ?? []).map((row: { course_id: number }) => row.course_id);
+  const reviewCounts = new Map<number, number>();
+  const avgRatings = new Map<number, number | null>();
+
+  if (courseIds.length > 0) {
+    const [countsResult, ratingsResult] = await Promise.all([
+      db.from('course_reviews').select('course_id').in('course_id', courseIds),
+      db.from('course_reviews').select('course_id, rating').in('course_id', courseIds),
+    ]);
+
+    for (const row of (countsResult.data ?? []) as { course_id: number }[]) {
+      reviewCounts.set(row.course_id, (reviewCounts.get(row.course_id) ?? 0) + 1);
+    }
+
+    const ratingSums = new Map<number, { sum: number; count: number }>();
+    for (const row of (ratingsResult.data ?? []) as { course_id: number; rating: number }[]) {
+      const entry = ratingSums.get(row.course_id) ?? { sum: 0, count: 0 };
+      entry.sum += row.rating;
+      entry.count += 1;
+      ratingSums.set(row.course_id, entry);
+    }
+    for (const [courseId, entry] of ratingSums) {
+      avgRatings.set(
+        courseId,
+        entry.count > 0 ? Math.round((entry.sum / entry.count) * 10) / 10 : null,
+      );
+    }
+  }
+
+  const courses = (data ?? [])
+    .map(
+      (row: {
+        course_id: number;
+        courses: {
+          id: number;
+          subject: string;
+          course_number: string;
+          title: string;
+          department: string | null;
+          credits: string;
+        }[];
+      }) => {
+        const c = row.courses?.[0];
+        if (!c) return null;
+        return {
+          id: c.id,
+          code: `${c.subject} ${c.course_number}`,
+          title: c.title,
+          department: c.department,
+          credits: c.credits,
+          averageRating: avgRatings.get(c.id) ?? null,
+          reviewCount: reviewCounts.get(c.id) ?? 0,
+        };
+      },
+    )
+    .filter(Boolean) as {
+    id: number;
+    code: string;
+    title: string;
+    department: string | null;
+    credits: string;
+    averageRating: number | null;
+    reviewCount: number;
+  }[];
+
+  return createOffsetPage(courses, count ?? 0, pagination);
 }
 
 export async function createProfessorReview(
@@ -221,7 +338,7 @@ export async function createProfessorReview(
       comment: input.comment ?? null,
     })
     .select(
-      '*, users!professor_reviews_user_id_fkey(id, first_name, last_name, email, major, level)',
+      `*, users!professor_reviews_user_id_fkey(${REVIEWER_COLUMNS})`,
     )
     .single();
 
@@ -229,7 +346,7 @@ export async function createProfessorReview(
     throw error;
   }
 
-  const review = professorReviewResponse(data as ProfessorReviewWithAuthor);
+  const review = professorReviewResponse(data as ProfessorReviewWithAuthor, true);
   await trackActivity(userId, 'professor_review_created', 'You posted a professor review.', {
     professorId,
     reviewId: review.id,
@@ -241,12 +358,13 @@ export async function createProfessorReview(
 export async function getProfessorReviews(
   professorId: number,
   pagination: OffsetPagination,
+  viewerId?: string,
 ): Promise<OffsetPage<ReturnType<typeof professorReviewResponse>>> {
   const db = requireSupabaseClient();
   const { data, error, count } = await db
     .from('professor_reviews')
     .select(
-      '*, users!professor_reviews_user_id_fkey(id, first_name, last_name, email, major, level)',
+      `*, users!professor_reviews_user_id_fkey(${REVIEWER_COLUMNS})`,
       { count: 'exact' },
     )
     .eq('professor_id', professorId)
@@ -257,8 +375,19 @@ export async function getProfessorReviews(
     throw error;
   }
 
+  const rows = (data ?? []) as ProfessorReviewWithAuthor[];
+  const revealedIds = await getRevealedAuthorIds(
+    rows
+      .map((review) => review.users)
+      .filter((author): author is User => author !== null)
+      .map((author) => ({ id: author.id, profile_visibility: author.profile_visibility })),
+    viewerId,
+  );
+
   return createOffsetPage(
-    (data ?? []).map((review) => professorReviewResponse(review as ProfessorReviewWithAuthor)),
+    rows.map((review) =>
+      professorReviewResponse(review, review.users ? revealedIds.has(review.users.id) : true),
+    ),
     count ?? 0,
     pagination,
   );

@@ -1,13 +1,15 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import {
-  Plus, X, Trash2, Sparkles, RotateCcw, Zap, GitCompare,
-  Eye, ArrowLeftRight, Send, Bot, User, Info, AlertCircle,
+  Plus, X, Trash2, Sparkles, Pencil,
+  Eye, ArrowLeftRight, ArrowLeft, Send, Bot, User, AlertCircle,
   BookOpen, Clock, MapPin, Star, TrendingUp, Bookmark,
-  GripVertical, Search, CalendarDays, CheckCircle,
+  GripVertical, Search, CalendarDays, CheckCircle, Loader2,
 } from 'lucide-react'
 import type { Page } from '../App'
-import { api, type CourseSummary, type CourseSection, type CourseReview, type GradeDistributionRow } from '../lib/api'
+import { api, type CourseSummary, type CourseSection, type CourseReview, type GradeDistributionRow, type ScheduleDetail, type SectionMeeting } from '../lib/api'
 import { displayName, timeAgo } from '../lib/format'
+import { buildOptimizeRequest, onlineOptimizerSections, optimizerMeetingOccurrences, termLabel, validateOptimizerResult, type AttributeOption, type CourseOption, type OptimizeScheduleResult, type OptimizerFormState, type SelectedSection, type TermOption } from '../lib/scheduleOptimizer'
+import { scheduleStats, removeCalendarSection, uniqueSectionIds, linkGroupKey, linkColumn } from '../lib/schedule'
 
 const HOUR_HEIGHT = 60 // px per hour
 const START_HOUR = 7   // 7 AM
@@ -31,107 +33,29 @@ interface Course {
   colorLight: string
   credits: number
   sectionId: number | null
+  /** Shared identity for linked lecture+recitation/lab bundles (see schedule.ts). */
+  groupId?: string | null
 }
 
-const SCHEDULE_1: Course[] = [
-  {
-    id: 'eece330',
-    code: 'EECE 330',
-    name: 'Digital Systems',
-    section: '01',
-    professor: 'Dr. Hassan',
-    room: 'BE-301',
-    days: [0, 2],
-    startHour: 10,
-    startMin: 0,
-    durationMin: 75,
-    color: '#4338CA',
-    colorLight: '#EEF2FF',
-    credits: 3,
-    sectionId: null,
-  },
-  {
-    id: 'math201',
-    code: 'MATH 201',
-    name: 'Calculus III',
-    section: '03',
-    professor: 'Dr. Khalil',
-    room: 'SCC-210',
-    days: [1, 3],
-    startHour: 9,
-    startMin: 0,
-    durationMin: 75,
-    color: '#059669',
-    colorLight: '#ECFDF5',
-    credits: 3,
-    sectionId: null,
-  },
-  {
-    id: 'phys211',
-    code: 'PHYS 211',
-    name: 'Physics II',
-    section: '02',
-    professor: 'Dr. Nassif',
-    room: 'SCC-315',
-    days: [0, 2, 4],
-    startHour: 13,
-    startMin: 0,
-    durationMin: 60,
-    color: '#0284C7',
-    colorLight: '#F0F9FF',
-    credits: 3,
-    sectionId: null,
-  },
-  {
-    id: 'eece351',
-    code: 'EECE 351',
-    name: 'Signals & Systems',
-    section: '01',
-    professor: 'Dr. Farhat',
-    room: 'BE-402',
-    days: [1, 3],
-    startHour: 11,
-    startMin: 30,
-    durationMin: 90,
-    color: '#7C3AED',
-    colorLight: '#F5F3FF',
-    credits: 3,
-    sectionId: null,
-  },
-  {
-    id: 'chem201',
-    code: 'CHEM 201',
-    name: 'General Chemistry',
-    section: '05',
-    professor: 'Dr. Ibrahim',
-    room: 'SCC-110',
-    days: [4],
-    startHour: 8,
-    startMin: 0,
-    durationMin: 60,
-    color: '#D97706',
-    colorLight: '#FFFBEB',
-    credits: 3,
-    sectionId: null,
-  },
-]
-
-const SCHEDULE_2: Course[] = [
-  { ...SCHEDULE_1[0], days: [1, 3], startHour: 11, section: '02', room: 'BE-205' },
-  { ...SCHEDULE_1[1], days: [0, 2], startHour: 14, section: '01', room: 'SCC-108' },
-  { ...SCHEDULE_1[2], days: [1, 3], startHour: 15, section: '04', room: 'SCC-220' },
-  { ...SCHEDULE_1[3], days: [0, 2], startHour: 9, section: '03', room: 'BE-301' },
-  { ...SCHEDULE_1[4], days: [4], startHour: 10, section: '02', room: 'SCC-112' },
-]
-
-const SCHEDULES = [SCHEDULE_1, SCHEDULE_2, SCHEDULE_1.slice(0, 4)]
-
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function formatHour(h: number) {
   if (h === 12) return '12 PM'
   if (h > 12) return `${h - 12} PM`
   return `${h} AM`
+}
+
+function decodeHtmlEntities(value: string) {
+  return value
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([\da-f]+);/gi, (_, code: string) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&apos;|&quot;|&lt;|&gt;|&amp;/g, (entity) => ({
+      '&apos;': "'",
+      '&quot;': '"',
+      '&lt;': '<',
+      '&gt;': '>',
+      '&amp;': '&',
+    })[entity] ?? entity)
 }
 
 function courseTop(c: Course) {
@@ -144,35 +68,69 @@ function courseEndTime(c: Course) {
   const totalMin = c.startHour * 60 + c.startMin + c.durationMin
   const endH = Math.floor(totalMin / 60)
   const endM = totalMin % 60
-  const label = endH > 12 ? `${endH - 12}:${endM.toString().padStart(2, '0')} PM` : `${endH}:${endM.toString().padStart(2, '0')} AM`
-  return label
+  const h12 = endH % 12 === 0 ? 12 : endH % 12
+  const period = endH >= 12 ? 'PM' : 'AM'
+  return `${h12}:${endM.toString().padStart(2, '0')} ${period}`
 }
 function courseStartTime(c: Course) {
   const h = c.startHour
   const m = c.startMin
-  const label = h > 12 ? `${h - 12}:${m.toString().padStart(2, '0')} PM` : `${h}:${m.toString().padStart(2, '0')} AM`
-  return label
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  const period = h >= 12 ? 'PM' : 'AM'
+  return `${h12}:${m.toString().padStart(2, '0')} ${period}`
 }
 
 function parseDays(days: string | null): number[] {
   if (!days) {
     return []
   }
-  return days
-    .split(',')
-    .map((d) => Number(d.trim()))
-    .filter((n) => !Number.isNaN(n))
+
+  const numericDays = days.match(/\b[1-5]\b/g)
+  if (numericDays?.length) {
+    return [...new Set(numericDays.map((day) => Number(day) - 1))].sort((a, b) => a - b)
+  }
+
+  const DAY_CODES: Record<string, number> = { M: 0, T: 1, W: 2, R: 3, F: 4 }
+  const DAY_NAMES: Record<string, number> = { MON: 0, TUE: 1, WED: 2, THU: 3, FRI: 4 }
+  const parsed = new Set<number>()
+
+  for (const token of days.trim().toUpperCase().split(/[^A-Z]+/)) {
+    if (!token) continue
+    const named = DAY_NAMES[token.slice(0, 3)]
+    if (token.length >= 3 && named !== undefined) {
+      parsed.add(named)
+      continue
+    }
+    for (const ch of token) {
+      const day = DAY_CODES[ch]
+      if (day !== undefined) parsed.add(day)
+    }
+  }
+
+  return [...parsed].sort((a, b) => a - b)
 }
 
 function parseTime(t: string | null): { hours: number; minutes: number } | null {
   if (!t) {
     return null
   }
-  const [h, m] = t.split(':').map(Number)
-  if (Number.isNaN(h)) {
+  const normalized = t.trim()
+  const twelveHour = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(normalized)
+  if (twelveHour) {
+    const hours = Number(twelveHour[1])
+    const minutes = Number(twelveHour[2])
+    if (hours < 1 || hours > 12 || minutes > 59) return null
+    return { hours: (hours % 12) + (twelveHour[3]?.toUpperCase() === 'PM' ? 12 : 0), minutes }
+  }
+
+  const compact = /^(\d{2})(\d{2})$/.exec(normalized)
+  const match = /^(\d{1,2}):(\d{2})/.exec(normalized)
+  const hours = Number(compact?.[1] ?? match?.[1])
+  const minutes = Number(compact?.[2] ?? match?.[2])
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || hours > 23 || minutes > 59) {
     return null
   }
-  return { hours: h, minutes: m ?? 0 }
+  return { hours, minutes }
 }
 
 function daysLabel(days: number[]): string {
@@ -198,11 +156,48 @@ function durationMinutes(start: string | null, end: string | null): number {
   if (!s || !e) {
     return 60
   }
-  return e.hours * 60 + e.minutes - (s.hours * 60 + s.minutes)
+  return Math.max(0, e.hours * 60 + e.minutes - (s.hours * 60 + s.minutes))
 }
 
 // ----- Course Detail Modal -----
-function CourseModal({ course, onSwap, onClose }: { course: Course; onSwap?: (c: Course) => void; onClose: () => void }) {
+
+/** Convert a SectionMeeting's boolean day fields to number[] (0=Mon..4=Fri) */
+function meetingDaysToNumbers(mt: SectionMeeting): number[] {
+  const days: number[] = []
+  if (mt.monday) days.push(0)
+  if (mt.tuesday) days.push(1)
+  if (mt.wednesday) days.push(2)
+  if (mt.thursday) days.push(3)
+  if (mt.friday) days.push(4)
+  return days
+}
+
+/** Classify a section's component type from its schedule type strings. */
+function sectionComponentType(
+  sec: Pick<CourseSection, 'schedule_type' | 'meeting_schedule_type'>,
+): 'lecture' | 'recitation' | 'lab' | 'other' {
+  const type = `${sec.schedule_type ?? ''} ${sec.meeting_schedule_type ?? ''}`.toLowerCase()
+  if (type.includes('recit')) return 'recitation'
+  if (type.includes('laboratory') || type.includes('lab') || type.includes('studio')) return 'lab'
+  if (type.includes('lecture')) return 'lecture'
+  return 'other'
+}
+
+/** Build a short human-readable meeting line for a single section. */
+function sectionMeetingLine(sec: CourseSection): string {
+  const type = sec.schedule_type ?? sec.meeting_schedule_type ?? 'Class'
+  const meetings = sec.section_meetings ?? []
+  if (meetings.length > 0) {
+    return meetings
+      .map((mt) => `${type}: ${daysLabel(meetingDaysToNumbers(mt))} ${timeLabel(mt.start_time)}–${timeLabel(mt.end_time)}`)
+      .join(' + ')
+  }
+  const mtDays = daysLabel(parseDays(sec.days))
+  const mtTime = `${timeLabel(sec.start_time)}–${timeLabel(sec.end_time)}`
+  return `${type}: ${mtDays} ${mtTime}`
+}
+
+function CourseModal({ course, onClose }: { course: Course; onClose: () => void }) {
   const [summary, setSummary] = useState<CourseSummary | null>(null)
   const [reviews, setReviews] = useState<CourseReview[]>([])
   const [grades, setGrades] = useState<GradeDistributionRow[]>([])
@@ -377,15 +372,6 @@ function CourseModal({ course, onSwap, onClose }: { course: Course; onSwap?: (c:
           >
             View Full Reviews
           </button>
-          {onSwap && (
-            <button
-              onClick={() => onSwap(course)}
-              className="flex-1 py-2 rounded-lg text-sm font-semibold text-white transition-colors"
-              style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}
-            >
-              Replace Section
-            </button>
-          )}
         </div>
       </div>
     </div>
@@ -396,25 +382,29 @@ function CourseModal({ course, onSwap, onClose }: { course: Course; onSwap?: (c:
 function SectionPickerModal({
   title,
   code,
+  termId,
   currentSection,
   onPick,
   onClose,
 }: {
   title: string
   code: string
+  termId?: number | null
   currentSection?: string
-  onPick: (sec: CourseSection) => void
+  onPick: (sections: CourseSection[]) => void
   onClose: () => void
 }) {
   const [sections, setSections] = useState<CourseSection[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Step 1 picks a lecture; step 2 (if the lecture is linked) picks one companion.
+  const [selectedLecture, setSelectedLecture] = useState<CourseSection | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
     api.courses
-      .sections(code)
+      .sections(code, termId ?? undefined)
       .then((res) => {
         if (!cancelled) {
           setSections(res.data)
@@ -434,20 +424,119 @@ function SectionPickerModal({
     return () => {
       cancelled = true
     }
-  }, [code])
+  }, [code, termId])
+
+  // Lectures are the top-level pickable sections; companions (recitations/labs)
+  // attach to them by shared link column.
+  const { lectures, companionsByColumn } = useMemo(() => {
+    const lectures: CourseSection[] = []
+    const companionsByColumn = new Map<string, CourseSection[]>()
+    for (const sec of sections) {
+      const type = sectionComponentType(sec)
+      if (type === 'recitation' || type === 'lab') {
+        const column = linkColumn(sec.link_identifier)
+        const key = column ?? sec.link_identifier ?? String(sec.id)
+        const list = companionsByColumn.get(key) ?? []
+        list.push(sec)
+        companionsByColumn.set(key, list)
+      } else if (type === 'lecture') {
+        lectures.push(sec)
+      }
+    }
+    return { lectures, companionsByColumn }
+  }, [sections])
+
+  const lectureCompanions = selectedLecture
+    ? companionsByColumn.get(linkColumn(selectedLecture.link_identifier) ?? selectedLecture.link_identifier ?? '') ?? []
+    : []
+
+  const renderLectureCard = (sec: CourseSection) => {
+    const linked = sec.link_identifier != null
+    const companions = linked
+      ? companionsByColumn.get(linkColumn(sec.link_identifier) ?? sec.link_identifier ?? '') ?? []
+      : []
+    const isCurrent = sec.section_number === currentSection
+    const professor = displayName(sec.professors?.first_name, sec.professors?.last_name) || 'Unknown instructor'
+    const seatsLeft =
+      sec.seats_total !== null && sec.seats_remaining !== null ? sec.seats_remaining : null
+    const seatsLabel = seatsLeft == null ? 'Seats N/A' : `${seatsLeft} seats open`
+
+    return (
+      <button
+        key={sec.id}
+        onClick={() => (linked && companions.length > 0 ? setSelectedLecture(sec) : onPick([sec]))}
+        className="flex items-start gap-4 p-4 rounded-xl text-left transition-all"
+        style={{ background: '#F8FAFC', border: '1px solid #F1F5F9', cursor: 'pointer' }}
+        onMouseEnter={(e) => { e.currentTarget.style.border = '1px solid #4338CA50'; e.currentTarget.style.background = '#EEF2FF' }}
+        onMouseLeave={(e) => { e.currentTarget.style.border = '1px solid #F1F5F9'; e.currentTarget.style.background = '#F8FAFC' }}
+      >
+        <div className="rounded-lg px-2 py-1 shrink-0" style={{ background: '#4338CA20', color: '#4338CA', fontSize: 12, fontWeight: 800 }}>
+          §{sec.section_number}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{professor}</div>
+          <div style={{ fontSize: 11, color: '#64748B', lineHeight: 1.5 }}>{sectionMeetingLine(sec)}</div>
+          {linked && (
+            <div style={{ fontSize: 11, color: '#4338CA', marginTop: 2, fontWeight: 600 }}>
+              {companions.length > 0 ? `Choose one of ${companions.length} linked ${companions.length === 1 ? 'section' : 'sections'}` : 'No linked sections'}
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: seatsLeft != null && seatsLeft > 0 ? '#059669' : '#94A3B8', marginTop: 2 }}>
+            {seatsLabel}
+          </div>
+        </div>
+        <div className="ml-auto text-xs font-semibold" style={{ color: '#4338CA' }}>
+          {isCurrent ? 'Current' : linked && companions.length > 0 ? 'Choose →' : '+' }
+        </div>
+      </button>
+    )
+  }
+
+  const renderCompanionCard = (sec: CourseSection) => {
+    const professor = displayName(sec.professors?.first_name, sec.professors?.last_name) || 'Unknown instructor'
+    return (
+      <button
+        key={sec.id}
+        onClick={() => selectedLecture && onPick([selectedLecture, sec])}
+        className="flex items-start gap-4 p-4 rounded-xl text-left transition-all"
+        style={{ background: '#F8FAFC', border: '1px solid #F1F5F9', cursor: 'pointer' }}
+        onMouseEnter={(e) => { e.currentTarget.style.border = '1px solid #4338CA50'; e.currentTarget.style.background = '#EEF2FF' }}
+        onMouseLeave={(e) => { e.currentTarget.style.border = '1px solid #F1F5F9'; e.currentTarget.style.background = '#F8FAFC' }}
+      >
+        <div className="rounded-lg px-2 py-1 shrink-0" style={{ background: '#05966920', color: '#059669', fontSize: 12, fontWeight: 800 }}>
+          §{sec.section_number}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{professor}</div>
+          <div style={{ fontSize: 11, color: '#64748B', lineHeight: 1.5 }}>{sectionMeetingLine(sec)}</div>
+        </div>
+        <div className="ml-auto text-xs font-semibold" style={{ color: '#059669' }}>Select</div>
+      </button>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-        style={{ width: 480, maxHeight: '85vh', background: '#FFFFFF' }}>
+        style={{ width: 520, maxHeight: '85vh', background: '#FFFFFF' }}>
         <div className="px-5 py-4 flex items-center justify-between"
           style={{ background: '#F8FAFC', borderBottom: '1px solid #F1F5F9' }}>
-          <div>
-            <span className="rounded-md px-2 py-0.5 text-xs font-bold" style={{ background: '#4338CA', color: 'white' }}>{code}</span>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>{title}</div>
-            {currentSection && <div style={{ fontSize: 12, color: '#64748B' }}>Current: Section {currentSection}</div>}
+          <div className="flex items-center gap-2">
+            {selectedLecture && (
+              <button onClick={() => setSelectedLecture(null)} className="rounded-lg p-1.5" style={{ color: '#64748B' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}>
+                <ArrowLeft size={18} />
+              </button>
+            )}
+            <div>
+              <span className="rounded-md px-2 py-0.5 text-xs font-bold" style={{ background: '#4338CA', color: 'white' }}>{code}</span>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#0F172A', marginTop: 4 }}>
+                {selectedLecture ? `Section ${selectedLecture.section_number} — choose linked` : title}
+              </div>
+            </div>
           </div>
           <button onClick={onClose} className="rounded-lg p-1.5" style={{ color: '#64748B' }}
             onMouseEnter={(e) => { e.currentTarget.style.background = '#F1F5F9' }}
@@ -462,39 +551,20 @@ function SectionPickerModal({
             </div>
           )}
           {loading && <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>Loading sections...</div>}
-          {!loading && sections.length === 0 && !error && (
+          {!loading && !selectedLecture && lectures.length === 0 && !error && (
             <div style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', padding: '20px 0' }}>No sections available this semester.</div>
           )}
-          {sections.map((sec) => {
-            const isCurrent = sec.section_number === currentSection
-            const start = parseTime(sec.start_time)
-            const end = parseTime(sec.end_time)
-            const startLabel = start ? `${timeLabel(sec.start_time)}` : '—'
-            const endLabel = end ? timeLabel(sec.end_time) : '—'
-            const seatsLeft = sec.seats_total !== null && sec.seats_remaining !== null ? sec.seats_remaining : null
-            return (
-              <button
-                key={sec.id}
-                onClick={() => onPick(sec)}
-                className="flex items-start gap-4 p-4 rounded-xl text-left transition-all"
-                style={{ background: '#F8FAFC', border: '1px solid #F1F5F9', cursor: isCurrent ? 'default' : 'pointer', opacity: isCurrent ? 0.75 : 1 }}
-                onMouseEnter={(e) => { if (!isCurrent) { e.currentTarget.style.border = '1px solid #4338CA50'; e.currentTarget.style.background = '#EEF2FF' } }}
-                onMouseLeave={(e) => { e.currentTarget.style.border = '1px solid #F1F5F9'; e.currentTarget.style.background = '#F8FAFC' }}
-              >
-                <div className="rounded-lg px-2 py-1 shrink-0" style={{ background: '#4338CA20', color: '#4338CA', fontSize: 12, fontWeight: 800 }}>
-                  §{sec.section_number}
+          {!selectedLecture && lectures.map(renderLectureCard)}
+          {selectedLecture && (
+            <>
+              {lectureCompanions.length === 0 && (
+                <div className="rounded-xl px-4 py-3" style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', fontSize: 12, color: '#1D4ED8' }}>
+                  No linked recitation/lab sections found for this lecture.
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#1E293B' }}>{displayName(sec.professors?.first_name, sec.professors?.last_name) || 'Unknown instructor'}</div>
-                  <div style={{ fontSize: 11, color: '#64748B' }}>{daysLabel(parseDays(sec.days))} · {startLabel} – {endLabel} · {sec.room || 'TBA'}</div>
-                  <div style={{ fontSize: 11, color: seatsLeft !== null && seatsLeft > 0 ? '#059669' : '#94A3B8', marginTop: 2 }}>
-                    {seatsLeft !== null ? `${seatsLeft} seats open` : 'Seats N/A'}
-                  </div>
-                </div>
-                <div className="ml-auto text-xs font-semibold" style={{ color: '#4338CA' }}>{isCurrent ? 'Current' : 'Select →'}</div>
-              </button>
-            )
-          })}
+              )}
+              {lectureCompanions.map(renderCompanionCard)}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -507,13 +577,11 @@ function CalendarColumn({
   courses,
   onCourseClick,
   onRemove,
-  onChange,
 }: {
   dayIndex: number
   courses: Course[]
   onCourseClick: (c: Course) => void
-  onRemove?: (id: string) => void
-  onChange?: (c: Course) => void
+  onRemove?: (course: Course) => void
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const dayCourses = courses.filter((c) => c.days.includes(dayIndex))
@@ -561,14 +629,9 @@ function CalendarColumn({
           >
             <div className="p-1.5 h-full flex flex-col">
               <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.9)', lineHeight: 1.2 }}>{course.code}</div>
-              {height > 40 && (
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.3, marginTop: 1 }}>
-                  {course.name}
-                </div>
-              )}
-              {height > 55 && (
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.65)', marginTop: 'auto' }}>
-                  {course.room}
+              {height > 40 && course.room && (
+                <div className="overflow-hidden text-ellipsis" style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', lineHeight: 1.3, marginTop: 2 }}>
+                  {decodeHtmlEntities(course.room)}
                 </div>
               )}
             </div>
@@ -584,8 +647,7 @@ function CalendarColumn({
                 </div>
                 {[
                   { icon: <Eye size={10} />, label: 'View', action: () => onCourseClick(course) },
-                  { icon: <ArrowLeftRight size={10} />, label: 'Change', action: () => onChange ? onChange(course) : onCourseClick(course) },
-                  { icon: <Trash2 size={10} />, label: 'Remove', action: () => onRemove ? onRemove(course.id) : undefined, danger: true },
+                  { icon: <Trash2 size={10} />, label: 'Delete Section', action: () => onRemove ? onRemove(course) : undefined, danger: true },
                 ].map((a) => (
                   <button
                     key={a.label}
@@ -608,7 +670,7 @@ function CalendarColumn({
 }
 
 // ----- Weekly Calendar -----
-function WeeklyCalendar({ courses, onCourseClick, onRemove, onChange }: { courses: Course[]; onCourseClick: (c: Course) => void; onRemove?: (id: string) => void; onChange?: (c: Course) => void }) {
+function WeeklyCalendar({ courses, onCourseClick, onRemove }: { courses: Course[]; onCourseClick: (c: Course) => void; onRemove?: (course: Course) => void }) {
   return (
     <div className="flex-1 overflow-auto">
       {/* Day headers */}
@@ -636,176 +698,308 @@ function WeeklyCalendar({ courses, onCourseClick, onRemove, onChange }: { course
         </div>
         {/* Day columns */}
         {DAYS.map((_, di) => (
-          <CalendarColumn key={di} dayIndex={di} courses={courses} onCourseClick={onCourseClick} onRemove={onRemove} onChange={onChange} />
+          <CalendarColumn key={di} dayIndex={di} courses={courses} onCourseClick={onCourseClick} onRemove={onRemove} />
         ))}
       </div>
     </div>
   )
 }
 
-// ----- Preferences Panel -----
-function PreferencesPanel({ onGenerate }: { onGenerate: () => void }) {
-  const [requiredCourses, setRequiredCourses] = useState(['EECE 330', 'MATH 201', 'PHYS 211', 'EECE 351'])
-  const [newCourse, setNewCourse] = useState('')
-  const [priority, setPriority] = useState('Balanced workload')
-  const [startTime, setStartTime] = useState('9:00 AM')
-  const [endTime, setEndTime] = useState('6:00 PM')
-  const [maxClasses, setMaxClasses] = useState('3')
-  const [freeDays, setFreeDays] = useState<string[]>(['Friday'])
-  const [minBreak, setMinBreak] = useState('30 min')
+function optimizerSectionsToCourses(sections: SelectedSection[]): Course[] {
+  const colors = new Map<string, string>()
+  return optimizerMeetingOccurrences(sections).map(({ section, meeting, key, dayIndex }) => {
+    const courseId = String(section.course_id)
+    if (!colors.has(courseId)) colors.set(courseId, COURSE_COLORS[colors.size % COURSE_COLORS.length])
+    const [startHour, startMin] = meeting.start.split(':').map(Number)
+    const [endHour, endMin] = meeting.end.split(':').map(Number)
+    const room = [meeting.building, meeting.room].filter(Boolean).join(' ')
+    return {
+      id: key, code: section.course_code ?? courseId,
+      name: section.course_title ?? '', section: section.section_number ?? '',
+      professor: section.professor ? displayName(section.professor.first_name, section.professor.last_name) : '',
+      room: room || section.room || '', days: [dayIndex], startHour, startMin,
+      durationMin: (endHour * 60 + endMin) - (startHour * 60 + startMin), color: colors.get(courseId)!,
+      colorLight: '#EEF2FF', credits: section.credits ?? 0,
+      sectionId: typeof section.id === 'number' ? section.id : Number.isFinite(Number(section.id)) ? Number(section.id) : null,
+    }
+  })
+}
 
-  const toggleDay = (d: string) => {
-    setFreeDays((prev) => prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d])
+/**
+ * Converts a persisted schedule (from the shared /schedules model) into the
+ * in-memory calendar representation so the Manual Builder and AI Scheduler
+ * render exactly what is stored for the current draft/term.
+ */
+function scheduleCoursesToCourses(courses: import('../lib/api').ScheduleCourse[]): Course[] {
+  const colors = new Map<string, string>()
+  const result: Course[] = []
+  for (const course of courses) {
+    const courseId = String(course.courseId ?? course.code ?? '')
+    if (!colors.has(courseId)) colors.set(courseId, COURSE_COLORS[colors.size % COURSE_COLORS.length])
+    const color = colors.get(courseId)!
+    const groupId = linkGroupKey(course.code ?? '', course.section.linkIdentifier)
+    const meetings = course.section.meetings
+    if (meetings.length > 0) {
+      for (const mt of meetings) {
+        if (mt.days.length === 0) continue
+        for (const day of mt.days) {
+          const start = parseTime(mt.startTime)
+          const end = parseTime(mt.endTime)
+          result.push({
+            id: `sec-${course.section.id}-mt-${mt.id}-d${day}`,
+            code: course.code ?? '',
+            name: course.title ?? '',
+            section: `${course.section.sectionNumber} ${mt.meetingType ?? ''}`.trim(),
+            professor: course.professor ? displayName(course.professor.firstName, course.professor.lastName) : '',
+            room: [mt.building, mt.room].filter(Boolean).join(' ') || (course.section.room ?? ''),
+            days: [day],
+            startHour: start?.hours ?? START_HOUR,
+            startMin: start?.minutes ?? 0,
+            durationMin: mt.durationMinutes ?? (start && end ? end.minutes + end.hours * 60 - (start.minutes + start.hours * 60) : 0),
+            color,
+            colorLight: color + '15',
+            credits: course.credits,
+            sectionId: course.section.id,
+            groupId,
+          })
+        }
+      }
+    } else {
+      const start = parseTime(course.section.startTime)
+      const end = parseTime(course.section.endTime)
+      result.push({
+        id: `sec-${course.section.id}`,
+        code: course.code ?? '',
+        name: course.title ?? '',
+        section: course.section.sectionNumber,
+        professor: course.professor ? displayName(course.professor.firstName, course.professor.lastName) : '',
+        room: course.section.room ?? '',
+        days: course.section.days,
+        startHour: start?.hours ?? START_HOUR,
+        startMin: start?.minutes ?? 0,
+        durationMin: course.section.durationMinutes ?? (start && end ? end.minutes + end.hours * 60 - (start.minutes + start.hours * 60) : 0),
+        color,
+        colorLight: color + '15',
+        credits: course.credits,
+        sectionId: course.section.id,
+        groupId,
+      })
+    }
   }
+  return result
+}
 
+const panelCardStyle = { background: '#F8FAFC', border: '1px solid #F1F5F9' }
+const fieldStyle = { fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }
+
+const DEFAULT_OPTIMIZER_FORM: OptimizerFormState = {
+  termId: null, requiredCourses: [], acceptableElectives: [], selectedAttributeIds: [], creditMode: 'exact',
+  exactCredits: 15, minCredits: 12, maxCredits: 18, weights: { days: 34, gaps: 33, professor: 33 }, professorPreferences: {}, excludedSectionIds: [],
+}
+
+function courseSummaryToOption(summary: CourseSummary): CourseOption {
+  const credits = Number(summary.credits)
+  return {
+    id: summary.id,
+    code: summary.code,
+    title: summary.title,
+    credits: Number.isFinite(credits) ? credits : 0,
+    professors: summary.professors ?? [],
+  }
+}
+
+function OptimizerSearch({ termId, excludedIds, onPick }: { termId: number | null; excludedIds: number[]; onPick: (course: CourseOption) => void }) {
+  const [query, setQuery] = useState(''); const [courses, setCourses] = useState<CourseOption[]>([]); const [open, setOpen] = useState(false); const [loading, setLoading] = useState(false)
+  const latest = useRef(0)
+  useEffect(() => {
+    if (!open) { setCourses([]); return }
+    const id = ++latest.current; let cancelled = false; setLoading(true)
+    const timer = setTimeout(() => { api.courses.list({ search: query.trim() || undefined, termId: termId ?? undefined, limit: 100 }).then((res) => { if (!cancelled && id === latest.current) setCourses(res.data.map(courseSummaryToOption).filter((course) => !excludedIds.includes(course.id))) }).catch(() => { if (!cancelled && id === latest.current) setCourses([]) }).finally(() => { if (!cancelled && id === latest.current) setLoading(false) }) }, 250)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [query, open, termId, excludedIds.join('|')])
+  return <div className="relative"><div className="flex items-center gap-2 rounded-lg px-2.5 py-2" style={fieldStyle}><Search size={12} color="#94A3B8" /><input disabled={termId == null} value={query} onFocus={() => setOpen(true)} onChange={(e) => { setQuery(e.target.value); setOpen(true) }} placeholder={termId == null ? 'Select a term first' : 'Search offered courses...'} className="flex-1 min-w-0 outline-none bg-transparent" /></div>{open && termId != null && <div className="absolute left-0 right-0 top-full mt-1 rounded-lg overflow-y-auto shadow-xl z-30" style={{ maxHeight: 190, background: '#FFFFFF', border: '1px solid #E2E8F0' }}>{loading ? <div className="p-3 text-center text-xs">Searching...</div> : courses.length === 0 ? <div className="p-3 text-center text-xs">No matching courses</div> : courses.map((course) => <button key={course.id} className="w-full text-left px-3 py-2 hover:bg-slate-50" onClick={() => { onPick(course); setQuery(''); setOpen(false) }}><div style={{ fontSize: 11, fontWeight: 800 }}>{course.code}</div><div className="truncate" style={{ fontSize: 10, color: '#64748B' }}>{course.title} — {course.credits} credits</div></button>)}</div>}</div>
+}
+
+function OptimizerCourseRow({ course, ratings, onRate, onRemove }: { course: CourseOption; ratings: Record<string, number>; onRate: (id: number, value: number | null) => void; onRemove: () => void }) {
   return (
-    <div
-      className="h-full overflow-y-auto flex flex-col gap-3 p-4"
-      style={{ width: 264, background: '#FFFFFF', borderRight: '1px solid #F1F5F9' }}
-    >
-      <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A' }}>Student Preferences</div>
-
-      {/* Required courses */}
-      <div className="rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Required Courses
-        </div>
-        <div className="flex flex-col gap-1.5 mb-2">
-          {requiredCourses.map((c) => (
-            <div key={c} className="flex items-center justify-between rounded-lg px-2.5 py-1.5"
-              style={{ background: '#EEF2FF', border: '1px solid #C7D2FE' }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#4338CA' }}>{c}</span>
-              <button onClick={() => setRequiredCourses((p) => p.filter((x) => x !== c))}
-                style={{ color: '#818CF8' }}>
-                <X size={12} />
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-1.5">
-          <input
-            value={newCourse}
-            onChange={(e) => setNewCourse(e.target.value)}
-            placeholder="Add course..."
-            className="flex-1 rounded-lg px-2.5 py-1.5 outline-none"
-            style={{ fontSize: 12, border: '1px solid #E2E8F0', background: '#FFFFFF' }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && newCourse.trim()) {
-                setRequiredCourses((p) => [...p, newCourse.trim()])
-                setNewCourse('')
-              }
-            }}
-          />
-          <button
-            onClick={() => { if (newCourse.trim()) { setRequiredCourses((p) => [...p, newCourse.trim()]); setNewCourse('') } }}
-            className="rounded-lg px-2 py-1.5"
-            style={{ background: '#4338CA', color: 'white' }}
-          >
-            <Plus size={12} />
-          </button>
-        </div>
-      </div>
-
-      {/* Time prefs */}
-      <div className="rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Class Times
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { label: 'Earliest Start', val: startTime, set: setStartTime, options: ['7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM'] },
-            { label: 'Latest End', val: endTime, set: setEndTime, options: ['3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM'] },
-          ].map((f) => (
-            <div key={f.label}>
-              <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>{f.label}</div>
-              <select
-                value={f.val}
-                onChange={(e) => f.set(e.target.value)}
-                className="w-full rounded-lg px-2 py-1.5 outline-none"
-                style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}
-              >
-                {f.options.map((o) => <option key={o}>{o}</option>)}
-              </select>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Schedule options */}
-      <div className="rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Preferences
-        </div>
-        <div className="flex flex-col gap-2">
-          <div>
-            <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>Max Classes/Day</div>
-            <select value={maxClasses} onChange={(e) => setMaxClasses(e.target.value)}
-              className="w-full rounded-lg px-2 py-1.5 outline-none"
-              style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}>
-              {['1', '2', '3', '4', '5'].map((o) => <option key={o}>{o}</option>)}
-            </select>
+    <div className="rounded-xl" style={{ background: 'var(--color-primary-light, #EEF2FF)', border: '1px solid var(--color-primary-border, #C7D2FE)' }}>
+      <div className="flex items-start gap-2 p-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--color-primary, #4338CA)' }}>{course.code}</span>
+            <span className="rounded-md px-1.5" style={{ fontSize: 9, fontWeight: 700, color: '#4338CA', background: '#FFFFFF' }}>{course.credits} cr</span>
           </div>
-          <div>
-            <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>Min Break Between Classes</div>
-            <select value={minBreak} onChange={(e) => setMinBreak(e.target.value)}
-              className="w-full rounded-lg px-2 py-1.5 outline-none"
-              style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}>
-              {['No minimum', '15 min', '30 min', '45 min', '1 hour'].map((o) => <option key={o}>{o}</option>)}
-            </select>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600, marginBottom: 3 }}>Schedule Priority</div>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)}
-              className="w-full rounded-lg px-2 py-1.5 outline-none"
-              style={{ fontSize: 11, border: '1px solid #E2E8F0', background: '#FFFFFF', color: '#374151' }}>
-              {['Shortest days', 'Longest weekends', 'Balanced workload', 'Highest rated professors', 'Lowest workload', 'No morning classes'].map((o) => <option key={o}>{o}</option>)}
-            </select>
-          </div>
+          <div className="truncate" style={{ fontSize: 10, color: '#64748B', marginTop: 1 }}>{course.title}</div>
         </div>
+        <button
+          onClick={onRemove}
+          title="Remove course"
+          className="shrink-0 rounded-md p-1 transition-colors"
+          style={{ color: '#818CF8', background: 'transparent' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = '#FFFFFF' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+        >
+          <X size={13} />
+        </button>
       </div>
-
-      {/* Free days */}
-      <div className="rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Preferred Free Days
-        </div>
-        <div className="flex gap-1.5 flex-wrap">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map((d) => {
-            const sel = freeDays.includes(d)
+      {course.professors.length > 0 && (
+        <div className="px-2 pb-2 pt-1" style={{ borderTop: '1px solid #E2E8F0' }}>
+          {course.professors.map((professor) => {
+            const rating = ratings[String(professor.id)] ?? null
             return (
-              <button
-                key={d}
-                onClick={() => toggleDay(d)}
-                className="rounded-full px-2.5 py-1 text-xs font-semibold transition-all"
-                style={{
-                  background: sel ? '#4338CA' : '#F1F5F9',
-                  color: sel ? 'white' : '#64748B',
-                  border: sel ? '1px solid #4338CA' : '1px solid #E2E8F0',
-                }}
-              >
-                {d}
-              </button>
+              <div key={professor.id} className="flex items-center gap-1 py-0.5">
+                <span className="flex-1 truncate" style={{ fontSize: 10, color: '#374151' }}>{displayName(professor.first_name, professor.last_name)}</span>
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <button key={value} title={`Rate ${professor.first_name} ${professor.last_name} ${value} star${value === 1 ? '' : 's'}`} onClick={() => onRate(professor.id, value)}>
+                      <Star size={11} fill={rating != null && value <= rating ? '#F59E0B' : 'transparent'} color={rating != null && value <= rating ? '#F59E0B' : '#CBD5E1'} />
+                    </button>
+                  ))}
+                  {rating != null && (
+                    <button onClick={() => onRate(professor.id, null)} style={{ fontSize: 9, color: '#64748B', marginLeft: 2 }}>Clear</button>
+                  )}
+                </div>
+              </div>
             )
           })}
         </div>
+      )}
+    </div>
+  )
+}
+
+interface PrefSectionProps { title: string; children: React.ReactNode }
+function PrefSection({ title, children }: PrefSectionProps) {
+  return (
+    <div className="rounded-xl p-3 flex flex-col gap-2.5" style={panelCardStyle}>
+      <div style={{ fontSize: 10, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</div>
+      {children}
+    </div>
+  )
+}
+
+function PrefLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, fontWeight: 600, color: '#64748B' }}>{children}</div>
+      {hint && <div className="mt-0.5" style={{ fontSize: 9, color: '#94A3B8', lineHeight: 1.4 }}>{hint}</div>}
+    </div>
+  )
+}
+
+function OptimizerPreferences({ form, setForm, terms, attributes, loading, optimizing, error, onGenerate }: { form: OptimizerFormState; setForm: React.Dispatch<React.SetStateAction<OptimizerFormState>>; terms: TermOption[]; attributes: AttributeOption[]; loading: boolean; optimizing: boolean; error: string | null; onGenerate: () => void }) {
+  const allIds = [...form.requiredCourses, ...form.acceptableElectives].map((course) => course.id)
+  const requiredCredits = form.requiredCourses.reduce((sum, course) => sum + course.credits, 0)
+  const rate = (id: number, value: number | null) => setForm((current) => { const professorPreferences = { ...current.professorPreferences }; if (value == null) delete professorPreferences[String(id)]; else professorPreferences[String(id)] = value; return { ...current, professorPreferences } })
+  const updateWeight = (key: keyof OptimizerFormState['weights'], value: number) => { const others = (Object.keys(form.weights) as (keyof OptimizerFormState['weights'])[]).filter((candidate) => candidate !== key); const remaining = 100 - value; const old = form.weights[others[0]] + form.weights[others[1]]; const first = old === 0 ? Math.floor(remaining / 2) : Math.round(remaining * form.weights[others[0]] / old); setForm((current) => ({ ...current, weights: { ...current.weights, [key]: value, [others[0]]: first, [others[1]]: remaining - first } })) }
+  const selectTerm = (value: string) => { const termId = value ? Number(value) : null; setForm({ ...DEFAULT_OPTIMIZER_FORM, termId }) }
+
+  return (
+    <div className="h-full overflow-y-auto flex flex-col gap-3 p-4 shrink-0" style={{ width: 304, background: '#FFFFFF', borderRight: '1px solid #F1F5F9' }}>
+      <div>
+        <div className="flex items-center gap-1.5" style={{ fontSize: 15, fontWeight: 800, color: '#0F172A' }}>
+          <Sparkles size={15} color="#4338CA" />Optimized Builder
+        </div>
+        <div style={{ fontSize: 10, color: '#94A3B8', marginTop: 2 }}>Set your preferences, then generate a schedule.</div>
       </div>
 
-      {/* Buttons */}
-      <button
-        onClick={onGenerate}
-        className="w-full py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all"
-        style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)', color: 'white', fontSize: 13 }}
-      >
-        <Sparkles size={14} />
-        Generate Schedule
-      </button>
-      <button
-        className="w-full py-2 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all"
-        style={{ background: '#F1F5F9', color: '#64748B', fontSize: 13 }}
-      >
-        <RotateCcw size={13} />
-        Reset Preferences
-      </button>
+      <PrefSection title="Scheduling Preferences">
+        <div className="flex flex-col gap-2">
+          <PrefLabel>Planning term</PrefLabel>
+          <select disabled={loading} value={form.termId ?? ''} onChange={(e) => selectTerm(e.target.value)} className="w-full rounded-lg px-2.5 py-2 outline-none" style={{ ...fieldStyle, opacity: loading ? 0.6 : 1 }}>
+            <option value="">{loading ? 'Loading terms...' : 'Select a term'}</option>
+            {terms.map((term) => <option key={term.id} value={term.id}>{termLabel(term)}</option>)}
+          </select>
+
+          <PrefLabel hint="Choose an exact or ranged credit target.">Credit load</PrefLabel>
+          <div className="flex rounded-lg p-0.5" style={{ background: '#E2E8F0' }}>
+            {(['exact', 'range'] as const).map((mode) => (
+              <button key={mode} onClick={() => setForm((current) => ({ ...current, creditMode: mode }))} className="flex-1 rounded-md py-1.5 transition-all" style={{ fontSize: 10, fontWeight: 700, textTransform: 'capitalize', background: form.creditMode === mode ? '#FFFFFF' : 'transparent', color: form.creditMode === mode ? 'var(--color-primary, #4338CA)' : '#64748B', boxShadow: form.creditMode === mode ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>{mode}</button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {form.creditMode === 'exact' ? (
+              <label>
+                <span style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8' }}>Credits</span>
+                <input aria-label="Exact credits" type="number" min="0" value={form.exactCredits} onChange={(e) => setForm((current) => ({ ...current, exactCredits: Number(e.target.value) }))} className="w-full rounded-lg px-2 py-1.5 outline-none" style={fieldStyle} />
+              </label>
+            ) : (
+              <>
+                <label>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8' }}>Minimum</span>
+                  <input aria-label="Minimum credits" type="number" min="0" value={form.minCredits} onChange={(e) => setForm((current) => ({ ...current, minCredits: Number(e.target.value) }))} className="w-full rounded-lg px-2 py-1.5 outline-none" style={fieldStyle} />
+                </label>
+                <label>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: '#94A3B8' }}>Maximum</span>
+                  <input aria-label="Maximum credits" type="number" min="0" value={form.maxCredits} onChange={(e) => setForm((current) => ({ ...current, maxCredits: Number(e.target.value) }))} className="w-full rounded-lg px-2 py-1.5 outline-none" style={fieldStyle} />
+                </label>
+              </>
+            )}
+          </div>
+          <div style={{ fontSize: 9, color: '#94A3B8' }}>Required: {requiredCredits} cr · Need {Math.max(0, (form.creditMode === 'exact' ? form.exactCredits : form.minCredits) - requiredCredits)} elective cr.</div>
+
+          <PrefLabel>Priorities</PrefLabel>
+          {([['days', 'Minimize days on campus'], ['gaps', 'Compact days / fewer gaps'], ['professor', 'Professor preference']] as [keyof OptimizerFormState['weights'], string][]).map(([key, label]) => (
+            <label key={key}>
+              <span className="flex justify-between" style={{ fontSize: 10, color: '#64748B' }}><span>{label}</span><span style={{ fontWeight: 700, color: '#4338CA' }}>{form.weights[key]}%</span></span>
+              <input type="range" min="0" max="100" value={form.weights[key]} onChange={(e) => updateWeight(key, Number(e.target.value))} className="w-full" style={{ accentColor: 'var(--color-primary, #4338CA)' }} />
+            </label>
+          ))}
+        </div>
+      </PrefSection>
+
+      <PrefSection title="Constraints &amp; Requirements">
+        <div className="flex flex-col gap-2">
+          <PrefLabel hint="These courses must appear in the schedule.">Required courses</PrefLabel>
+          {form.requiredCourses.map((course) => <OptimizerCourseRow key={course.id} course={course} ratings={form.professorPreferences} onRate={rate} onRemove={() => setForm((current) => ({ ...current, requiredCourses: current.requiredCourses.filter((item) => item.id !== course.id) }))} />)}
+          <OptimizerSearch key={`required-${form.termId ?? 'none'}`} termId={form.termId} excludedIds={allIds} onPick={(course) => setForm((current) => ({ ...current, requiredCourses: [...current.requiredCourses, course] }))} />
+
+          <PrefLabel hint="Optional. Courses the optimizer may pick to fill credits.">Acceptable electives</PrefLabel>
+          {form.acceptableElectives.map((course) => <OptimizerCourseRow key={course.id} course={course} ratings={form.professorPreferences} onRate={rate} onRemove={() => setForm((current) => ({ ...current, acceptableElectives: current.acceptableElectives.filter((item) => item.id !== course.id) }))} />)}
+          <OptimizerSearch key={`elective-${form.termId ?? 'none'}`} termId={form.termId} excludedIds={allIds} onPick={(course) => setForm((current) => ({ ...current, acceptableElectives: [...current.acceptableElectives, course] }))} />
+
+          <PrefLabel hint="At least one course must satisfy each selected attribute.">Required attributes</PrefLabel>
+          {attributes.length === 0 ? (
+            <div style={{ fontSize: 9, color: '#94A3B8' }}>{loading ? 'Loading attributes...' : 'No attributes available.'}</div>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {attributes.map((attribute) => {
+                const selected = form.selectedAttributeIds.includes(attribute.id)
+                return (
+                  <button key={attribute.id} onClick={() => setForm((current) => ({ ...current, selectedAttributeIds: selected ? current.selectedAttributeIds.filter((id) => id !== attribute.id) : [...current.selectedAttributeIds, attribute.id] }))} className="rounded-full px-2 py-1 transition-colors" style={{ fontSize: 9, fontWeight: 700, background: selected ? 'var(--color-primary, #4338CA)' : '#FFFFFF', color: selected ? '#FFFFFF' : '#64748B', border: `1px solid ${selected ? 'var(--color-primary, #4338CA)' : '#E2E8F0'}` }}>{attribute.name}</button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </PrefSection>
+
+      {error && (
+        <div className="rounded-lg p-2.5" style={{ fontSize: 10, color: '#B91C1C', background: '#FEF2F2', border: '1px solid #FECACA', lineHeight: 1.4 }}>{error}</div>
+      )}
+
+      <div className="mt-auto flex flex-col gap-2 pt-1">
+        <button
+          disabled={optimizing || form.termId == null}
+          onClick={onGenerate}
+          className="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 font-semibold transition-all"
+          style={{ background: 'var(--color-primary-grad, linear-gradient(135deg, #4338CA, #6366F1))', color: form.termId == null ? '#A5B4FC' : '#FFFFFF', fontSize: 13, opacity: optimizing || form.termId == null ? 0.6 : 1, cursor: optimizing || form.termId == null ? 'not-allowed' : 'pointer', boxShadow: '0 1px 2px rgba(0,0,0,0.15)' }}
+        >
+          {optimizing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          {optimizing ? 'Generating schedule...' : 'Generate Schedule'}
+        </button>
+        {form.termId == null && !optimizing && (
+          <div className="text-center" style={{ fontSize: 9, color: '#B45309' }}>Select a planning term before generating.</div>
+        )}
+        <button
+          onClick={() => setForm(DEFAULT_OPTIMIZER_FORM)}
+          disabled={optimizing}
+          className="w-full flex items-center justify-center gap-2 rounded-xl py-2 font-semibold transition-colors"
+          style={{ fontSize: 12, background: '#FFFFFF', color: '#B45309', border: '1px solid #FDE68A', cursor: optimizing ? 'not-allowed' : 'pointer', opacity: optimizing ? 0.6 : 1 }}
+        >
+          Reset Preferences
+        </button>
+      </div>
     </div>
   )
 }
@@ -817,57 +1011,47 @@ interface Message {
   timestamp: string
 }
 
-const INITIAL_MESSAGES: Message[] = [
-  {
-    role: 'ai',
-    text: "Hi Alex! I've analyzed your preferences and generated 3 schedule options. Schedule 1 gives you the best work-life balance with Fridays partially free. What would you like to adjust?",
-    timestamp: '10:02 AM',
-  },
-  {
-    role: 'user',
-    text: 'I want no classes before 10 AM and I only want professors rated above 4.5.',
-    timestamp: '10:04 AM',
-  },
-  {
-    role: 'ai',
-    text: "Got it! I've updated Schedule 1 to start no earlier than 10 AM. Dr. Hassan (4.8★), Dr. Khalil (4.6★), and Dr. Nassif (4.9★) all qualify. CHEM 201 on Friday is the only exception — Dr. Ibrahim is rated 4.3★. Want me to find an alternative section?",
-    timestamp: '10:04 AM',
-  },
-]
+const INITIAL_MESSAGES: Message[] = []
 
-const EXAMPLE_PROMPTS = [
-  "Give me Fridays off",
-  "Only professors rated above 4.5",
-  "No classes before 10 AM",
-  "I need one humanities elective",
-]
-
-function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
+function AIAssistantPanel({ termId }: { termId: number | null }) {
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [aiName, setAiName] = useState('AI Assistant')
+  const [editingName, setEditingName] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [sessionId] = useState(() =>
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `session-${Date.now()}`,
+  )
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!input.trim()) return
     const userMsg: Message = { role: 'user', text: input, timestamp: 'now' }
     setMessages((p) => [...p, userMsg])
     setInput('')
     setLoading(true)
-    // TODO(frontend): no AI conversation endpoint yet — response is a UI placeholder.
-    setTimeout(() => {
+    try {
+      const res = await api.assistant.chat(input, sessionId, termId)
       setMessages((p) => [...p, {
         role: 'ai',
-        text: "I've updated the schedule based on your preferences. Schedule 2 now satisfies most constraints. Would you like me to optimize further or compare the options?",
+        text: res.data.response,
         timestamp: 'now',
       }])
+    } catch {
+      setMessages((p) => [...p, {
+        role: 'ai',
+        text: 'Sorry, I encountered an error. Please try again.',
+        timestamp: 'now',
+      }])
+    } finally {
       setLoading(false)
-      onGenerate()
-    }, 1200)
+    }
   }
 
   return (
@@ -877,13 +1061,16 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
     >
       {/* Header */}
       <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid #F1F5F9' }}>
-        <div className="rounded-lg p-1.5" style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}>
+        <div className="rounded-lg p-1.5" style={{ background: 'var(--color-primary-grad, linear-gradient(135deg, #4338CA, #6366F1))' }}>
           <Sparkles size={13} color="white" />
         </div>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>AI Assistant</div>
-          <div style={{ fontSize: 10, color: '#10B981', fontWeight: 600 }}>● Online</div>
-        </div>
+        {editingName ? (
+          <input autoFocus value={aiName} onChange={(e) => setAiName(e.target.value)}
+            onBlur={() => { setAiName((name) => name.trim() || 'AI Assistant'); setEditingName(false) }}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+            className="flex-1 rounded-md px-2 py-1 outline-none" style={{ fontSize: 13, fontWeight: 700, border: '1px solid var(--color-primary-border, #C7D2FE)' }} />
+        ) : <div className="flex-1" style={{ fontSize: 13, fontWeight: 700, color: '#0F172A' }}>{aiName}</div>}
+        <button onClick={() => setEditingName(true)} title="Edit assistant name" style={{ color: '#94A3B8' }}><Pencil size={12} /></button>
       </div>
 
       {/* Messages */}
@@ -931,76 +1118,6 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Reasoning card */}
-      <div className="mx-3 mb-2 rounded-xl p-3" style={{ background: '#F0F9FF', border: '1px solid #BAE6FD' }}>
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <Info size={12} color="#0284C7" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#0284C7' }}>Reasoning</span>
-        </div>
-        <p style={{ fontSize: 11, color: '#0369A1', lineHeight: 1.6 }}>
-          I selected this schedule because it minimizes walking distance between buildings while keeping all your classes after 10 AM.
-        </p>
-      </div>
-
-      {/* Trade-offs card */}
-      <div className="mx-3 mb-2 rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #F1F5F9' }}>
-        <div className="flex items-center gap-1.5 mb-2">
-          <AlertCircle size={12} color="#D97706" />
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#92400E' }}>Trade-offs</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          {[
-            { ok: true, text: 'Fridays free' },
-            { ok: true, text: 'Highest rated professors' },
-            { ok: true, text: 'No classes before 10' },
-            { ok: false, text: 'EECE 351 morning section mandatory' },
-          ].map((t, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <span style={{ fontSize: 13, lineHeight: 1 }}>{t.ok ? '✓' : '✗'}</span>
-              <span style={{ fontSize: 11, color: t.ok ? '#059669' : '#DC2626', fontWeight: t.ok ? 500 : 600 }}>{t.text}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Quick prompts */}
-      <div className="px-3 mb-2">
-        <div className="flex flex-wrap gap-1">
-          {EXAMPLE_PROMPTS.map((p) => (
-            <button
-              key={p}
-              onClick={() => setInput(p)}
-              className="rounded-full px-2.5 py-1 transition-colors"
-              style={{ fontSize: 10, fontWeight: 600, background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#EEF2FF'; e.currentTarget.style.color = '#4338CA' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#64748B' }}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Action buttons */}
-      <div className="px-3 mb-2 flex gap-1.5">
-        {[
-          { icon: <RotateCcw size={11} />, label: 'Regenerate', fn: onGenerate },
-          { icon: <Zap size={11} />, label: 'Optimize', fn: onGenerate },
-          { icon: <GitCompare size={11} />, label: 'Compare', fn: () => {} },
-        ].map((b) => (
-          <button
-            key={b.label}
-            onClick={b.fn}
-            className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg transition-colors"
-            style={{ fontSize: 10, fontWeight: 600, background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#EEF2FF'; e.currentTarget.style.color = '#4338CA' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#64748B' }}
-          >
-            {b.icon}{b.label}
-          </button>
-        ))}
-      </div>
-
       {/* Input */}
       <div className="px-3 pb-3">
         <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
@@ -1029,16 +1146,21 @@ function AIAssistantPanel({ onGenerate }: { onGenerate: () => void }) {
 function ManualBuilder({
   courses,
   setCourses,
+  termId,
+  terms,
+  onChangeTerm,
 }: {
   courses: Course[]
   setCourses: React.Dispatch<React.SetStateAction<Course[]>>
+  termId: number | null
+  terms: TermOption[]
+  onChangeTerm: (termId: number | null) => void
 }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [available, setAvailable] = useState<CourseSummary[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [viewCourse, setViewCourse] = useState<Course | null>(null)
   const [picking, setPicking] = useState<{ code: string; title: string; credits: number } | null>(null)
-  const [changeCourse, setChangeCourse] = useState<Course | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
   useEffect(() => {
@@ -1046,7 +1168,7 @@ function ManualBuilder({
     setSearchLoading(true)
     const timer = setTimeout(() => {
       api.courses
-        .list({ search: searchTerm.trim() || undefined, limit: 20 })
+        .list({ search: searchTerm.trim() || undefined, limit: 100 })
         .then((res) => {
           if (!cancelled) {
             setAvailable(res.data)
@@ -1068,14 +1190,64 @@ function ManualBuilder({
       cancelled = true
       clearTimeout(timer)
     }
-  }, [searchTerm])
+  }, [searchTerm, termId])
 
-  const handleRemove = (id: string) => {
-    setCourses((p) => p.filter((c) => c.id !== id))
+  const handleRemove = (target: Course) => {
+    setCourses((p) => removeCalendarSection(p, target))
   }
 
-  const buildCourse = (src: { code: string; title: string; credits: number }, sec: CourseSection): Course => {
-    const color = COURSE_COLORS[courses.length % COURSE_COLORS.length]
+  let colorIndex = courses.length
+
+  const buildCourseFromMeeting = (
+    src: { code: string; title: string; credits: number },
+    sec: CourseSection,
+    meeting: { days: number[]; startTime: string | null; endTime: string | null; room: string | null; building: string | null; meetingType: string | null },
+    label: string,
+    groupId?: string | null,
+  ): Course => {
+    const color = COURSE_COLORS[colorIndex % COURSE_COLORS.length]
+    colorIndex++
+    const start = parseTime(meeting.startTime)
+    const end = parseTime(meeting.endTime)
+    const roomStr = meeting.building && meeting.room ? `${meeting.building} ${meeting.room}` : (meeting.room ?? sec.room ?? '')
+    return {
+      id: `sec-${sec.id}-mt-${label}`,
+      code: src.code,
+      name: src.title,
+      section: `${sec.section_number} ${label}`.trim(),
+      professor: displayName(sec.professors?.first_name, sec.professors?.last_name),
+      room: roomStr,
+      days: meeting.days,
+      startHour: start?.hours ?? START_HOUR,
+      startMin: start?.minutes ?? 0,
+      durationMin: start && end ? durationMinutes(meeting.startTime, meeting.endTime) : 0,
+      color,
+      colorLight: color + '15',
+      credits: src.credits,
+      sectionId: sec.id,
+      groupId,
+    }
+  }
+
+  const buildCourseFromSection = (
+    src: { code: string; title: string; credits: number },
+    sec: CourseSection,
+    groupId?: string | null,
+  ): Course => {
+    const meetings = sec.section_meetings ?? []
+    if (meetings.length > 0) {
+      const mt = meetings[0]!
+      return buildCourseFromMeeting(src, sec, {
+        days: meetingDaysToNumbers(mt),
+        startTime: mt.start_time,
+        endTime: mt.end_time,
+        room: mt.room,
+        building: mt.building,
+        meetingType: mt.meeting_type,
+      }, mt.meeting_type ?? '', groupId)
+    }
+    const color = COURSE_COLORS[colorIndex % COURSE_COLORS.length]
+    colorIndex++
     const start = parseTime(sec.start_time)
     const end = parseTime(sec.end_time)
     return {
@@ -1086,44 +1258,55 @@ function ManualBuilder({
       professor: displayName(sec.professors?.first_name, sec.professors?.last_name),
       room: sec.room ?? '',
       days: parseDays(sec.days),
-      startHour: start?.hours ?? 8,
+      startHour: start?.hours ?? START_HOUR,
       startMin: start?.minutes ?? 0,
-      durationMin: start && end ? durationMinutes(sec.start_time, sec.end_time) : 60,
+      durationMin: start && end ? durationMinutes(sec.start_time, sec.end_time) : 0,
       color,
       colorLight: color + '15',
       credits: src.credits,
       sectionId: sec.id,
+      groupId,
     }
   }
 
-  const handlePick = (sec: CourseSection) => {
-    if (!picking) {
-      return
+  const handlePick = (pickedSections: CourseSection[]) => {
+    if (!picking) return
+    const newCourses: Course[] = []
+    let hasPlacementIssue = false
+
+    for (const sec of pickedSections) {
+      // Linked components (a lecture + its chosen recitation/lab) share a group
+      // key so they count/delete as one course; standalone sections have none.
+      const groupId = sec.link_identifier ? linkGroupKey(picking.code, sec.link_identifier) : null
+      const meetings = sec.section_meetings ?? []
+      if (meetings.length > 0) {
+        meetings.forEach((mt, i) => {
+          const c = buildCourseFromMeeting(picking, sec, {
+            days: meetingDaysToNumbers(mt),
+            startTime: mt.start_time,
+            endTime: mt.end_time,
+            room: mt.room,
+            building: mt.building,
+            meetingType: mt.meeting_type,
+          }, `${mt.meeting_type ?? 'mt'}-${i}-${sec.id}`, groupId)
+          if (c.days.length === 0 || c.durationMin <= 0) hasPlacementIssue = true
+          newCourses.push(c)
+        })
+      } else {
+        const c = buildCourseFromSection(picking, sec, groupId)
+        if (c.days.length === 0 || c.durationMin <= 0) hasPlacementIssue = true
+        newCourses.push(c)
+      }
     }
-    setCourses((p) => [...p, buildCourse(picking, sec)])
+
+    if (hasPlacementIssue) {
+      setNotice('Some meetings were added but their meeting time is not available for calendar placement.')
+    }
+    setCourses((p) => [...p, ...newCourses])
     setPicking(null)
   }
 
-  const handleSwap = (target: Course, sec: CourseSection) => {
-    const start = parseTime(sec.start_time)
-    const end = parseTime(sec.end_time)
-    setCourses((p) =>
-      p.map((c) => c.id === target.id ? {
-        ...c,
-        section: sec.section_number,
-        professor: displayName(sec.professors?.first_name, sec.professors?.last_name),
-        room: sec.room ?? '',
-        days: parseDays(sec.days),
-        startHour: start?.hours ?? c.startHour,
-        startMin: start?.minutes ?? c.startMin,
-        durationMin: start && end ? durationMinutes(sec.start_time, sec.end_time) : c.durationMin,
-        sectionId: sec.id,
-      } : c)
-    )
-    setChangeCourse(null)
-  }
-
-  const totalCredits = courses.reduce((acc, c) => acc + c.credits, 0)
+  const { count: selectedCourseCount, credits: totalCredits } = scheduleStats(courses)
 
   return (
     <div className="flex h-full">
@@ -1131,12 +1314,25 @@ function ManualBuilder({
       <div className="flex flex-col h-full overflow-y-auto" style={{ width: 264, background: '#FFFFFF', borderRight: '1px solid #F1F5F9' }}>
         <div className="p-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
           <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', marginBottom: 10 }}>Available Courses</div>
+          <div className="flex items-center gap-2 rounded-lg px-3 py-2 mb-2" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+            <CalendarDays size={13} color="#4338CA" />
+            <select
+              value={termId ?? ''}
+              onChange={(e) => onChangeTerm(e.target.value ? Number(e.target.value) : null)}
+              className="flex-1 outline-none bg-transparent cursor-pointer"
+              style={{ fontSize: 12, fontWeight: 700, color: '#4338CA' }}
+            >
+              {terms.map((t) => (
+                <option key={t.id} value={t.id}>{termLabel(t)}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
             <Search size={13} color="#94A3B8" />
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search courses..."
+              placeholder="Search by name, CRN, professor, attribute"
               className="flex-1 outline-none bg-transparent"
               style={{ fontSize: 12, color: '#374151' }}
             />
@@ -1185,22 +1381,13 @@ function ManualBuilder({
         </div>
         <div className="p-3" style={{ borderTop: '1px solid #F1F5F9' }}>
           <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 6, textAlign: 'center' }}>
-            {courses.length} courses · {totalCredits} credits
+            {selectedCourseCount} courses · {totalCredits} credits
           </div>
           {notice && (
             <div className="rounded-lg px-3 py-2 mb-2" style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', fontSize: 11, color: '#0284C7', textAlign: 'center' }}>
               {notice}
             </div>
           )}
-          {/* TODO(frontend): automatic conflict fixing not wired — no backend endpoint for unsaved builders. */}
-          <button
-            onClick={() => setNotice('Automatic conflict fixing isn\'t wired yet. Review your calendar or adjust sections manually.')}
-            className="w-full py-2.5 rounded-xl font-semibold flex items-center justify-center gap-2"
-            style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)', color: 'white', fontSize: 13 }}
-          >
-            <Sparkles size={14} />
-            AI Fix Conflicts
-          </button>
         </div>
       </div>
 
@@ -1212,7 +1399,7 @@ function ManualBuilder({
               style={{ background: '#FEF9C3', border: '1px solid #FDE68A' }}>
               <AlertCircle size={12} color="#D97706" />
               <span style={{ fontSize: 11, fontWeight: 600, color: '#92400E' }}>
-                Hover a course block to View, Change section, or Remove it from your schedule.
+                Hover a course block to View, or Delete the section from your schedule.
               </span>
             </div>
           </div>
@@ -1221,14 +1408,12 @@ function ManualBuilder({
           courses={courses}
           onCourseClick={setViewCourse}
           onRemove={handleRemove}
-          onChange={setChangeCourse}
         />
       </div>
 
       {viewCourse && (
         <CourseModal
           course={viewCourse}
-          onSwap={(c) => { setViewCourse(null); setChangeCourse(c) }}
           onClose={() => setViewCourse(null)}
         />
       )}
@@ -1236,17 +1421,9 @@ function ManualBuilder({
         <SectionPickerModal
           title="Pick a section"
           code={picking.code}
+          termId={termId}
           onPick={handlePick}
           onClose={() => setPicking(null)}
-        />
-      )}
-      {changeCourse && (
-        <SectionPickerModal
-          title="Change Section"
-          code={changeCourse.code}
-          currentSection={changeCourse.section}
-          onPick={(sec) => handleSwap(changeCourse, sec)}
-          onClose={() => setChangeCourse(null)}
         />
       )}
     </div>
@@ -1255,7 +1432,10 @@ function ManualBuilder({
 
 // ----- Main AIScheduler -----
 function Toast({ message, onDone }: { message: string; onDone: () => void }) {
-  setTimeout(onDone, 3000)
+  useEffect(() => {
+    const timer = setTimeout(onDone, 3000)
+    return () => clearTimeout(timer)
+  }, [message, onDone])
   return (
     <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl px-5 py-3 shadow-xl"
       style={{ background: '#1E293B', color: 'white', fontSize: 13, fontWeight: 600, animation: 'none' }}>
@@ -1265,44 +1445,177 @@ function Toast({ message, onDone }: { message: string; onDone: () => void }) {
   )
 }
 
-export default function AIScheduler({ activeMode }: { activeMode: Page; setPage: (p: Page) => void }) {
+export default function AIScheduler({ activeMode, setPage }: { activeMode: Page; setPage: (p: Page) => void }) {
   const [mode, setMode] = useState<'ai' | 'manual'>(activeMode === 'manual-builder' ? 'manual' : 'ai')
-  const [scheduleTab, setScheduleTab] = useState(0)
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
   const [generating, setGenerating] = useState(false)
-  const [_currentScheduleIdx, setCurrentScheduleIdx] = useState(0)
   const [manualCourses, setManualCourses] = useState<Course[]>([])
   const [toast, setToast] = useState<string | null>(null)
+  const [draft, setDraft] = useState<ScheduleDetail | null>(null)
+  const [optimizerForm, setOptimizerForm] = useState<OptimizerFormState>(DEFAULT_OPTIMIZER_FORM)
+  const [terms, setTerms] = useState<TermOption[]>([])
+  const [attributes, setAttributes] = useState<AttributeOption[]>([])
+  const [loadingOptions, setLoadingOptions] = useState(true)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [requestError, setRequestError] = useState<string | null>(null)
+  const [optimizerResult, setOptimizerResult] = useState<OptimizeScheduleResult | null>(null)
+  const optimizerRequest = useRef(0)
 
-  // TODO(frontend): no schedule-generation endpoint yet (Phase 9 unchecked) — AI preview stays a UI placeholder.
-  const handleGenerate = () => {
-    setGenerating(true)
-    setTimeout(() => {
-      setCurrentScheduleIdx((p) => (p + 1) % SCHEDULES.length)
-      setGenerating(false)
-    }, 1500)
+  const selectedTermId = optimizerForm.termId ?? draft?.termId ?? null
+
+  useEffect(() => {
+    setMode(activeMode === 'manual-builder' ? 'manual' : 'ai')
+    setSelectedCourse(null)
+    setGenerating(false)
+  }, [activeMode])
+
+  useEffect(() => {
+    let cancelled = false
+    setLoadingOptions(true)
+    // If we arrived here by loading a saved schedule, open the builder on that
+    // schedule's term instead of defaulting to the first term.
+    const openTermRaw = sessionStorage.getItem('logicflow.openTerm')
+    sessionStorage.removeItem('logicflow.openTerm')
+    const openTerm = openTermRaw === null ? undefined : (openTermRaw === '' ? null : Number(openTermRaw))
+    Promise.all([
+      api.schedules.optimizerTerms(),
+      api.schedules.optimizerOptions(),
+    ]).then(([loadedTerms, options]) => {
+      if (cancelled) return
+      setTerms(loadedTerms)
+      setAttributes(options.attributes)
+      setOptimizerForm((prev) => {
+        if (prev.termId != null) return prev
+        if (openTerm !== undefined) {
+          if (openTerm === null) return prev
+          if (loadedTerms.some((t) => t.id === openTerm)) return { ...prev, termId: openTerm }
+          return loadedTerms[0] ? { ...prev, termId: loadedTerms[0].id } : prev
+        }
+        return loadedTerms[0] ? { ...prev, termId: loadedTerms[0].id } : prev
+      })
+    }).catch((error) => { if (!cancelled) setRequestError(error instanceof Error ? error.message : 'Could not load optimizer options.') }).finally(() => { if (!cancelled) setLoadingOptions(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  // Load the persisted draft for the selected term so both builders always see
+  // the same working schedule, even after reopening the page.
+  useEffect(() => {
+    let cancelled = false
+    api.schedules.getDraft(selectedTermId)
+      .then((res) => {
+        if (cancelled) return
+        const detail = res.data
+        setDraft(detail)
+        const courses = detail ? scheduleCoursesToCourses(detail.courses) : []
+        setManualCourses(courses)
+        if (detail && detail.courses.length > 0) {
+          setOptimizerResult(null)
+        }
+      })
+      .catch(() => { if (!cancelled) setDraft(null) })
+    return () => { cancelled = true }
+  }, [selectedTermId])
+
+  const persistDraft = async (sectionIds: number[], name?: string) => {
+    if (selectedTermId == null) return
+    try {
+      const res = await api.schedules.saveDraft(selectedTermId, { name, sectionIds })
+      setDraft(res.data)
+      return res.data
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : 'Could not save your draft.')
+      return null
+    }
   }
 
-  const activeCourses = SCHEDULES[scheduleTab] ?? SCHEDULE_1
-  const currentCredits = mode === 'manual'
-    ? manualCourses.reduce((acc, c) => acc + c.credits, 0)
-    : activeCourses.reduce((acc, c) => acc + c.credits, 0)
+  const handleManualChange: React.Dispatch<React.SetStateAction<Course[]>> = (value) => {
+    setManualCourses((prev) => {
+      const next = typeof value === 'function' ? value(prev) : value
+      // Always persist the latest calendar state as the draft, including when
+      // the calendar is emptied, so the draft never goes stale. Section IDs are
+      // deduped so a multi-meeting section persists as a single schedule item.
+      void persistDraft(uniqueSectionIds(next))
+      return next
+    })
+  }
 
-  async function handleSave() {
-    if (mode === 'ai') {
-      setToast('AI-generated previews aren\'t saved yet — build a schedule in Manual Builder to save.')
+  // Deletes every block belonging to the same course/section (matching
+  // sectionId, falling back to the course code) across both builders and keeps
+  // the draft in sync. Also clears the stored AI result so the AI calendar
+  // reflects the edited schedule instead of the original optimizer output.
+  const handleRemoveCourse = (course: Course) => {
+    handleManualChange((prev) => removeCalendarSection(prev, course))
+    setOptimizerResult(null)
+  }
+
+  // Generate Schedule calls the schedule optimizer directly. The result is
+  // persisted as the current (unsaved) draft so it becomes the single shared
+  // schedule shown in both the AI Scheduler and the Manual Builder.
+  const handleGenerate = async () => {
+    if (generating) return
+    setFormError(null); setRequestError(null)
+    let request
+    try { request = buildOptimizeRequest(optimizerForm) } catch (error) { setFormError(error instanceof Error ? error.message : 'Check your preferences.'); return }
+    const requestNumber = ++optimizerRequest.current
+    setGenerating(true)
+    try {
+      const result = await api.schedules.optimize(request)
+      if (requestNumber !== optimizerRequest.current) return
+      validateOptimizerResult(result)
+      setOptimizerResult(result)
+      if (result.status === 'optimal') {
+        const sectionIds = result.selected_sections.map((section) => Number(section.id))
+        const draftDetail = await persistDraft(sectionIds)
+        setManualCourses(draftDetail ? scheduleCoursesToCourses(draftDetail.courses) : optimizerSectionsToCourses(result.selected_sections))
+      } else {
+        setRequestError(result.message ?? `Optimizer finished with status: ${result.status}`)
+      }
+    } catch (error) {
+      if (requestNumber === optimizerRequest.current) { setOptimizerResult(null); setRequestError(error instanceof Error ? error.message : 'Could not reach the schedule optimizer.') }
+    } finally { if (requestNumber === optimizerRequest.current) setGenerating(false) }
+  }
+
+  const handleTermChange = (termId: number | null) => {
+    optimizerRequest.current += 1
+    setOptimizerResult(null)
+    setOptimizerForm((prev) => ({ ...prev, termId }))
+  }
+
+  const moveToManual = () => {
+    if (optimizerResult?.status !== 'optimal' || optimizerResult.selected_sections.length === 0) {
+      setToast('Generate an optimized schedule before moving it to the manual builder.')
       return
     }
-    const ids = manualCourses.map((c) => c.sectionId).filter((x): x is number => x != null)
+    setManualCourses(optimizerSectionsToCourses(optimizerResult.selected_sections))
+    setMode('manual')
+    setPage('manual-builder')
+    setToast('Optimized schedule moved to the manual builder.')
+  }
+
+  const activeCourses = mode === 'manual'
+    ? manualCourses
+    : (optimizerResult?.status === 'optimal' ? optimizerSectionsToCourses(optimizerResult.selected_sections) : manualCourses)
+  const onlineSections = optimizerResult?.status === 'optimal' ? onlineOptimizerSections(optimizerResult.selected_sections) : []
+  const { credits: currentCredits } = scheduleStats(activeCourses)
+  const currentDraftId = draft?.id ?? null
+
+  async function handleSave() {
+    const ids = uniqueSectionIds(activeCourses)
     if (ids.length === 0) {
       setToast('Add at least one course before saving.')
       return
     }
+    const name = mode === 'ai'
+      ? `Optimized Schedule ${new Date().toLocaleDateString()}`
+      : `My Schedule ${new Date().toLocaleDateString()}`
     try {
-      await api.schedules.create({
-        name: `My Schedule ${new Date().toLocaleDateString()}`,
-        sectionIds: ids,
-      })
+      if (currentDraftId != null) {
+        // The working schedule is already persisted as a draft; saving just
+        // promotes it to a saved schedule.
+        await api.schedules.save(currentDraftId)
+      } else {
+        await api.schedules.create({ name, termId: optimizerForm.termId ?? undefined, sectionIds: ids })
+      }
       setToast('Schedule saved successfully!')
     } catch (err) {
       setToast(err instanceof Error ? err.message : 'Could not save schedule.')
@@ -1315,16 +1628,16 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
       <div className="flex items-center gap-3 px-4 py-2.5 shrink-0" style={{ background: '#FFFFFF', borderBottom: '1px solid #F1F5F9' }}>
         {/* Mode toggle */}
         <div className="flex rounded-lg p-0.5" style={{ background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
-          {[{ id: 'ai', label: 'AI Builder', icon: <Sparkles size={12} /> }, { id: 'manual', label: 'Manual Builder', icon: <CalendarDays size={12} /> }].map((m) => (
+          {[{ id: 'ai', label: 'Optimized Builder', icon: <Sparkles size={12} /> }, { id: 'manual', label: 'Manual Builder', icon: <CalendarDays size={12} /> }].map((m) => (
             <button
               key={m.id}
-              onClick={() => setMode(m.id as 'ai' | 'manual')}
+              onClick={() => setPage(m.id === 'ai' ? 'ai-scheduler' : 'manual-builder')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all"
               style={{
                 fontSize: 12,
                 fontWeight: 600,
                 background: mode === m.id ? '#FFFFFF' : 'transparent',
-                color: mode === m.id ? '#4338CA' : '#64748B',
+                color: mode === m.id ? 'var(--color-primary, #4338CA)' : '#64748B',
                 boxShadow: mode === m.id ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
               }}
             >
@@ -1333,42 +1646,26 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
           ))}
         </div>
 
-        {/* Schedule tabs (AI mode only) */}
-        {mode === 'ai' && (
-          <div className="flex items-center gap-1">
-            {['Schedule 1', 'Schedule 2', 'Schedule 3'].map((t, i) => (
-              <button
-                key={t}
-                onClick={() => setScheduleTab(i)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  background: scheduleTab === i ? '#EEF2FF' : 'transparent',
-                  color: scheduleTab === i ? '#4338CA' : '#64748B',
-                  border: scheduleTab === i ? '1px solid #C7D2FE' : '1px solid transparent',
-                }}
-              >
-                {t}
-                {scheduleTab === i && <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#4338CA' }} />}
-              </button>
-            ))}
-            <button
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-              style={{ fontSize: 12, fontWeight: 600, color: '#64748B', border: '1px solid #E2E8F0' }}
-            >
-              <GitCompare size={12} />
-              Compare
-            </button>
-          </div>
-        )}
-
         <div className="ml-auto flex items-center gap-2">
-          {/* Credits count */}
-          <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
-            <TrendingUp size={12} color="#16A34A" />
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#15803D' }}>{currentCredits} Credits</span>
-          </div>
+          {/* Credits count (AI Builder only) */}
+          {mode === 'ai' && (
+            <div className="flex items-center gap-1.5 rounded-lg px-3 py-1.5" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+              <TrendingUp size={12} color="#16A34A" />
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#15803D' }}>{currentCredits} Credits</span>
+            </div>
+          )}
+          {mode === 'ai' && optimizerResult?.status === 'optimal' && (
+            <button
+              onClick={moveToManual}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
+              style={{ fontSize: 12, fontWeight: 600, background: '#EEF2FF', border: '1px solid #C7D2FE', color: '#4338CA' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#E0E7FF' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#EEF2FF' }}
+            >
+              <ArrowLeftRight size={12} />
+              Move to Manual
+            </button>
+          )}
           <button
             onClick={() => void handleSave()}
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-colors"
@@ -1391,19 +1688,21 @@ export default function AIScheduler({ activeMode }: { activeMode: Page; setPage:
                   <Sparkles size={28} color="#4338CA" className="animate-pulse" />
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: '#4338CA' }}>Generating your perfect schedule...</div>
-                <div style={{ fontSize: 12, color: '#94A3B8' }}>Analyzing 847 section combinations</div>
               </div>
             </div>
           )}
-          <PreferencesPanel onGenerate={handleGenerate} />
-          <div className="flex-1 overflow-hidden">
-            <WeeklyCalendar courses={activeCourses} onCourseClick={setSelectedCourse} />
+          <OptimizerPreferences form={optimizerForm} setForm={(value) => { optimizerRequest.current += 1; setOptimizerResult(null); setOptimizerForm(value) }} terms={terms} attributes={attributes} loading={loadingOptions} optimizing={generating} error={formError} onGenerate={handleGenerate} />
+          <div className="flex-1 overflow-hidden flex flex-col">
+            {requestError && <div className="m-3 rounded-xl p-3" style={{ background: '#FEF2F2', color: '#B91C1C', fontSize: 12 }}>{requestError}</div>}
+            {optimizerResult?.status === 'infeasible' && <div className="m-3 rounded-xl p-4" style={{ background: '#FFF7ED', color: '#9A3412' }}><b>No feasible schedule was found.</b>{optimizerResult.message && <div className="mt-1 text-sm">{optimizerResult.message}</div>}</div>}
+            {onlineSections.length > 0 && <div className="mx-3 mt-2 rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}><b style={{ fontSize: 11 }}>Online / Asynchronous</b><div className="flex flex-wrap gap-2 mt-1">{onlineSections.map((section) => <span key={String(section.id)} className="rounded-lg px-2 py-1" style={{ background: '#FFFFFF', fontSize: 10 }}>{section.course_code ?? section.course_id}{section.component_type ? ` — ${section.component_type}` : ''}</span>)}</div></div>}
+            <WeeklyCalendar courses={activeCourses} onCourseClick={setSelectedCourse} onRemove={handleRemoveCourse} />
           </div>
-          <AIAssistantPanel onGenerate={handleGenerate} />
+          <AIAssistantPanel termId={selectedTermId} />
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
-          <ManualBuilder courses={manualCourses} setCourses={setManualCourses} />
+          <ManualBuilder courses={manualCourses} setCourses={handleManualChange} termId={selectedTermId} terms={terms} onChangeTerm={handleTermChange} />
         </div>
       )}
 

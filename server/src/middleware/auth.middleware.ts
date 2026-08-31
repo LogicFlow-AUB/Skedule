@@ -3,6 +3,33 @@ import type { RequestHandler } from 'express';
 import { requireAuthClient } from '../db/supabase.js';
 import { AppError } from '../utils/app-error.js';
 
+export const optionalAuth: RequestHandler = async (req, _res, next) => {
+  const authorization = req.header('authorization');
+
+  if (!authorization) {
+    return next();
+  }
+
+  const [scheme, token] = authorization.split(' ');
+
+  if (scheme !== 'Bearer' || !token) {
+    return next();
+  }
+
+  try {
+    const authDb = requireAuthClient();
+    const { data, error } = await authDb.auth.getUser(token);
+
+    if (!error && data.user) {
+      req.userId = data.user.id;
+    }
+  } catch {
+    // silently continue — auth is optional
+  }
+
+  next();
+};
+
 export const requireAuth: RequestHandler = async (req, _res, next) => {
   const authorization = req.header('authorization');
 

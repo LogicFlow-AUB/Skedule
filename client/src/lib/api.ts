@@ -1,3 +1,5 @@
+import type { AttributeOption, CourseOption, OptimizeScheduleRequest, OptimizeScheduleResult, SelectedSection, TermOption } from './scheduleOptimizer'
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api'
 
 const ACCESS_TOKEN_KEY = 'logicflow.access_token'
@@ -165,6 +167,24 @@ export type CourseSummary = {
   averageDifficulty: number | null
   averageWorkload: number | null
   wouldRetakePercentage: number | null
+  /** Professors teaching this course in the requested term (present when termId is supplied). */
+  professors?: { id: number; first_name: string; last_name: string }[]
+}
+
+export type SectionMeeting = {
+  id: number
+  monday: boolean
+  tuesday: boolean
+  wednesday: boolean
+  thursday: boolean
+  friday: boolean
+  saturday: boolean
+  sunday: boolean
+  start_time: string | null
+  end_time: string | null
+  building: string | null
+  room: string | null
+  meeting_type: string | null
 }
 
 export type CourseSection = {
@@ -177,7 +197,11 @@ export type CourseSection = {
   end_time: string | null
   seats_total: number | null
   seats_remaining: number | null
+  link_identifier: string | null
+  schedule_type: string | null
+  meeting_schedule_type: string | null
   professors?: { id: number; first_name: string; last_name: string } | null
+  section_meetings?: SectionMeeting[]
 }
 
 export type GradeDistributionRow = {
@@ -227,6 +251,19 @@ export type ProfessorReview = {
   author: { id: string; firstName: string; lastName: string } | null
 }
 
+export type ScheduleCourseMeeting = {
+  id: number
+  days: number[]
+  startTime: string | null
+  endTime: string | null
+  startMinutes: number | null
+  endMinutes: number | null
+  durationMinutes: number | null
+  building: string | null
+  room: string | null
+  meetingType: string | null
+}
+
 export type ScheduleCourse = {
   courseId: number | null
   code: string | null
@@ -244,6 +281,9 @@ export type ScheduleCourse = {
     durationMinutes: number | null
     seatsTotal: number | null
     seatsRemaining: number | null
+    linkIdentifier: string | null
+    scheduleType: string | null
+    meetings: ScheduleCourseMeeting[]
   }
   professor: { id: number; firstName: string; lastName: string } | null
 }
@@ -253,6 +293,8 @@ export type ScheduleSummary = {
   name: string | null
   notes: string | null
   termId: number | null
+  saved: boolean
+  isFavorite: boolean
   createdAt: string
   updatedAt: string
   courseCount: number
@@ -311,14 +353,26 @@ export type Post = {
   author: PostAuthor | null
   likeCount: number
   commentCount: number
+  isLikedByCurrentUser: boolean
+  isSavedByCurrentUser: boolean
 }
 
 export type PostComment = {
   id: number
   postId: number
   content: string
+  parentCommentId: number | null
   createdAt: string
   author: PostAuthor | null
+}
+
+export type MyComment = {
+  id: number
+  content: string
+  parentCommentId: number | null
+  isReply: boolean
+  createdAt: string
+  post: { id: number; type: string; content: string } | null
 }
 
 export type FriendProfile = {
@@ -340,6 +394,10 @@ export type FriendRequest = {
 export type FriendRequests = {
   incoming: FriendRequest[]
   outgoing: FriendRequest[]
+}
+
+export type StudentSearchResult = FriendProfile & {
+  relationship: 'self' | 'friends' | 'request_sent' | 'request_received' | 'none'
 }
 
 export type FreeTimeDay = {
@@ -368,6 +426,7 @@ export type UserProfile = {
   email: string
   major: string | null
   level: string | null
+  profileVisibility?: 'public' | 'friends' | 'private'
 }
 
 export type UserStats = {
@@ -409,8 +468,71 @@ export type NotificationPreferences = {
   registrationReminders: boolean
 }
 
+export type StudyGroupMeeting = {
+  days: number[]
+  startTime: string | null
+  endTime: string | null
+}
+
+export type StudyGroupRole = 'owner' | 'member' | 'pending' | 'none'
+
+export type StudyGroupSummary = {
+  id: number
+  name: string
+  course: { id: number; code: string; title: string } | null
+  bio: string | null
+  owner: { id: string; firstName: string | null; lastName: string | null } | null
+  memberCount: number
+  createdAt: string
+  meeting: StudyGroupMeeting | null
+  role: StudyGroupRole
+  joined: boolean
+  requested: boolean
+  /** Number of pending join requests. Only present for the group owner. */
+  pendingRequestCount?: number
+}
+
+export type StudyGroupDetail = StudyGroupSummary & {
+  members: {
+    id: string
+    firstName: string | null
+    lastName: string | null
+    joinedAt: string | null
+  }[]
+}
+
+export type StudyGroupJoinRequest = {
+  userId: string
+  user: { id: string; firstName: string | null; lastName: string | null } | null
+  createdAt: string
+}
+
+export type StudyGroupMessage = {
+  id: number
+  studyGroupId: number
+  sender: { id: string; firstName: string | null; lastName: string | null } | null
+  content: string
+  createdAt: string
+}
+
+export type ChatHistoryPage = {
+  data: StudyGroupMessage[]
+  hasMore: boolean
+  nextCursor: string | null
+}
+
+export type CreateStudyGroupInput = {
+  name: string
+  courseId: number
+  bio?: string
+  meetingDays?: number[]
+  startTime?: string | null
+  endTime?: string | null
+}
+
 export type ListCoursesQuery = {
   search?: string
+  termId?: number
   attribute?: string
   sort?: 'name' | 'rating' | 'difficulty' | 'workload' | 'popularity'
   order?: 'asc' | 'desc'
@@ -426,6 +548,33 @@ export type ListProfessorsQuery = {
   limit?: number
 }
 
+/**
+ * Payload carried by the assistant chat response when the router picks the
+ * optimizer route. `selected_sections` has the same shape as the standalone
+ * `/schedules/optimize` result so it can be rendered identically.
+ */
+export type AssistantOptimizerPayload = {
+  status: string
+  request_id?: string | null
+  total_credits: number
+  campus_days: number
+  selected_section_ids: string[]
+  selected_sections: SelectedSection[]
+  input: {
+    term_id: number
+    required_course_ids: number[]
+    acceptable_elective_course_ids: number[]
+    min_credits: number
+    max_credits: number
+  }
+}
+
+export type AssistantChatResult = {
+  response: string
+  route: 'assistant' | 'optimizer' | string
+  optimizer?: AssistantOptimizerPayload
+}
+
 export const api = {
   auth: {
     login: (email: string, password: string) =>
@@ -434,11 +583,11 @@ export const api = {
         auth: false,
         body: { email, password },
       }),
-    register: (email: string, password: string, confirmPassword: string) =>
+    register: (email: string, password: string, confirmPassword: string, profile?: { firstName?: string; lastName?: string; major?: string; level?: string }) =>
       request<AuthResponse>('/auth/register', {
         method: 'POST',
         auth: false,
-        body: { email, password, confirmPassword },
+        body: { email, password, confirmPassword, ...profile },
       }),
     me: () => request<{ user: AuthUser }>('/auth/me'),
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
@@ -455,6 +604,7 @@ export const api = {
     list: (query: ListCoursesQuery = {}) => {
       const params = new URLSearchParams()
       if (query.search) params.set('search', query.search)
+      if (query.termId != null) params.set('term_id', String(query.termId))
       if (query.attribute) params.set('attribute', query.attribute)
       params.set('sort', query.sort ?? 'name')
       params.set('order', query.order ?? 'asc')
@@ -464,8 +614,13 @@ export const api = {
     },
     get: (code: string) =>
       request<{ data: CourseSummary }>(`/courses/${encodeURIComponent(code)}`),
-    sections: (code: string) =>
-      request<{ data: CourseSection[] }>(`/courses/${encodeURIComponent(code)}/sections`),
+    sections: (code: string, termId?: number) => {
+      const params = new URLSearchParams()
+      if (termId != null) params.set('term_id', String(termId))
+      return request<{ data: CourseSection[] }>(
+        `/courses/${encodeURIComponent(code)}/sections?${params.toString()}`,
+      )
+    },
     gradeDistribution: (code: string) =>
       request<{ data: GradeDistributionRow[] }>(
         `/courses/${encodeURIComponent(code)}/grade-distribution`,
@@ -492,6 +647,8 @@ export const api = {
       request<void>(`/courses/${encodeURIComponent(code)}/save`, { method: 'POST' }),
     unsave: (code: string) =>
       request<void>(`/courses/${encodeURIComponent(code)}/save`, { method: 'DELETE' }),
+    saved: (page = 1, limit = 50) =>
+      request<Page<CourseSummary>>(`/courses/saved?page=${page}&limit=${limit}`),
   },
 
   professors: {
@@ -525,6 +682,17 @@ export const api = {
   },
 
   schedules: {
+    optimizerOptions: () => request<{ terms: TermOption[]; attributes: AttributeOption[] }>('/schedule/optimizer-options'),
+    optimizerTerms: async () => {
+      const body = await request<{ data: TermOption[] }>('/schedule/terms')
+      if (!body || !Array.isArray(body.data)) throw new ApiError(502, 'MALFORMED_RESPONSE', 'Term list returned a malformed response.')
+      return body.data
+    },
+    optimize: async (input: OptimizeScheduleRequest) => {
+      const body = await request<{ data?: OptimizeScheduleResult }>('/schedule/optimize', { method: 'POST', body: input })
+      if (!body?.data || typeof body.data.status !== 'string') throw new ApiError(502, 'MALFORMED_RESPONSE', 'Optimizer returned a malformed response.')
+      return body.data
+    },
     list: (page = 1, limit = 50) =>
       request<Page<ScheduleSummary>>(`/schedules?page=${page}&limit=${limit}`),
     get: (id: number) => request<{ data: ScheduleDetail }>(`/schedules/${id}`),
@@ -552,6 +720,45 @@ export const api = {
       }),
     conflicts: (id: number) =>
       request<{ data: ScheduleConflicts }>(`/schedules/${id}/conflicts`),
+    getDraft: (termId?: number | null) => {
+      const params = new URLSearchParams()
+      if (termId != null) params.set('term_id', String(termId))
+      return request<{ data: ScheduleDetail | null }>(`/schedules/draft?${params.toString()}`)
+    },
+    saveDraft: (
+      termId: number | null,
+      input: { name?: string; notes?: string | null; sectionIds?: number[] },
+    ) => {
+      const params = new URLSearchParams()
+      if (termId != null) params.set('term_id', String(termId))
+      return request<{ data: ScheduleDetail }>(`/schedules/draft?${params.toString()}`, {
+        method: 'PUT',
+        body: input,
+      })
+    },
+    save: (id: number) => request<{ data: ScheduleDetail }>(`/schedules/${id}/save`, { method: 'POST' }),
+    favorite: (id: number) =>
+      request<{ data: ScheduleDetail }>(`/schedules/${id}/favorite`, { method: 'POST' }),
+    loadAsDraft: (id: number) =>
+      request<{ data: ScheduleDetail }>(`/schedules/${id}/load`, { method: 'POST' }),
+    pdf: async (id: number): Promise<Blob> => {
+      const token = getAccessToken()
+      const response = await fetch(`${API_BASE}/schedules/${id}/pdf`, {
+        method: 'GET',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      })
+      if (!response.ok) {
+        let message = `Request failed with status ${response.status}.`
+        try {
+          const payload = (await response.json()) as { error?: { message?: string } }
+          message = payload.error?.message ?? message
+        } catch {
+          // response body was not JSON
+        }
+        throw new ApiError(response.status, 'UNKNOWN_ERROR', message)
+      }
+      return response.blob()
+    },
   },
 
   feed: {
@@ -566,13 +773,24 @@ export const api = {
     unsave: (id: number) => request<void>(`/feed/${id}/save`, { method: 'DELETE' }),
     comments: (id: number, page = 1, limit = 50) =>
       request<Page<PostComment>>(`/feed/${id}/comments?page=${page}&limit=${limit}`),
-    createComment: (id: number, content: string) =>
-      request<{ data: PostComment }>(`/feed/${id}/comments`, { method: 'POST', body: { content } }),
+    createComment: (id: number, content: string, parentCommentId?: number) =>
+      request<{ data: PostComment }>(`/feed/${id}/comments`, {
+        method: 'POST',
+        body: parentCommentId != null ? { content, parentCommentId } : { content },
+      }),
+    deleteComment: (commentId: number) =>
+      request<void>(`/feed/comments/${commentId}`, { method: 'DELETE' }),
+    myComments: (page = 1, limit = 50) =>
+      request<Page<MyComment>>(`/feed/my/comments?page=${page}&limit=${limit}`),
+    myPosts: (page = 1, limit = 50) =>
+      request<Page<Post>>(`/feed/my/posts?page=${page}&limit=${limit}`),
   },
 
   friends: {
     list: () => request<{ data: FriendProfile[] }>('/friends'),
     suggested: (limit = 10) => request<{ data: FriendProfile[] }>(`/friends/suggested?limit=${limit}`),
+    search: (query: string, limit = 10) =>
+      request<{ data: StudentSearchResult[] }>(`/friends/search?query=${encodeURIComponent(query)}&limit=${limit}`),
     requests: () => request<{ data: FriendRequests }>('/friends/requests'),
     sendRequest: (userId: string) =>
       request<{ data: FriendRequest }>(`/friends/requests/${userId}`, { method: 'POST' }),
@@ -582,6 +800,8 @@ export const api = {
       request<void>(`/friends/requests/${userId}/reject`, { method: 'POST' }),
     remove: (userId: string) => request<void>(`/friends/${userId}`, { method: 'DELETE' }),
     commonFreeTime: () => request<{ data: CommonFreeTime }>('/friends/common-free-time'),
+    schedule: (userId: string) =>
+      request<{ data: ScheduleDetail | null }>(`/friends/${userId}/schedule`),
   },
 
   notifications: {
@@ -591,6 +811,55 @@ export const api = {
     markRead: (id: number) => request<void>(`/notifications/${id}/read`, { method: 'PUT' }),
     markAllRead: () => request<void>('/notifications/read-all', { method: 'PUT' }),
     preferences: () => request<{ data: NotificationPreferences }>('/notifications/preferences'),
+  },
+
+  studyGroups: {
+    list: (page = 1, limit = 100) =>
+      request<Page<StudyGroupSummary>>(`/study-groups?page=${page}&limit=${limit}`),
+    mine: (page = 1, limit = 100) =>
+      request<Page<StudyGroupSummary>>(`/study-groups/mine?page=${page}&limit=${limit}`),
+    get: (id: number) => request<StudyGroupDetail>(`/study-groups/${id}`),
+    create: (input: CreateStudyGroupInput) =>
+      request<StudyGroupDetail>('/study-groups', { method: 'POST', body: input }),
+    requestToJoin: (id: number) =>
+      request<{ joined: boolean; requested: boolean }>(`/study-groups/${id}/requests`, {
+        method: 'POST',
+      }),
+    cancelJoinRequest: (id: number) =>
+      request<void>(`/study-groups/${id}/requests`, { method: 'DELETE' }),
+    joinRequests: (id: number) =>
+      request<{ data: StudyGroupJoinRequest[] }>(`/study-groups/${id}/requests`),
+    acceptRequest: (id: number, userId: string) =>
+      request<void>(`/study-groups/${id}/requests/${userId}/accept`, { method: 'POST' }),
+    rejectRequest: (id: number, userId: string) =>
+      request<void>(`/study-groups/${id}/requests/${userId}/reject`, { method: 'POST' }),
+    messages: (id: number, query?: { before?: string; limit?: number }) => {
+      const q = new URLSearchParams()
+      if (query?.before) q.set('before', query.before)
+      if (query?.limit != null) q.set('limit', String(query.limit))
+      return request<ChatHistoryPage>(`/study-groups/${id}/messages${q.toString() ? `?${q.toString()}` : ''}`)
+    },
+    sendMessage: (id: number, content: string) =>
+      request<{ data: StudyGroupMessage }>(`/study-groups/${id}/messages`, {
+        method: 'POST',
+        body: { content },
+      }),
+    update: (id: number, input: CreateStudyGroupInput) =>
+      request<StudyGroupDetail>(`/study-groups/${id}`, { method: 'PATCH', body: input }),
+    removeMember: (id: number, userId: string) =>
+      request<void>(`/study-groups/${id}/members/${userId}`, { method: 'DELETE' }),
+  },
+
+  assistant: {
+    chat: (message: string, sessionId?: string, termId?: number | null) =>
+      request<{ data: AssistantChatResult }>('/assistant/chat', {
+        method: 'POST',
+        body: {
+          message,
+          ...(sessionId ? { sessionId } : {}),
+          ...(termId != null ? { termId } : {}),
+        },
+      }),
   },
 
   users: {
