@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildOptimizeRequest, buildOptimizerPrompt, onlineOptimizerSections, optimizerMeetingOccurrences, validateOptimizerResult, type OptimizerFormState, type SelectedSection } from './scheduleOptimizer.ts'
+import { buildOptimizeRequest, buildOptimizerPrompt, optimizerMeetingOccurrences, validateOptimizerResult, type OptimizerFormState, type SelectedSection } from './scheduleOptimizer.ts'
 
 const course = (id: number, credits = 3) => ({ id, code: `C ${id}`, title: 'Course', credits, professors: [{ id: 45, first_name: 'A', last_name: 'B' }] })
 const form = (overrides: Partial<OptimizerFormState> = {}): OptimizerFormState => ({ termId: 3, requiredCourses: [course(101)], acceptableElectives: [course(207)], selectedAttributeIds: [12], creditMode: 'exact', exactCredits: 15, minCredits: 12, maxCredits: 18, weights: { days: 35, gaps: 40, professor: 25 }, professorPreferences: { '45': 5 }, excludedSectionIds: [], ...overrides })
@@ -32,9 +32,9 @@ test('validation rejects overlapping courses and invalid weights', () => {
 })
 
 const section = (id: number, component_type: string, meetings: SelectedSection['meetings']): SelectedSection => ({ id, course_id: 101, component_type, meetings })
-test('every returned meeting becomes one occurrence and online sections stay out of the calendar', () => {
+test('every returned timed meeting becomes one calendar occurrence', () => {
   const sections = [section(1, 'lecture', [{ day: 'M', start: '09:00', end: '10:00' }, { day: 'W', start: '09:00', end: '10:00' }]), section(2, 'lab', [] as SelectedSection['meetings'])]
-  assert.equal(optimizerMeetingOccurrences(sections).length, 2); assert.deepEqual(optimizerMeetingOccurrences(sections).map((item) => item.dayIndex), [0, 2]); assert.deepEqual(onlineOptimizerSections(sections).map((item) => item.id), [2])
+  assert.equal(optimizerMeetingOccurrences(sections).length, 2); assert.deepEqual(optimizerMeetingOccurrences(sections).map((item) => item.dayIndex), [0, 2])
 })
 
 test('lecture plus recitation/lab is accepted but recitation plus lab is reported', () => {

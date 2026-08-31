@@ -166,7 +166,3 @@ export function optimizerMeetingOccurrences(sections: SelectedSection[]) {
     dayIndex: OPTIMIZER_DAY_INDEX[meeting.day],
   })))
 }
-
-export function onlineOptimizerSections(sections: SelectedSection[]) {
-  return sections.filter((section) => section.meetings.length === 0)
-}

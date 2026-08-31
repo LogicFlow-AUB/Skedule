@@ -8,7 +8,7 @@ import {
 import type { Page } from '../App'
 import { api, type CourseSummary, type CourseSection, type CourseReview, type GradeDistributionRow, type ScheduleDetail, type SectionMeeting } from '../lib/api'
 import { displayName, timeAgo } from '../lib/format'
-import { buildOptimizeRequest, onlineOptimizerSections, optimizerMeetingOccurrences, termLabel, validateOptimizerResult, type AttributeOption, type CourseOption, type OptimizeScheduleResult, type OptimizerFormState, type SelectedSection, type TermOption } from '../lib/scheduleOptimizer'
+import { buildOptimizeRequest, optimizerMeetingOccurrences, termLabel, validateOptimizerResult, type AttributeOption, type CourseOption, type OptimizeScheduleResult, type OptimizerFormState, type SelectedSection, type TermOption } from '../lib/scheduleOptimizer'
 import { scheduleStats, removeCalendarSection, uniqueSectionIds, linkGroupKey, linkColumn } from '../lib/schedule'
 
 const HOUR_HEIGHT = 60 // px per hour
@@ -1460,6 +1460,7 @@ export default function AIScheduler({ activeMode, setPage }: { activeMode: Page;
   const [requestError, setRequestError] = useState<string | null>(null)
   const [optimizerResult, setOptimizerResult] = useState<OptimizeScheduleResult | null>(null)
   const optimizerRequest = useRef(0)
+  const draftLoadRequest = useRef(0)
 
   const selectedTermId = optimizerForm.termId ?? draft?.termId ?? null
 
@@ -1501,9 +1502,10 @@ export default function AIScheduler({ activeMode, setPage }: { activeMode: Page;
   // the same working schedule, even after reopening the page.
   useEffect(() => {
     let cancelled = false
+    const requestNumber = ++draftLoadRequest.current
     api.schedules.getDraft(selectedTermId)
       .then((res) => {
-        if (cancelled) return
+        if (cancelled || requestNumber !== draftLoadRequest.current) return
         const detail = res.data
         setDraft(detail)
         const courses = detail ? scheduleCoursesToCourses(detail.courses) : []
@@ -1512,7 +1514,7 @@ export default function AIScheduler({ activeMode, setPage }: { activeMode: Page;
           setOptimizerResult(null)
         }
       })
-      .catch(() => { if (!cancelled) setDraft(null) })
+      .catch(() => { if (!cancelled && requestNumber === draftLoadRequest.current) setDraft(null) })
     return () => { cancelled = true }
   }, [selectedTermId])
 
@@ -1557,6 +1559,9 @@ export default function AIScheduler({ activeMode, setPage }: { activeMode: Page;
     let request
     try { request = buildOptimizeRequest(optimizerForm) } catch (error) { setFormError(error instanceof Error ? error.message : 'Check your preferences.'); return }
     const requestNumber = ++optimizerRequest.current
+    // Prevent a draft fetch started when the page opened from replacing this
+    // newer generated schedule if that older request resolves late.
+    draftLoadRequest.current += 1
     setGenerating(true)
     try {
       const result = await api.schedules.optimize(request)
@@ -1566,6 +1571,9 @@ export default function AIScheduler({ activeMode, setPage }: { activeMode: Page;
       if (result.status === 'optimal') {
         const sectionIds = result.selected_sections.map((section) => Number(section.id))
         const draftDetail = await persistDraft(sectionIds)
+        if (requestNumber !== optimizerRequest.current) return
+        // This is the same expanded schedule model loaded after a refresh. Use
+        // it immediately because the optimizer payload may only contain IDs.
         setManualCourses(draftDetail ? scheduleCoursesToCourses(draftDetail.courses) : optimizerSectionsToCourses(result.selected_sections))
       } else {
         setRequestError(result.message ?? `Optimizer finished with status: ${result.status}`)
@@ -1586,16 +1594,14 @@ export default function AIScheduler({ activeMode, setPage }: { activeMode: Page;
       setToast('Generate an optimized schedule before moving it to the manual builder.')
       return
     }
-    setManualCourses(optimizerSectionsToCourses(optimizerResult.selected_sections))
     setMode('manual')
     setPage('manual-builder')
     setToast('Optimized schedule moved to the manual builder.')
   }
 
-  const activeCourses = mode === 'manual'
-    ? manualCourses
-    : (optimizerResult?.status === 'optimal' ? optimizerSectionsToCourses(optimizerResult.selected_sections) : manualCourses)
-  const onlineSections = optimizerResult?.status === 'optimal' ? onlineOptimizerSections(optimizerResult.selected_sections) : []
+  // Both builders use the normalized draft state. Do not replace it with the
+  // less-expanded optimizer response after generation.
+  const activeCourses = manualCourses
   const { credits: currentCredits } = scheduleStats(activeCourses)
   const currentDraftId = draft?.id ?? null
 
@@ -1695,7 +1701,6 @@ export default function AIScheduler({ activeMode, setPage }: { activeMode: Page;
           <div className="flex-1 overflow-hidden flex flex-col">
             {requestError && <div className="m-3 rounded-xl p-3" style={{ background: '#FEF2F2', color: '#B91C1C', fontSize: 12 }}>{requestError}</div>}
             {optimizerResult?.status === 'infeasible' && <div className="m-3 rounded-xl p-4" style={{ background: '#FFF7ED', color: '#9A3412' }}><b>No feasible schedule was found.</b>{optimizerResult.message && <div className="mt-1 text-sm">{optimizerResult.message}</div>}</div>}
-            {onlineSections.length > 0 && <div className="mx-3 mt-2 rounded-xl p-3" style={{ background: '#F8FAFC', border: '1px solid #E2E8F0' }}><b style={{ fontSize: 11 }}>Online / Asynchronous</b><div className="flex flex-wrap gap-2 mt-1">{onlineSections.map((section) => <span key={String(section.id)} className="rounded-lg px-2 py-1" style={{ background: '#FFFFFF', fontSize: 10 }}>{section.course_code ?? section.course_id}{section.component_type ? ` — ${section.component_type}` : ''}</span>)}</div></div>}
             <WeeklyCalendar courses={activeCourses} onCourseClick={setSelectedCourse} onRemove={handleRemoveCourse} />
           </div>
           <AIAssistantPanel termId={selectedTermId} />
