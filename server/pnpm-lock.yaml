@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@google/genai':
-        specifier: ^1.1.0
+        specifier: ^1.52.0
         version: 1.52.0(supports-color@7.2.0)
       '@supabase/supabase-js':
         specifier: ^2.57.4

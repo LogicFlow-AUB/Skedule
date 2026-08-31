@@ -19,7 +19,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
       {/* Welcome banner */}
       <div
         className="px-8 py-8 relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 60%, #8B5CF6 100%)' }}
+        style={{ background: 'var(--color-primary-grad, linear-gradient(135deg, #172554 0%, #1E3A8A 100%))' }}
       >
         {/* Decorative circles */}
         <div className="absolute -top-8 -right-8 rounded-full opacity-10"
@@ -43,7 +43,7 @@ export default function Dashboard({ setPage }: DashboardProps) {
             <button
               onClick={() => setPage('ai-scheduler')}
               className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold transition-all"
-              style={{ background: '#FFFFFF', color: '#4338CA', fontSize: 14, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}
+              style={{ background: '#FFFFFF', color: 'var(--color-primary, #172554)', fontSize: 14, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' }}
               onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)' }}
               onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)' }}
             >
@@ -76,11 +76,11 @@ export default function Dashboard({ setPage }: DashboardProps) {
               <button
                 onClick={() => setPage('ai-scheduler')}
                 className="flex items-center gap-4 p-4 rounded-xl text-left transition-all group"
-                style={{ background: '#EEF2FF', border: '1px solid #C7D2FE' }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#E0E7FF'; e.currentTarget.style.transform = 'translateX(2px)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#EEF2FF'; e.currentTarget.style.transform = 'translateX(0)' }}
+                style={{ background: 'var(--color-primary-light, #EAF0FF)', border: '1px solid var(--color-primary-border, #D7E1FF)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#E6EEFF'; e.currentTarget.style.transform = 'translateX(2px)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-primary-light, #EAF0FF)'; e.currentTarget.style.transform = 'translateX(0)' }}
               >
-                <div className="rounded-xl p-3" style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)', boxShadow: '0 2px 8px rgba(67,56,202,0.3)' }}>
+                <div className="rounded-xl p-3" style={{ background: 'var(--color-primary-grad, linear-gradient(135deg, #172554 0%, #1E3A8A 100%))', boxShadow: '0 2px 8px rgba(23,37,84,0.3)' }}>
                   <Sparkles size={20} color="white" />
                 </div>
                 <div className="flex-1">
@@ -134,9 +134,9 @@ export default function Dashboard({ setPage }: DashboardProps) {
             <div className="grid grid-cols-2 gap-3">
               {[
                 { label: 'Course Reviews', page: 'course-reviews' as Page, icon: <Star size={18} />, color: '#F59E0B', bg: '#FFFBEB' },
-                { label: 'Professor Reviews', page: 'professor-reviews' as Page, icon: <Award size={18} />, color: '#4338CA', bg: '#EEF2FF' },
-                { label: 'Community', page: 'community' as Page, icon: <Users size={18} />, color: '#10B981', bg: '#ECFDF5' },
-                { label: 'My Profile', page: 'profile' as Page, icon: <Zap size={18} />, color: '#8B5CF6', bg: '#F5F3FF' },
+                { label: 'Professor Reviews', page: 'professor-reviews' as Page, icon: <Award size={18} />, color: '#172554', bg: '#EAF0FF' },
+                { label: 'Community', page: 'community' as Page, icon: <Users size={18} />, color: '#0F766E', bg: '#CCFBF1' },
+                { label: 'My Profile', page: 'profile' as Page, icon: <Zap size={18} />, color: '#1E3A8A', bg: '#EFF6FF' },
               ].map((item) => (
                 <button
                   key={item.label}

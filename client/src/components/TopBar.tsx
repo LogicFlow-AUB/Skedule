@@ -135,7 +135,7 @@ export default function TopBar({ activePage }: { activePage: Page }) {
             {unreadCount > 0 && (
               <span
                 className="absolute top-1.5 right-1.5 rounded-full flex items-center justify-center"
-                style={{ width: 14, height: 14, background: '#EF4444', fontSize: 8, fontWeight: 700, color: 'white' }}
+                style={{ width: 14, height: 14, background: '#B91C1C', fontSize: 8, fontWeight: 700, color: 'white' }}
               >
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
@@ -169,7 +169,7 @@ export default function TopBar({ activePage }: { activePage: Page }) {
                       <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>{timeAgo(n.createdAt)}</div>
                     </div>
                     {!n.read && (
-                      <div className="shrink-0 rounded-full mt-1" style={{ width: 6, height: 6, background: '#4338CA' }} />
+                      <div className="shrink-0 rounded-full mt-1" style={{ width: 6, height: 6, background: '#8b1e2d' }} />
                     )}
                   </div>
                 ))
@@ -181,7 +181,7 @@ export default function TopBar({ activePage }: { activePage: Page }) {
         {/* Avatar */}
         <button
           className="rounded-full flex items-center justify-center ml-1"
-          style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', fontSize: 12, fontWeight: 700, color: 'white' }}
+          style={{ width: 32, height: 32, background: 'var(--color-primary-grad, linear-gradient(135deg, #7f1d2d 0%, #bf3d45 100%))', fontSize: 12, fontWeight: 700, color: 'white' }}
         >
           {initials}
         </button>

@@ -94,7 +94,7 @@ function AppGate() {
   if (initializing) {
     return (
       <div className="h-screen flex items-center justify-center" style={{ background: '#F8FAFC' }}>
-        <div className="rounded-xl p-3" style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }} />
+        <div className="rounded-xl p-3" style={{ background: 'var(--color-primary-grad, linear-gradient(135deg, #7f1d2d 0%, #8b1e2d 100%))' }} />
       </div>
     )
   }

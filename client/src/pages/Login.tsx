@@ -62,12 +62,12 @@ export default function Login() {
   return (
     <div className="h-screen flex items-center justify-center overflow-hidden"
       style={{ background: '#F8FAFC', fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif" }}>
-      <div className="absolute" style={{ width: 420, height: 420, top: -120, right: -80, background: 'radial-gradient(circle, rgba(99,102,241,0.18) 0%, rgba(99,102,241,0) 70%)' }} />
-      <div className="absolute" style={{ width: 420, height: 420, bottom: -120, left: -80, background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, rgba(139,92,246,0) 70%)' }} />
+      <div className="absolute" style={{ width: 420, height: 420, top: -120, right: -80, background: 'radial-gradient(circle, rgba(23,37,84,0.18) 0%, rgba(23,37,84,0) 70%)' }} />
+      <div className="absolute" style={{ width: 420, height: 420, bottom: -120, left: -80, background: 'radial-gradient(circle, rgba(15,118,110,0.15) 0%, rgba(15,118,110,0) 70%)' }} />
 
       <div className="relative z-10 w-full max-w-md px-6">
         <div className="flex items-center justify-center gap-2 mb-6">
-          <div className="rounded-xl p-2.5" style={{ background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)', boxShadow: '0 4px 16px rgba(67,56,202,0.35)' }}>
+          <div className="rounded-xl p-2.5" style={{ background: 'var(--color-primary-grad, linear-gradient(135deg, #172554 0%, #1E3A8A 100%))', boxShadow: '0 4px 16px rgba(23,37,84,0.35)' }}>
             <CalendarDays size={22} color="white" />
           </div>
           <span style={{ fontSize: 20, fontWeight: 800, color: '#0F172A' }}>Skedule</span>
@@ -92,7 +92,7 @@ export default function Login() {
                 className="flex-1 py-2 rounded-lg font-bold transition-all"
                 style={{
                   background: mode === m ? '#FFFFFF' : 'transparent',
-                  color: mode === m ? '#4338CA' : '#64748B',
+                  color: mode === m ? 'var(--color-primary, #172554)' : '#64748B',
                   fontSize: 13,
                   boxShadow: mode === m ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
                 }}
@@ -239,15 +239,15 @@ export default function Login() {
         >
           <div className="w-full rounded-2xl p-8 text-center" style={{ maxWidth: 400, background: '#FFFFFF', boxShadow: '0 24px 64px rgba(15,23,42,0.25)' }}>
             <div className="flex justify-center mb-4">
-              <div className="rounded-full p-3.5" style={{ background: '#EEF2FF' }}>
-                <MailCheck size={28} color="#4338CA" />
+              <div className="rounded-full p-3.5" style={{ background: '#EAF0FF' }}>
+                <MailCheck size={28} color="#172554" />
               </div>
             </div>
             <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0F172A' }}>Check your email</h2>
             <p style={{ fontSize: 13, color: '#64748B', marginTop: 8, lineHeight: 1.5 }}>
               We've sent a confirmation link to your email address. Please confirm your email before signing in.
             </p>
-            <p style={{ fontSize: 12, fontWeight: 600, color: '#4338CA', marginTop: 12 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#172554', marginTop: 12 }}>
               A confirmation link was sent to {confirmEmailAddress}.
             </p>
             <button

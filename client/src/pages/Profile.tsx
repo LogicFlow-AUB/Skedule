@@ -274,7 +274,7 @@ export default function Profile() {
           {/* Avatar */}
           <div className="relative">
             <div className="rounded-3xl flex items-center justify-center"
-              style={{ width: 96, height: 96, background: 'linear-gradient(135deg, var(--color-primary, #4338CA) 0%, #8B5CF6 100%)', fontSize: 32, fontWeight: 800, color: 'white', border: '4px solid white', boxShadow: '0 4px 16px rgba(67,56,202,0.3)' }}>
+              style={{ width: 96, height: 96, background: 'var(--color-primary-grad, linear-gradient(135deg, #7f1d2d 0%, #bf3d45 100%))', fontSize: 32, fontWeight: 800, color: 'white', border: '4px solid white', boxShadow: '0 4px 16px rgba(139,30,45,0.3)' }}>
               {nameInitials}
             </div>
             <div className="absolute -bottom-1 -right-1 rounded-full p-1.5"
@@ -303,7 +303,7 @@ export default function Profile() {
           <button onClick={startEdit}
             className="flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-colors mb-4"
             style={{ fontSize: 13, background: '#F1F5F9', color: '#64748B', border: '1px solid #E2E8F0' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#EEF2FF'; e.currentTarget.style.color = '#4338CA' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#FCE8EA'; e.currentTarget.style.color = '#8b1e2d' }}
             onMouseLeave={(e) => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#64748B' }}>
             <Edit3 size={14} />
             Edit Profile
@@ -320,10 +320,10 @@ export default function Profile() {
           ].map((t) => (
             <button key={t.id} onClick={() => setActiveTab(t.id as typeof activeTab)}
               className="px-4 py-2.5 font-semibold transition-all relative"
-              style={{ fontSize: 13, color: activeTab === t.id ? 'var(--color-primary, #4338CA)' : '#64748B' }}>
+              style={{ fontSize: 13, color: activeTab === t.id ? 'var(--color-primary, #8b1e2d)' : '#64748B' }}>
               {t.label}
               {activeTab === t.id && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full" style={{ background: 'var(--color-primary, #4338CA)' }} />
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full" style={{ background: 'var(--color-primary, #8b1e2d)' }} />
               )}
             </button>
           ))}

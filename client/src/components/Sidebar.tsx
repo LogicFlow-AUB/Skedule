@@ -58,7 +58,7 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
       <div className="flex items-center gap-2.5 px-5 py-4" style={{ borderBottom: '1px solid #F1F5F9' }}>
         <div
           className="flex items-center justify-center rounded-xl"
-          style={{ width: 32, height: 32, background: 'linear-gradient(135deg, #4338CA 0%, #6366F1 100%)' }}
+          style={{ width: 32, height: 32, background: 'var(--color-primary-grad, linear-gradient(135deg, #172554 0%, #1E3A8A 100%))' }}
         >
           <Sparkles size={16} color="white" />
         </div>
@@ -90,8 +90,8 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
                     style={{
                       fontSize: 13,
                       fontWeight: active ? 600 : 500,
-                      color: active ? '#4338CA' : '#475569',
-                      background: active ? '#EEF2FF' : 'transparent',
+                      color: active ? 'var(--color-primary, #172554)' : '#475569',
+                      background: active ? 'var(--color-primary-light, #EAF0FF)' : 'transparent',
                     }}
                     onMouseEnter={(e) => {
                       if (!active) {
@@ -106,7 +106,7 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
                       }
                     }}
                   >
-                    <span style={{ color: active ? '#4338CA' : '#94A3B8' }}>{item.icon}</span>
+                    <span style={{ color: active ? 'var(--color-primary, #172554)' : '#94A3B8' }}>{item.icon}</span>
                     {item.label}
                     {item.badge && (
                       <span
@@ -134,7 +134,7 @@ export default function Sidebar({ activePage, setActivePage }: SidebarProps) {
         >
           <div
             className="rounded-full flex items-center justify-center shrink-0"
-            style={{ width: 34, height: 34, background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)' }}
+            style={{ width: 34, height: 34, background: 'var(--color-primary-grad, linear-gradient(135deg, #172554 0%, #1E3A8A 100%))' }}
           >
             <GraduationCap size={16} color="white" />
           </div>
