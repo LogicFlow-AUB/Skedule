@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BookmarkCheck, GitCompare, Eye, FileDown, X, Calendar, Clock, BookOpen, CheckCircle, Star, Pencil, Sparkles } from 'lucide-react'
+import { BookmarkCheck, GitCompare, Eye, FileDown, X, Calendar, Clock, BookOpen, CheckCircle, Pencil, Sparkles } from 'lucide-react'
 import type { Page } from '../App'
 import { api, type ScheduleSummary, type ScheduleDetail } from '../lib/api'
 import { displayName, formatDate } from '../lib/format'
@@ -476,28 +476,6 @@ export default function SavedSchedules({ setPage }: { setPage?: (p: Page) => voi
                       {s.notes && <p style={{ fontSize: 12, color: '#94A3B8', marginTop: 6, lineHeight: 1.5 }}>{s.notes}</p>}
                     </div>
                     <div className="flex items-center gap-1">
-                      {s.isFavorite ? (
-                        <button
-                          title="Preferred schedule"
-                          className="rounded-lg p-1.5"
-                          style={{ color: '#F59E0B', cursor: 'default' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = '#FFFBEB' }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-                        >
-                          <Star size={15} fill="#F59E0B" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => void handleSetFavorite(s.id)}
-                          title={summaries.length > 1 ? 'Make preferred' : 'Preferred schedule'}
-                          className="rounded-lg p-1.5 transition-colors"
-                          style={{ color: summaries.length > 1 ? '#CBD5E1' : '#F59E0B' }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = '#FFFBEB' }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-                        >
-                          <Star size={15} fill={summaries.length > 1 ? 'none' : '#F59E0B'} />
-                        </button>
-                      )}
                       <button
                         onClick={() => void handleDelete(s.id)}
                         className="rounded-lg p-1.5 transition-colors"

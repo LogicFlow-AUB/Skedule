@@ -9,37 +9,52 @@
 
 ## Overview
 
-**Skedule** is a course planning and scheduling platform for university students. It combines an AI-powered schedule generator, a manual drag-and-drop builder, and a rich course/professor review community — everything needed to plan a semester, compare options, and coordinate with friends.
+**Skedule** is a course planning and student social platform designed to help university students build their schedules, make informed course decisions, and coordinate with friends and classmates.
 
 ### Highlights
 
-- **AI-powered & manual scheduling** — Generate optimized schedules from your preferences, or build your own by hand on a weekly calendar.
-- **Informed decisions** — Browse detailed course and professor reviews with ratings, difficulty, workload, and grade distributions.
-- **Community-driven** — Share schedules, leave reviews, follow friends, and join study groups.
-- **Save & export** — Store schedules and export them as a clean PDF with a weekly calendar view.
+- **AI-powered scheduling** — Generate optimized schedules using the Optimized Builder and its AI Assistant.
+- **Manual scheduling** — Build and customize your schedule yourself using the weekly calendar.
+- **Social planning** — Compare your schedule with one or more friends through Common Free Time.
+- **Course & professor insights** — Browse and contribute to course and professor reviews.
+- **Student community** — Connect with other students through posts, comments, replies, friend requests, and study groups.
+- **Schedule management** — Save multiple schedules, compare them, and download them as PDFs.
 
 ---
 
 ## Features
 
 ### Scheduling
-- **AI Schedule Generator** — Configure time windows, free days, daily class limits, and break durations, then generate optimized schedules.
-- **Manual Builder** — Browse available courses, add them to a weekly calendar, and swap sections at any time.
-- **Schedule Comparison** — Compare two schedules side-by-side with shared courses highlighted.
-- **Weekly Calendar View** — A Mon–Fri, 7 AM – 9 PM timetable with color-coded course blocks.
-- **Save & Export** — Save schedules and export them as PDF.
+
+- **Optimized Builder** — Generate optimized schedules based on your scheduling preferences with the help of an AI Assistant.
+- **Manual Builder** — Search for courses, select sections, and build your schedule manually on a weekly calendar.
+- **Save Schedules** — Save multiple schedules and access them later.
+- **Schedule Comparison** — Compare your saved schedules side-by-side and see shared courses.
+- **Common Free Time** — Compare the schedules of a student and one or more friends to find common available time.
+- **PDF Export** — Download saved schedules as PDFs with a visual weekly calendar and course details.
 
 ### Reviews
-- **Course Reviews** — Ratings, difficulty, workload, GPA, and recommendation percentages, filterable by academic attribute and searchable by name/code/professor.
-- **Professor Reviews** — Rating breakdowns, grade distributions, and student feedback.
-- **Write Reviews** — Submit course and professor reviews with star ratings and tags.
-- **Comparisons** — Compare courses or professors side-by-side with winner indicators.
 
-### Community & Profile
-- **Feed** — Browse schedule shares, reviews, questions, and tips from the community.
-- **Social** — Like, comment, save, and share posts; view friends, study groups, events, and trending content.
-- **Profile** — GPA, credits, achievements, saved schedules, completed courses, and submitted reviews.
-- **Settings** — Notifications, privacy, account details, and theme color.
+- **Course Reviews** — Browse and submit reviews for courses.
+- **Professor Reviews** — Browse and submit reviews for professors.
+- **Ratings & Feedback** — View student ratings and feedback to help make informed course and professor choices.
+
+### Community & Social
+
+- **Community** — Browse posts from other students.
+- **Comments & Replies** — Comment on posts and reply to existing comments.
+- **Friend Requests** — Send, receive, accept, and manage friend requests to build your network.
+- **Study Groups** — Discover and create study groups around courses.
+- **Study Group Chat** — Communicate with members through persistent group chat rooms.
+- **Profile Visibility** — Control whether your name is shown on your posts and reviews to everyone, friends only, or nobody.
+
+### Profile & Account
+
+- **My Activity** — View and manage your own posts, comments, and replies.
+- **My Reviews** — View and manage the course and professor reviews you have submitted.
+- **Saved Schedules** — Manage your saved schedules and open them in the builders.
+- **Account & Privacy** — Manage account information and profile visibility.
+- **Danger Zone** — Delete your account.
 
 ---
 

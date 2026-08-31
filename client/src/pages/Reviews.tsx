@@ -1,26 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Star, ThumbsUp, Flag, Filter, BookOpen, Award, ChevronRight, X, GitCompare, CheckCircle, Loader2 } from 'lucide-react'
+import { Search, Star, ThumbsUp, Flag, BookOpen, Award, ChevronRight, X, GitCompare, CheckCircle, Loader2 } from 'lucide-react'
 import { api, type CourseSummary, type CourseReview, type ProfessorSummary, type ProfessorReview, type CourseSection } from '../lib/api'
 import { displayName, timeAgo } from '../lib/format'
-
-const FILTERS = ['Highest Rated', 'Lowest Workload', 'Most Popular', 'Easy A', 'Newest Reviews']
-const ATTRIBUTES = ['All', 'Writing', 'Humanities', 'Natural Science', 'Social Science', 'Labs', 'Engineering']
-
-const SORT_MAP: Record<string, { sort: 'name' | 'rating' | 'difficulty' | 'workload' | 'popularity'; order: 'asc' | 'desc' }> = {
-  'Highest Rated': { sort: 'rating', order: 'desc' },
-  'Lowest Workload': { sort: 'workload', order: 'asc' },
-  'Most Popular': { sort: 'popularity', order: 'desc' },
-  'Easy A': { sort: 'difficulty', order: 'asc' },
-  'Newest Reviews': { sort: 'name', order: 'asc' },
-}
-
-const PROFESSOR_SORT_MAP: Record<string, { sort: 'name' | 'rating' | 'difficulty' | 'popularity'; order: 'asc' | 'desc' }> = {
-  'Highest Rated': { sort: 'rating', order: 'desc' },
-  'Most Popular': { sort: 'popularity', order: 'desc' },
-  'Lowest Workload': { sort: 'name', order: 'asc' },
-  'Easy A': { sort: 'difficulty', order: 'asc' },
-  'Newest Reviews': { sort: 'name', order: 'asc' },
-}
 
 function StarRating({ value, size = 12 }: { value: number; size?: number }) {
   return (
@@ -583,8 +564,7 @@ function ProfessorDetailView({ professorId, onClose }: { professorId: number; on
 export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | 'professor-reviews' }) {
   const [tab, setTab] = useState<'courses' | 'professors'>(activeTab === 'professor-reviews' ? 'professors' : 'courses')
   const [search, setSearch] = useState('')
-  const [activeFilter, setActiveFilter] = useState('Highest Rated')
-  const [activeAttribute, setActiveAttribute] = useState('All')
+
   const [courses, setCourses] = useState<CourseSummary[]>([])
   const [professors, setProfessors] = useState<ProfessorSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -607,23 +587,20 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
     async function load() {
       try {
         if (tab === 'courses') {
-          const sort = SORT_MAP[activeFilter] ?? SORT_MAP['Highest Rated']
           const page = await api.courses.list({
             search: search || undefined,
-            attribute: activeAttribute === 'All' ? undefined : activeAttribute,
-            sort: sort.sort,
-            order: sort.order,
+            sort: 'rating',
+            order: 'desc',
             limit: 50,
           })
           if (!cancelled) {
             setCourses(page.data)
           }
         } else {
-          const sort = PROFESSOR_SORT_MAP[activeFilter] ?? PROFESSOR_SORT_MAP['Highest Rated']
           const page = await api.professors.list({
             search: search || undefined,
-            sort: sort.sort,
-            order: sort.order,
+            sort: 'rating',
+            order: 'desc',
             limit: 50,
           })
           if (!cancelled) {
@@ -646,7 +623,7 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
     return () => {
       cancelled = true
     }
-  }, [tab, search, activeFilter, activeAttribute])
+  }, [tab, search])
 
   if (selectedProfId) {
     return (
@@ -684,32 +661,6 @@ export default function Reviews({ activeTab }: { activeTab: 'course-reviews' | '
               className="flex-1 outline-none bg-transparent"
               style={{ fontSize: 13, color: '#374151' }} />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl"
-            style={{ fontSize: 13, fontWeight: 600, background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#64748B' }}>
-            <Filter size={14} />Filters
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 mt-3 overflow-x-auto pb-0.5">
-          {FILTERS.map((f) => (
-            <button key={f} onClick={() => setActiveFilter(f)}
-              className="shrink-0 rounded-full px-3 py-1.5 transition-all"
-              style={{ fontSize: 12, fontWeight: 600, background: activeFilter === f ? 'var(--color-primary, #4338CA)' : '#F1F5F9', color: activeFilter === f ? 'white' : '#64748B', border: activeFilter === f ? '1px solid var(--color-primary, #4338CA)' : '1px solid #E2E8F0' }}>
-              {f}
-            </button>
-          ))}
-          {tab === 'courses' && (
-            <>
-              <div className="w-px h-4 shrink-0" style={{ background: '#E2E8F0' }} />
-              {ATTRIBUTES.map((a) => (
-                <button key={a} onClick={() => setActiveAttribute(a)}
-                  className="shrink-0 rounded-full px-3 py-1.5 transition-all"
-                  style={{ fontSize: 12, fontWeight: 600, background: activeAttribute === a ? 'var(--color-primary-light, #EEF2FF)' : 'transparent', color: activeAttribute === a ? 'var(--color-primary, #4338CA)' : '#94A3B8', border: activeAttribute === a ? '1px solid var(--color-primary-border, #C7D2FE)' : '1px solid transparent' }}>
-                  {a}
-                </button>
-              ))}
-            </>
-          )}
         </div>
       </div>
 
